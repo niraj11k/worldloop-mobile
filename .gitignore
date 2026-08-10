@@ -1,0 +1,47 @@
+# dependencies
+node_modules/
+
+# React Native
+.expo/
+ios/build/
+ios/Pods/
+android/app/build/
+android/build/
+android/.gradle/
+
+# Xcode
+*.xcworkspace
+!default.xcworkspace
+xcuserdata/
+*.xcuserstate
+
+# Android
+*.hprof
+local.properties
+
+# Metro
+.metro-health-check*
+
+# Env
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+
+# OS
+.DS_Store
+
+# Editors
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Project docs
+docs/
