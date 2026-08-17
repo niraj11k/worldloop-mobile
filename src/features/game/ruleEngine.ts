@@ -1,4 +1,4 @@
-import type { InvalidReason } from '@types/game';
+import type { InvalidReason } from '@app-types/game';
 
 /**
  * Local (client-side) rule engine.

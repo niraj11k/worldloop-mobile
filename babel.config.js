@@ -15,7 +15,7 @@ module.exports = {
           '@services': './src/services',
           '@store': './src/store',
           '@hooks': './src/hooks',
-          '@types': './src/types',
+          '@app-types': './src/types',
           '@constants': './src/constants',
           '@theme': './src/theme',
           '@utils': './src/utils',

@@ -4,7 +4,7 @@
  * wording without updating that doc, since it's been reviewed for tone
  * ("avoid making casual players feel like they are taking an examination").
  */
-import type { InvalidReason } from '@types/game';
+import type { InvalidReason } from '@app-types/game';
 
 export const INVALID_WORD_MESSAGES: Record<InvalidReason, string> = {
   wrong_letter: 'Your word must begin with {letter}.',
