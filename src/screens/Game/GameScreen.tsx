@@ -3,7 +3,7 @@ import { View, Text, TextInput, Pressable } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
 import { normalizeWord, validateMove, getRequiredLetter } from '@features/game/ruleEngine';
-import type { Move, TurnPhase } from '@types/game';
+import type { Move, TurnPhase } from '@app-types/game';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
 
