@@ -7,7 +7,13 @@ type Props = NativeStackScreenProps<RootStackParamList, 'AccountCreation'>;
 
 /**
  * Account creation screen (modal presentation).
- * Spec: trigger.md wireframe + Architecture doc section 8.4.
+ * Spec: Guest Account Trigger Policy doc wireframe + Architecture doc section 8.4.
+ *
+ * Dormant for v1 (Delivery Plan D-04, closed): unreachable in practice, since
+ * SettingsScreen hides the entry point behind ACCOUNTS_ENABLED_V1 and the
+ * soft-prompt policy that would be the other entry point is itself not
+ * wired into any live screen yet. Kept implemented, not deleted — this is
+ * the 1.1 accounts release's screen.
  *
  * Auth providers proposed: Apple, Google, Email magic link.
  * [Unverified] Apple Sign-In requirement against current App Store policy
