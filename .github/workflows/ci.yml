@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+  schedule:
+    # Advisories appear against dependencies that have not changed, and the
+    # audit-allowlist.json exceptions expire on a date rather than on a commit.
+    # A weekly run surfaces both without waiting for someone to push.
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.11.0'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      # Fails on any advisory that is not a reviewed, unexpired exception in
+      # audit-allowlist.json, and on exceptions that have gone stale. See the
+      # "Dependency audit state" section of README.md.
+      - name: Dependency audit gate
+        run: npm run audit:ci

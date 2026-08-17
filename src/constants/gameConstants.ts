@@ -18,3 +18,10 @@ export const INVALID_WORD_MESSAGES: Record<InvalidReason, string> = {
 
 export const MIN_WORD_LENGTH = 3;
 export const HINT_LEVELS = ['required_letter', 'word_count', 'example_word', 'definition_clue'] as const;
+
+/**
+ * Delivery Plan D-04 (closed): v1 ships guest-only. Account creation, the
+ * soft-prompt policy, and every hard-gated feature stay implemented and
+ * tested but dormant behind this flag until the 1.1 accounts release.
+ */
+export const ACCOUNTS_ENABLED_V1 = false;

@@ -4,10 +4,11 @@
  * Wraps device-local persistence for guest profile, settings, and the
  * current in-progress game (Data Model doc sections 2 and 4).
  *
- * Library choice (AsyncStorage vs. MMKV) is listed as open in the
- * Architecture doc — both are included in package.json as candidates.
- * This module isolates that choice behind a small interface so switching
- * later doesn't ripple through the app.
+ * Library: MMKV (Delivery Plan D-07, closed). Chosen for synchronous reads
+ * on the small, frequently-toggled SETTINGS key, and because zustand (this
+ * project's state library) has first-class MMKV persist-middleware support.
+ * This module still isolates the choice behind a small interface so a
+ * future change doesn't ripple through the app.
  */
 
 export interface StorageAdapter {
@@ -24,8 +25,8 @@ export const STORAGE_KEYS = {
 } as const;
 
 /**
- * STUB adapter. Replace with AsyncStorage or MMKV binding once the storage
- * library decision is finalized.
+ * STUB adapter. Replace with an MMKV binding in WL-002 (Phase 0, gated on
+ * native projects existing so the round-trip can be verified on-device).
  */
 export const storage: StorageAdapter = {
   async getItem(_key) {

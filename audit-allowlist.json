@@ -1,0 +1,29 @@
+{
+  "$comment": [
+    "Reviewed, time-boxed exceptions for `npm run audit:ci`.",
+    "Every entry needs a reason, the mitigation that makes it acceptable, and a reviewBy date.",
+    "The gate fails when an entry expires, when an allowlisted advisory stops appearing",
+    "(the exception is stale and must be deleted), or when its severity changes.",
+    "See the 'Dependency audit state' section of README.md for the full analysis."
+  ],
+  "advisories": [
+    {
+      "url": "https://github.com/advisories/GHSA-w3rx-r6r6-pgpr",
+      "package": "image-size",
+      "severity": "high",
+      "title": "image-size: ICNS parser allows denial of service through an infinite loop",
+      "reason": "Reached only via metro (the bundler) at build time; not present in the shipped app binary. Every published image-size version (<=2.0.2) is affected, so there is no version to upgrade to, and no API-compatible replacement package exists.",
+      "mitigation": "metro.config.js calls image-size's disableTypes() on Metro's own instance to switch off the icns parser. Metro never requests dimensions for ICNS assets, so this costs nothing and the payload is rejected instantly instead of looping.",
+      "reviewBy": "2026-11-08"
+    },
+    {
+      "url": "https://github.com/advisories/GHSA-5p2g-fcmc-qvqq",
+      "package": "image-size",
+      "severity": "high",
+      "title": "image-size: JXL and HEIF parsers allow denial of service through infinite loops",
+      "reason": "Same root cause, package and reachability as GHSA-w3rx-r6r6-pgpr.",
+      "mitigation": "metro.config.js disables the jxl, jxl-stream and heif parsers alongside icns.",
+      "reviewBy": "2026-11-08"
+    }
+  ]
+}
