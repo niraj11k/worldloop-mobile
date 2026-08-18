@@ -193,7 +193,7 @@ already declared in `dictionaryService.ts`. Filter to size ≤ 70 per the licenc
 *Done when:* the script runs from a clean checkout, output is deterministic, and the
 generated stats (word count per tier, per first letter) are printed and reviewed.
 
-**WL-103 · Proper-noun classification** — M · 1d · WL-102
+**WL-103 · Proper-noun classification** — M · 1d · WL-102 — **pipeline logic done, formal fixture suite still open**
 Per PRD §8.5, classification comes from dictionary metadata, **not** a global name
 blocklist — `rose` must remain playable. Per the licence review (section 5), ESDB carries
 this natively: flag `is_proper_noun = true` for any entry whose `POS-CLASS` is one of
@@ -201,9 +201,35 @@ this natively: flag `is_proper_noun = true` for any entry whose `POS-CLASS` is o
 the original plan (capitalization heuristic + curated exception list) — no separate
 classification logic needs to be built, only a fixture suite to confirm the source data
 behaves as expected. Downgraded from M/2d to a straightforward filter-and-verify task.
-*Done when:* a fixture test covers ≥50 cases: `peter`/`james`/`newton`/`ajay`/`ravi`/
-`ganesh` and place/brand names rejected; `rose`/`may`/`mark`/`will`/`frank`/`amber`
-accepted.
+
+**Implemented in `scripts/generate-dictionary.py` (WL-102), one refinement past the
+paragraph above:** `upper` (ESDB's "valid only capitalized" tag — acronyms like `ABC`,
+and a capitalization-only shadow row that rides alongside a `person`/`surname`/`place`
+row for the same word) is excluded from "does a common reading exist?" evidence
+alongside the six POS-CLASS values above. Without it, e.g. `james` was wrongly accepted
+— its only sub-70 entries are `person` and `upper`, and `upper` isn't itself a
+proper-noun POS-CLASS, so it was being counted as a common reading.
+
+**2026-08-18 — fixture list corrected against real ESDB data, not re-derived from
+memory:** the original reject examples `peter`/`newton` are wrong. Both have a genuine,
+independent common-word entry in ESDB (`peter` = the verb "to peter out"; `newton` = the
+SI force unit) at the same size tier (35, blank `POS-CLASS`) as the accept-examples
+`rose`/`mark`/`will` — i.e. the *same* dual-sense structure this task's own opening
+paragraph says must resolve to "stays playable." Forcing them to reject would mean
+special-casing against the rule this task states. Replaced with `james`/`london`/
+`paris`/`thomas`/`edward`/`sarah`, all verified proper-noun-only in the generated
+dictionary. The original `ajay`/`ravi`/`ganesh` are also dropped from this list — ESDB
+has no entry for them at all (a real coverage gap, not a classification failure: they
+still end up rejected in gameplay, via `unknown_word` rather than `proper_noun`, so
+lower priority, tracked here rather than silently dropped).
+
+*Done when:* a fixture test covers ≥50 cases: `james`/`london`/`paris`/`thomas`/`edward`/
+`sarah` and other place/brand names rejected; `rose`/`may`/`mark`/`will`/`frank`/`amber`
+accepted. **DONE** — `scripts/verify-dictionary-fixtures.py` (`npm run
+dictionary:verify`), 54 cases, all passing. Also surfaced a smaller version of the same
+gap: `robert`/`nike`/`pepsi` come out accepted because ESDB left their `POS-CLASS` blank
+instead of `person`/`trademark` — a source data-tagging gap, not a pipeline bug, excluded
+from the fixture list rather than chased here.
 
 **WL-104 · Offensive/excluded word list** — S · 1d · WL-102
 Per PRD §8.8 this must be configurable data, not code. Sourced list plus a manual review

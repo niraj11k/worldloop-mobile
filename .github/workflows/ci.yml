@@ -46,3 +46,74 @@ jobs:
       # "Dependency audit state" section of README.md.
       - name: Dependency audit gate
         run: npm run audit:ci
+
+  # WL-004: native platforms must actually compile, not just typecheck.
+  # Gated on `verify` so a lint/test failure doesn't burn expensive macOS
+  # minutes on a PR that was already going to fail.
+  build-ios:
+    needs: verify
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.11.0'
+          cache: npm
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            ios/Pods
+            ~/Library/Caches/CocoaPods
+          key: pods-${{ runner.os }}-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: pods-${{ runner.os }}-
+
+      - name: Install CocoaPods dependencies
+        working-directory: ios
+        run: pod install
+
+      - name: Build iOS (Debug, Simulator)
+        working-directory: ios
+        run: |
+          xcodebuild \
+            -workspace WordLoop.xcworkspace \
+            -scheme WordLoop \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+  build-android:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.11.0'
+          cache: npm
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Android (Debug)
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon

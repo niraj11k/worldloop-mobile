@@ -10,6 +10,7 @@
  * This module still isolates the choice behind a small interface so a
  * future change doesn't ripple through the app.
  */
+import { createMMKV } from 'react-native-mmkv';
 
 export interface StorageAdapter {
   getItem(key: string): Promise<string | null>;
@@ -24,18 +25,16 @@ export const STORAGE_KEYS = {
   ACCOUNT_PROMPT_STATE: 'wordloop:account_prompt_state',
 } as const;
 
-/**
- * STUB adapter. Replace with an MMKV binding in WL-002 (Phase 0, gated on
- * native projects existing so the round-trip can be verified on-device).
- */
+const mmkv = createMMKV({ id: 'wordloop-storage' });
+
 export const storage: StorageAdapter = {
-  async getItem(_key) {
-    return null;
+  async getItem(key) {
+    return mmkv.getString(key) ?? null;
   },
-  async setItem(_key, _value) {
-    return;
+  async setItem(key, value) {
+    mmkv.set(key, value);
   },
-  async removeItem(_key) {
-    return;
+  async removeItem(key) {
+    mmkv.remove(key);
   },
 };

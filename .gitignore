@@ -47,3 +47,11 @@ coverage/
 
 # Project docs
 docs/
+
+# Dictionary generation pipeline (WL-102) — script is committed and
+# re-runnable (npm run dictionary:generate); its inputs/outputs are not:
+# ESDB source+build (~150MB) and the generated bundle (~34MB, pre WL-105
+# repacking) are both reproducible from the script, not hand-authored.
+.cache/
+src/assets/dictionary/dictionary.json
+src/assets/dictionary/manifest.json

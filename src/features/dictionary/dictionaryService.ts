@@ -22,6 +22,8 @@ export interface DictionaryWord {
   isObscure: boolean;
   isOffensive: boolean;
   isAllowed: boolean;
+  /** PRD section 8.7 — the computer only draws from this narrower tier. */
+  isComputerPlayable: boolean;
   frequencyScore: number;
 }
 
