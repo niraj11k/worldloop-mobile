@@ -8,6 +8,8 @@ ios/Pods/
 android/app/build/
 android/build/
 android/.gradle/
+ios/
+android/
 
 # Xcode
 *.xcworkspace
