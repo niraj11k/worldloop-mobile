@@ -30,6 +30,26 @@ npm run android
 Android also needs `android/local.properties` with `sdk.dir=<path to your
 Android SDK>` — gitignored, machine-specific, not committed.
 
+## Device and OS support matrix (WL-005)
+
+Per Wireframe doc §19 (small phones, large phones, tablets, landscape). Minimum OS
+versions are the RN 0.86.2 template's own floor (`IPHONEOS_DEPLOYMENT_TARGET` /
+`minSdkVersion` in the generated project) — going lower isn't a supported
+configuration for this RN version, so there's no reason to target below it.
+
+| Platform | Minimum OS | Target/compile OS | Representative test devices |
+|---|---|---|---|
+| iOS | iOS 15.1 | iOS 26 (current) | iPhone SE (3rd gen) — small phone; iPhone 17 — baseline; iPhone 17 Pro Max — large phone |
+| Android | Android 7.0 (API 24) | API 36 (current) | A ~5.4" small-screen device (e.g. Pixel 4a class); a mid-size device (`Medium_Phone_API_36.1` covers this in the emulator); a large/tablet-class device |
+
+Tablets and landscape are acknowledged in Wireframe §19 but not treated as a
+first-class layout target for v1 — the design is portrait-phone-first. Revisit
+once WL-409 (responsive/orientation pass, Phase 4) runs.
+
+Physical-device coverage (as opposed to simulator/emulator) is a manual QA
+step — see WL-310 (M1 device pass) and WL-805 (pre-submission QA) — not a CI
+axis, since CI runners don't have physical hardware.
+
 ## Folder structure
 
 ```text
