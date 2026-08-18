@@ -4,35 +4,31 @@ Scaffold only. No gameplay is fully wired up yet. This README explains the
 structure and what's real vs. stubbed, so anyone picking this up (including
 future-you) doesn't mistake a skeleton for a finished feature.
 
-This scaffold was **not** built by running `npx react-native init` in a
-networked environment (this sandbox has no network access), so:
-
-- `ios/` and `android/` native project folders are **not present** and must
-  be generated locally (see Setup below).
-
-Dependency versions have since been installed and verified against the npm
+Dependency versions have been installed and verified against the npm
 registry, and aligned with the official React Native 0.86.2 template
 (React 19.2.3). `npm install`, `npm test`, and `npm run lint` all run
 clean; see "Dependency audit state" below for the standing `npm audit`
 output and why it is expected.
 
-## Setup (run locally, not in this sandbox)
+`ios/` and `android/` native project folders **are present and committed**
+(`WL-001`). Bundle identifier / package name is **provisional**:
+`com.wordloop.mobile`, pending D-10 (product name clearance) — expect this
+to change before store submission. Verified: `npm run ios` and
+`npm run android` both build and launch the Welcome screen, on iOS
+Simulator and an Android emulator respectively.
+
+## Setup
 
 ```bash
 npm install
-npx @react-native-community/cli@latest init WordLoopTemp --version 0.86.2   # only if you need fresh native folders
-# then copy the generated ios/ and android/ folders into this project root,
-# against this existing src/ and package.json.
-
-npx pod-install ios   # macOS only, after ios/ exists
+npx pod-install ios   # macOS only — regenerates ios/Pods (gitignored)
 
 npm run ios      # or
 npm run android
 ```
 
-[Unverified] Exact native-folder bootstrapping steps depend on the React
-Native version and CLI tooling current at the time you actually set this
-up — the above is a general outline, not a tested sequence.
+Android also needs `android/local.properties` with `sdk.dir=<path to your
+Android SDK>` — gitignored, machine-specific, not committed.
 
 ## Folder structure
 
