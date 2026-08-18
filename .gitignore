@@ -8,10 +8,10 @@ ios/Pods/
 android/app/build/
 android/build/
 android/.gradle/
-ios/
-android/
+android/app/.cxx/
 
 # Xcode
+ios/.xcode.env.local
 *.xcworkspace
 !default.xcworkspace
 xcuserdata/
