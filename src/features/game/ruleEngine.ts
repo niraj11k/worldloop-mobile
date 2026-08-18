@@ -1,12 +1,13 @@
 import type { InvalidReason } from '@app-types/game';
+import { lookupWord, type DictionaryLookupResult } from '@features/dictionary/dictionaryService';
 
 /**
  * Local (client-side) rule engine.
  *
- * Per Architecture doc section 5: this is the offline fallback mirror of the
- * server-side rule engine, which remains the authoritative source of truth
- * (Architecture doc section 3). Reconciliation behaviour between this and
- * the server result is an open item — not implemented yet.
+ * Per Architecture doc section 5 and Delivery Plan D-03 (closed): this is the
+ * sole authoritative validator for v1 — there is no server to defer to, and
+ * per Phase 7's scope note that stays true even once an accounts backend
+ * exists.
  *
  * Validation rules per PRD section 8:
  * - Letter chaining (first letter matches previous word's last letter)
@@ -27,6 +28,9 @@ export interface ValidationResult {
   reason: InvalidReason | null;
 }
 
+/** Injectable so the engine stays unit-testable without a bundled dictionary. */
+export type WordLookup = (normalizedWord: string) => Promise<DictionaryLookupResult>;
+
 /**
  * Normalizes raw input per PRD section 8.2.
  */
@@ -35,23 +39,28 @@ export function normalizeWord(rawInput: string): string {
 }
 
 /**
- * Validates a submitted word against the local dictionary and game state.
+ * Structural checks — everything decidable without a dictionary.
  *
- * NOTE: This is a structural stub. It does not yet call into the
- * DictionaryService (src/features/dictionary) for word-list lookups or
- * proper-noun / obscurity / exclusion classification — those depend on the
- * bundled SCOWL-based dataset, which is not yet integrated (see Architecture
- * doc section 4, open items).
+ * Split out and run first so a typo never costs a dictionary lookup, and so
+ * the check ordering is explicit rather than incidental: PRD section 24
+ * requires each rejection to explain itself, and a word can fail several
+ * rules at once (`to` submitted twice is both too_short and duplicate), so
+ * which reason surfaces is a real product decision, not an implementation
+ * detail. Cheapest and most-obvious-to-the-player first.
+ *
+ * Returns null when nothing structural is wrong.
  */
-export function validateMove(params: {
-  rawInput: string;
+function validateStructure(params: {
+  normalizedWord: string;
   requiredLetter: string;
   usedWords: Set<string>;
-}): ValidationResult {
-  const normalizedWord = normalizeWord(params.rawInput);
+}): ValidationResult | null {
+  const { normalizedWord } = params;
 
   if (normalizedWord.length === 0) {
-    return { isValid: false, normalizedWord, reason: null }; // empty state, not an error state
+    // Empty state, not an error state — Wireframe doc section 9 ("input empty")
+    // treats this as a distinct, non-error phase with Submit disabled.
+    return { isValid: false, normalizedWord, reason: null };
   }
 
   if (!VALID_WORD_PATTERN.test(normalizedWord)) {
@@ -70,9 +79,66 @@ export function validateMove(params: {
     return { isValid: false, normalizedWord, reason: 'duplicate' };
   }
 
-  // TODO: dictionary lookup (unknown_word), proper-noun check (proper_noun),
-  // exclusion list check (offensive_excluded) — depends on DictionaryService.
+  return null;
+}
 
+/**
+ * Validates a submitted word against the local dictionary and game state.
+ *
+ * Async because the dictionary lookup is — Wireframe doc section 9 already
+ * anticipates this with its "validating" turn phase.
+ */
+export async function validateMove(
+  params: {
+    rawInput: string;
+    requiredLetter: string;
+    usedWords: Set<string>;
+  },
+  lookup: WordLookup = lookupWord,
+): Promise<ValidationResult> {
+  const normalizedWord = normalizeWord(params.rawInput);
+
+  const structuralFailure = validateStructure({
+    normalizedWord,
+    requiredLetter: params.requiredLetter,
+    usedWords: params.usedWords,
+  });
+  if (structuralFailure !== null) {
+    return structuralFailure;
+  }
+
+  const { found, entry } = await lookup(normalizedWord);
+
+  if (!found || entry === null) {
+    return { isValid: false, normalizedWord, reason: 'unknown_word' };
+  }
+
+  // Offensive before proper-noun: a word classified as both should surface the
+  // stronger exclusion, and "cannot be used in WordLoop" reveals less than
+  // naming the category (Wireframe doc section 10 — avoid exposing internal
+  // dictionary detail).
+  if (entry.isOffensive) {
+    return { isValid: false, normalizedWord, reason: 'offensive_excluded' };
+  }
+
+  if (entry.isProperNoun) {
+    return { isValid: false, normalizedWord, reason: 'proper_noun' };
+  }
+
+  if (!entry.isAllowed) {
+    // Disallowed for a reason with no dedicated InvalidReason value. Today
+    // isAllowed is derived purely from the two flags above so this is
+    // unreachable; it exists so a future pipeline change can't silently
+    // make disallowed words playable. unknown_word is the safe fallback —
+    // it leaks nothing and the suggested action ("try another word") is
+    // still correct.
+    return { isValid: false, normalizedWord, reason: 'unknown_word' };
+  }
+
+  // Deliberately NOT rejected here: isObscure. Per PRD section 8.7 the player
+  // may submit a wider vocabulary than the computer draws from — obscurity
+  // constrains computer selection (isComputerPlayable, used by the difficulty
+  // engine), not player submissions.
   return { isValid: true, normalizedWord, reason: null };
 }
 
