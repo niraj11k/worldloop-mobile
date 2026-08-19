@@ -246,7 +246,39 @@ listing it as a dependency.
 Budget: **cold-start dictionary ready ≤ 400ms; single-word lookup ≤ 5ms; bundle size
 increase ≤ 8MB.**
 *Done when:* the three budgets are measured on the slowest device in the WL-005 matrix and
-recorded.
+recorded. **DONE 2026-08-19 — all three budgets met with large headroom.**
+
+**Chosen format:** a single sorted, newline-separated string of `word` + one flag
+character (`tier index | proper-noun bit | offensive bit`), committed as
+`src/assets/dictionary/dictionary.pack.json`. Every other field the app exposes is derived
+from those three facts — the generated data has exactly 12 distinct flag combinations,
+which is what makes the packing lossless (verified entry-by-entry against all 148,111
+rows of the intermediate JSON). Startup builds an `Int32Array` of record offsets in one
+`indexOf` pass; lookups binary-search it, so no JS string is ever allocated per word.
+
+*Rejected:* shipping the generated JSON (36MB, and ~148k objects to materialize), and
+SQLite (fast, but adds a native dependency and its two-platform build surface to serve a
+read-only exact-match lookup a binary search already answers ~780× inside budget).
+
+| Measurement | Budget | iOS | Android |
+|---|---|---|---|
+| Dictionary ready (asset first-touch + index build) | ≤ 400ms | **17ms** (8 + 9) | **58ms** (32 + 26) |
+| Single-word lookup (mean of 1,400) | ≤ 5ms | **0.0064ms** | **0.0064ms** |
+| Bundle size increase | ≤ 8MB | **1.74MB** | **1.74MB** |
+
+Bundle increase measured as a true A/B: release JS bundle built with the real asset
+(2.97MB) minus the same bundle with the asset's records emptied (1.23MB). The
+`assetMs` column is a deliberate check that the JSON import hides no deferred parse — it
+does not on iOS (8ms) and is modest on Android (32ms).
+
+> **Caveat on "slowest device in the WL-005 matrix":** these numbers come from an iPhone 17
+> Pro **simulator** and a `Medium_Phone_API_36.1` **emulator**, both Debug builds on an
+> Apple-silicon Mac — not the physical iPhone SE / small Android handset the WL-005 matrix
+> names, which this project does not have on hand. Simulators run on host CPU and are
+> optimistic. The conclusion survives the gap by a wide margin (a device 7× slower than the
+> emulator would still meet the 400ms budget, and ~780× slower would still meet the 5ms
+> lookup budget), but the matrix devices remain formally unmeasured — fold into the
+> physical-device passes at WL-310 and WL-805 rather than treating this row as closed.
 
 **WL-106 · Precompute the reply-count index** — M · 1.5d · WL-102
 The difficulty engine's `option_reduction_score` needs "how many valid replies does this
@@ -275,12 +307,12 @@ exist yet — this task was started ahead of them:
 > - **`offensive_excluded` has no real data behind it (WL-104).** The pipeline hardcodes
 >   `is_offensive = false`, so the path is proven only against an injected fixture. It
 >   will not fire in the app until WL-104 lands a real exclusion list.
-> - **No real lookups happen on-device yet (WL-105).** `dictionaryService.lookupWord`
->   is still the not-found stub, so wiring the engine means the app now rejects *every*
->   submitted word as `unknown_word`. That is the correct behaviour for the current
->   stub, not a regression, and it resolves the moment WL-105 provides a loader — but
->   it does mean the game is temporarily unplayable end-to-end, on top of the
->   safe-area defect logged under WL-401.
+> - ~~**No real lookups happen on-device yet (WL-105).**~~ **Resolved 2026-08-19.**
+>   `lookupWord` now reads the bundled 148,111-word asset, so the engine validates
+>   against real data on both platforms and no longer rejects everything as
+>   `unknown_word`. The game is still not playable end-to-end, but for the remaining
+>   reasons only: no computer opponent (WL-108/WL-109/WL-110) and the safe-area defect
+>   logged under WL-401.
 
 **WL-108 · Candidate generation** — M · 1.5d · WL-105, WL-106
 Given a required letter and the used-word set, return scored candidates. Computer draws

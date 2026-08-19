@@ -66,6 +66,15 @@ SIZE_CAP = 70
 ALLOWED_SPELLINGS = ("_", "A", "B", "Z")
 EXCLUDED_REGIONS = ("AU",)
 EXCLUDED_CATEGORIES = ("hacker", "roman-numerals")
+# WL-105 packed-asset encoding. Every boolean the app needs is derivable from
+# these three facts, so only these are stored on device -- the generated data
+# has exactly 12 distinct flag combinations, all of them (tier, proper-noun,
+# offensive) permutations, which is what makes the packing lossless.
+SIZE_TIERS = [35, 40, 50, 60, 65, 70]
+FLAG_BASE = 65  # 'A'
+PROPER_NOUN_BIT = 8
+OFFENSIVE_BIT = 16
+
 PROPER_NOUN_POS_CLASSES = {"person", "surname", "place", "name", "demonym", "trademark"}
 # 'upper' marks a form ESDB considers valid only capitalized (acronyms like
 # "ABC"/"AAA", or a capitalization-only shadow row paired with a person/
@@ -177,11 +186,41 @@ def build_dictionary(rows: list[sqlite3.Row]) -> tuple[list[dict], int]:
                 "isAllowed": is_allowed,
                 "isComputerPlayable": is_computer_playable,
                 "frequencyScore": frequency_score,
+                "sizeTier": size,
             }
         )
 
     entries.sort(key=lambda e: e["normalizedWord"])
     return entries, dropped_non_letters
+
+
+def pack_entries(entries: list[dict]) -> str:
+    """Packs the dictionary into the on-device representation (WL-105).
+
+    One record per word, newline-separated, sorted ascending: the word
+    followed by a single flag character encoding
+    (tier index | proper-noun bit | offensive bit).
+
+    Chosen over shipping the JSON (34MB, and 148k JS objects to materialize
+    at startup) and over SQLite (which would add a native dependency for a
+    read-only lookup this can already serve). Sorted + newline-delimited
+    means the runtime can binary-search an offset index without ever
+    creating a JS string per word -- see dictionaryService.ts.
+
+    The flag character is always in 'A'..'^' (65-94), which sorts below every
+    lowercase letter, so raw record order equals word order even where one
+    word is a prefix of another ("cat" before "cats").
+    """
+    lines: list[str] = []
+    for entry in entries:
+        tier_index = SIZE_TIERS.index(entry["sizeTier"])
+        code = tier_index
+        if entry["isProperNoun"]:
+            code |= PROPER_NOUN_BIT
+        if entry["isOffensive"]:
+            code |= OFFENSIVE_BIT
+        lines.append(entry["normalizedWord"] + chr(FLAG_BASE + code))
+    return "\n".join(lines)
 
 
 def print_stats(entries: list[dict], dropped_non_letters: int) -> None:
@@ -235,11 +274,30 @@ def main() -> None:
         json.dump(manifest, f, indent=2)
         f.write("\n")
 
+    # The packed asset is what actually ships, so unlike the two files above
+    # it is committed rather than gitignored: Metro needs it to bundle, which
+    # means a fresh checkout (and CI's native build jobs) must have it without
+    # running this script, which needs Python, SQLite and a network fetch.
+    # Deliberately carries no generatedAt -- a timestamp would produce a diff
+    # on every regeneration of otherwise identical data.
+    packed = {
+        "sourceName": SOURCE_NAME,
+        "sourceVersion": ESDB_TAG,
+        "wordCount": len(entries),
+        "sizeTiers": SIZE_TIERS,
+        "records": pack_entries(entries),
+    }
+    packed_path = OUTPUT_DIR / "dictionary.pack.json"
+    with packed_path.open("w", encoding="utf-8") as f:
+        json.dump(packed, f, separators=(",", ":"))
+
     print_stats(entries, dropped_non_letters)
     size_mb = dict_path.stat().st_size / 1_000_000
+    packed_mb = packed_path.stat().st_size / 1_000_000
     print()
-    print(f"Wrote {dict_path} ({size_mb:.2f} MB)")
+    print(f"Wrote {dict_path} ({size_mb:.2f} MB, intermediate, gitignored)")
     print(f"Wrote {manifest_path}")
+    print(f"Wrote {packed_path} ({packed_mb:.2f} MB, shipped asset, committed)")
 
 
 if __name__ == "__main__":

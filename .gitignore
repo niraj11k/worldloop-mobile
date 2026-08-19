@@ -48,10 +48,15 @@ coverage/
 # Project docs
 docs/
 
-# Dictionary generation pipeline (WL-102) — script is committed and
-# re-runnable (npm run dictionary:generate); its inputs/outputs are not:
-# ESDB source+build (~150MB) and the generated bundle (~34MB, pre WL-105
-# repacking) are both reproducible from the script, not hand-authored.
+# Dictionary generation pipeline (WL-102/WL-105).
+#
+# Ignored: the ESDB source checkout + build (~150MB) and the intermediate
+# JSON (~36MB), both reproducible via `npm run dictionary:generate`.
+#
+# NOT ignored: src/assets/dictionary/dictionary.pack.json (~1.7MB), the
+# packed asset the app actually imports. Metro needs it to bundle, so a
+# fresh checkout and CI's native build jobs must have it without running
+# the generator (which needs Python, SQLite and a network fetch).
 .cache/
 src/assets/dictionary/dictionary.json
 src/assets/dictionary/manifest.json
