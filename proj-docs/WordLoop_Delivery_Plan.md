@@ -261,7 +261,26 @@ Wire the existing `ruleEngine.ts` to real lookups; implement the `unknown_word`,
 `proper_noun`, and `offensive_excluded` paths. Confirm inflected forms are accepted per
 PRD §8.6 (`cats`, `walked`, `playing`, `faster`) with no word-family restriction.
 *Done when:* every one of the 7 `InvalidReason` values is produced by a passing test, and
-PRD §24 "Player move" acceptance criteria are all covered.
+PRD §24 "Player move" acceptance criteria are all covered. **Engine DONE 2026-08-18;
+end-to-end still gated on WL-105.** `ruleEngine.ts` now calls the dictionary (async, with
+an injectable lookup so the engine stays testable without a bundle) and implements all
+three new paths. All 7 `InvalidReason` values and every PRD §24 "Player move" criterion
+are covered by `__tests__/ruleEngine.test.ts` (21 tests); PRD §8.6 inflected forms are
+confirmed against the **real** generated word list in
+`scripts/verify-dictionary-fixtures.py`, including the full `play`/`plays`/`played`/
+`playing` family to prove the no-word-family-restriction rule.
+
+Two things are deliberately *not* claimed as verified, because their dependencies don't
+exist yet — this task was started ahead of them:
+> - **`offensive_excluded` has no real data behind it (WL-104).** The pipeline hardcodes
+>   `is_offensive = false`, so the path is proven only against an injected fixture. It
+>   will not fire in the app until WL-104 lands a real exclusion list.
+> - **No real lookups happen on-device yet (WL-105).** `dictionaryService.lookupWord`
+>   is still the not-found stub, so wiring the engine means the app now rejects *every*
+>   submitted word as `unknown_word`. That is the correct behaviour for the current
+>   stub, not a regression, and it resolves the moment WL-105 provides a loader — but
+>   it does mean the game is temporarily unplayable end-to-end, on top of the
+>   safe-area defect logged under WL-401.
 
 **WL-108 · Candidate generation** — M · 1.5d · WL-105, WL-106
 Given a required letter and the used-word set, return scored candidates. Computer draws
@@ -448,6 +467,18 @@ Wireframe §2 structure. Android hardware back and iOS safe areas per §19. Conf
 before any action that discards a round.
 *Done when:* every screen's back behaviour is defined and correct on both platforms, and
 Android back never silently destroys an in-progress game.
+
+> **Defect found on-device 2026-08-18 (during WL-107 verification), logged here rather
+> than fixed out-of-phase:** no screen wraps its content in a safe-area view, so on a
+> notched device the first control on each screen renders *underneath* the Dynamic
+> Island and does not receive taps. Verified on an iPhone 17 Pro simulator: Home's
+> "Start Game" (the primary CTA, and the only route to Difficulty → Game) is
+> unreachable, while lower controls on the same screen navigate normally. `App.tsx`
+> already mounts `SafeAreaProvider`, but no screen consumes it. This makes the app
+> effectively unplayable on modern iPhones today and should be treated as the first
+> item of this task, not a polish pass. Separately, some skeleton buttons aren't wired
+> to any handler yet (How to Play's "Got It" is a no-op) — expected at this stage,
+> noted so it isn't mistaken for the same bug.
 
 **WL-402 · Guest profile and local persistence** — M · 2d · WL-002
 Persist the `GuestProfile` shape from the trigger policy doc: `guest_id`, `created_at`,

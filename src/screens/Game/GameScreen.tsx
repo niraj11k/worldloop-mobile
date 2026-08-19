@@ -18,7 +18,6 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
  * chain, turn indicator, computer-thinking loading state.
  *
  * This skeleton wires local rule-engine validation only. It does not yet:
- * - call the DictionaryService for word-list / proper-noun checks
  * - call the DifficultyEngine for the computer's response
  * - persist state via GameSession (Data Model doc section 4)
  * - integrate the Hint bottom sheet or Word Definition overlay (see
@@ -34,10 +33,10 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   const [chain, setChain] = useState<Move[]>([]);
   const [errorReason, setErrorReason] = useState<string | null>(null);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setPhase('validating');
     const usedWords = new Set(chain.map(m => m.normalizedWord));
-    const result = validateMove({ rawInput: input, requiredLetter, usedWords });
+    const result = await validateMove({ rawInput: input, requiredLetter, usedWords });
 
     if (!result.isValid) {
       setErrorReason(result.reason);

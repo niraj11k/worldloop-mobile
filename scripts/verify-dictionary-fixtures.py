@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-WordLoop dictionary proper-noun classification fixtures (Delivery Plan
-WL-103 "Done when": a fixture test covering >=50 cases).
+WordLoop dictionary data fixtures (Delivery Plan WL-103 "Done when": a
+fixture test covering >=50 proper-noun cases; plus WL-107's PRD section 8.6
+inflected-form confirmation).
 
 Verifies scripts/generate-dictionary.py's output against real words with a
 known-correct classification, so a future change to the pipeline's
@@ -53,6 +54,20 @@ ACCEPT_WORDS = [
     "journey", "freedom",
 ]
 
+# PRD section 8.6 / Delivery Plan WL-107: inflected forms must be accepted --
+# plurals, verb forms, comparatives, superlatives, and irregulars. The
+# play/plays/played/playing and fast/faster/fastest runs are here on purpose:
+# section 8.6 explicitly does NOT restrict multiple forms from one word family
+# in v1, so every member must be independently playable. The rule engine's
+# side of this is covered in __tests__/ruleEngine.test.ts; this asserts the
+# data actually carries them.
+INFLECTED_FORMS = [
+    "cats", "walked", "playing", "faster",          # the four PRD 8.6 names
+    "cat", "walk", "play", "plays", "played",       # same-family, no restriction
+    "fast", "fastest", "bigger", "biggest",         # comparative / superlative
+    "running", "ran", "children", "mice", "geese",  # irregular forms
+]
+
 
 def main() -> int:
     if not DICTIONARY_PATH.exists():
@@ -74,7 +89,7 @@ def main() -> int:
         elif entry["isAllowed"]:
             failures.append(f"{word}: expected isAllowed=False, got True")
 
-    for word in ACCEPT_WORDS:
+    for word in ACCEPT_WORDS + INFLECTED_FORMS:
         entry = by_word.get(word)
         if entry is None:
             failures.append(f"{word}: expected present+allowed, but missing entirely")
@@ -83,8 +98,12 @@ def main() -> int:
         elif not entry["isAllowed"]:
             failures.append(f"{word}: expected isAllowed=True, got False")
 
-    total_cases = len(REJECT_WORDS) + len(ACCEPT_WORDS)
-    print(f"WL-103 fixture cases: {total_cases} ({len(REJECT_WORDS)} reject, {len(ACCEPT_WORDS)} accept)")
+    total_cases = len(REJECT_WORDS) + len(ACCEPT_WORDS) + len(INFLECTED_FORMS)
+    print(
+        f"Fixture cases: {total_cases} "
+        f"({len(REJECT_WORDS)} reject, {len(ACCEPT_WORDS)} accept, "
+        f"{len(INFLECTED_FORMS)} inflected)"
+    )
 
     if failures:
         print(f"\nFAIL ({len(failures)}/{total_cases}):")
