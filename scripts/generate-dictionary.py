@@ -223,6 +223,26 @@ def pack_entries(entries: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def reply_counts_by_letter(entries: list[dict]) -> list[int]:
+    """Counts allowed words per first letter, a-z (WL-106).
+
+    This is the difficulty engine's `option_reduction_score` input: PRD
+    section 10 defines it for both Medium and Hard as "the number of valid
+    replies available to *the player*", so it counts the player-submittable
+    set (`isAllowed`) rather than the narrower computer-playable tier the
+    computer draws its own move from (PRD section 8.7).
+
+    Precomputed here because doing it per turn is O(candidates x dictionary)
+    and would stall the computer's turn; at runtime the only work left is
+    subtracting the handful of words already used this round.
+    """
+    counts = [0] * 26
+    for entry in entries:
+        if entry["isAllowed"]:
+            counts[ord(entry["normalizedWord"][0]) - ord("a")] += 1
+    return counts
+
+
 def print_stats(entries: list[dict], dropped_non_letters: int) -> None:
     total = len(entries)
     allowed = sum(1 for e in entries if e["isAllowed"])
@@ -285,6 +305,7 @@ def main() -> None:
         "sourceVersion": ESDB_TAG,
         "wordCount": len(entries),
         "sizeTiers": SIZE_TIERS,
+        "replyCounts": reply_counts_by_letter(entries),
         "records": pack_entries(entries),
     }
     packed_path = OUTPUT_DIR / "dictionary.pack.json"

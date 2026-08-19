@@ -286,7 +286,45 @@ candidate leave?" Computed naively that's O(candidates × dictionary) per turn a
 stall the turn. Precompute counts of playable words by first letter at pipeline time; at
 runtime subtract used words.
 *Done when:* candidate scoring for a worst-case letter completes in ≤ 50ms on the slowest
-target device.
+target device. **DONE 2026-08-19 — budget met, but only after fixing a real bottleneck the
+first measurement exposed (below).**
+
+The packed asset now carries `replyCounts`: 26 per-first-letter totals over the
+**player-submittable** set (`isAllowed`, 141,351 words), not the narrower computer-playable
+tier — PRD §10 defines this term, for both Medium and Hard, as "the number of valid replies
+available to *the player*". At runtime `replyCountForLetter()` subtracts the words already
+used this round, which is O(chain length). `optionReductionScore()` inverts and normalizes
+it to 0..1, because Architecture §6 sums this term against `commonness_score` (already 0..1)
+and a raw count in the thousands would swamp every other weight before WL-605 could tune
+anything.
+
+**The first measurement failed the budget**, at ~44ms on iOS and 42–59ms on Android for the
+worst-case letter (`s`, 10,041 computer-playable candidates) — over budget on Android, on an
+emulator *faster* than the physical targets. Phase breakdown found the cause was not the
+reply-count index at all:
+
+| Phase | Before | After |
+|---|---|---|
+| Enumerate candidates for the letter | ~10ms | ~10ms |
+| Build scored candidates (reply counts included) | ~8ms | ~8ms |
+| **Select the best candidate** | **~23–29ms** | **~1ms** |
+| **Total (worst run)** | **iOS 46 / Android 59** | **iOS 19 / Android 24** |
+
+`selectComputerWord` sorted the entire candidate list and its comparator called
+`scoreCandidate` twice per comparison — roughly 266k score computations to choose one word.
+Replaced with a single linear pass that scores each candidate exactly once. Behaviour is
+unchanged including tie-breaking (a strict `>` keeps the earliest maximum, matching the
+stable sort it replaced); both are covered by tests. **This is the PRD §25 / risk-table
+"naive candidate scoring stalls the computer's turn" risk materializing, caught by the
+budget rather than by a player** — worth noting that the risk register was right, and that
+the culprit was the ranking step, not the dictionary work it was assumed to be.
+
+> **Same caveat as WL-105:** measured on an iPhone 17 Pro simulator and a
+> `Medium_Phone_API_36.1` emulator, Debug builds on an Apple-silicon Mac — not the physical
+> WL-005 matrix devices. ~2× headroom on the worst Android run is a much thinner margin than
+> WL-105's, so this one genuinely does need re-measuring on real low-end hardware at WL-310
+> before it can be considered settled. WL-109 (top 3–5 selection) must not reintroduce a
+> full sort; a bounded partial selection keeps this budget.
 
 **WL-107 · Complete the rule engine against real dictionary data** — M · 1.5d · WL-103, WL-104, WL-105
 Wire the existing `ruleEngine.ts` to real lookups; implement the `unknown_word`,
@@ -500,17 +538,25 @@ before any action that discards a round.
 *Done when:* every screen's back behaviour is defined and correct on both platforms, and
 Android back never silently destroys an in-progress game.
 
-> **Defect found on-device 2026-08-18 (during WL-107 verification), logged here rather
-> than fixed out-of-phase:** no screen wraps its content in a safe-area view, so on a
-> notched device the first control on each screen renders *underneath* the Dynamic
-> Island and does not receive taps. Verified on an iPhone 17 Pro simulator: Home's
-> "Start Game" (the primary CTA, and the only route to Difficulty → Game) is
-> unreachable, while lower controls on the same screen navigate normally. `App.tsx`
-> already mounts `SafeAreaProvider`, but no screen consumes it. This makes the app
-> effectively unplayable on modern iPhones today and should be treated as the first
-> item of this task, not a polish pass. Separately, some skeleton buttons aren't wired
-> to any handler yet (How to Play's "Got It" is a no-op) — expected at this stage,
-> noted so it isn't mistaken for the same bug.
+> **Defect found on-device 2026-08-18 (during WL-107 verification) — FIXED 2026-08-19.**
+> No screen wrapped its content in a safe-area view, so on a notched device the first
+> control on each screen rendered *underneath* the Dynamic Island and did not receive
+> taps. Home's "Start Game" (the primary CTA, and the only route to Difficulty → Game)
+> was unreachable, making the app effectively unplayable on modern iPhones while
+> working normally on Android — which is exactly how it was reported by a user before
+> this task was due to start.
+>
+> Fixed ahead of the rest of this task because it blocked all iOS use: `RootNavigator`
+> now wraps the stack in a single `SafeAreaView`. Applied once at the navigator rather
+> than per screen so no future screen can forget it — `headerShown: false` means
+> nothing else insets the content. Verified on an iPhone 17 Pro simulator by walking
+> Welcome → Difficulty → Game, the exact path that was broken.
+>
+> Still owned by this task: per-screen back behaviour, Android hardware back, and the
+> confirmation-before-discard rule. WL-409 owns any screen that later wants to draw
+> deliberately edge-to-edge. Separately, some skeleton buttons aren't wired to any
+> handler yet (How to Play's "Got It" is a no-op) — expected at this stage, noted so
+> it isn't mistaken for the same bug.
 
 **WL-402 · Guest profile and local persistence** — M · 2d · WL-002
 Persist the `GuestProfile` shape from the trigger policy doc: `guest_id`, `created_at`,
