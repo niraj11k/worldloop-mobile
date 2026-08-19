@@ -4,6 +4,9 @@ import {
   isDictionaryReady,
   dictionarySize,
   dictionarySource,
+  replyCountForLetter,
+  maxReplyCount,
+  computerPlayableEntriesStartingWith,
 } from '@features/dictionary/dictionaryService';
 
 /**
@@ -118,5 +121,87 @@ describe('dictionaryService', () => {
     const { entry } = await lookupWord('rose');
     expect(entry?.baseWord).toBeNull();
     expect(entry?.partOfSpeech).toBeNull();
+  });
+});
+
+describe('reply-count index (WL-106)', () => {
+  it('reports a precomputed reply count per letter', () => {
+    // Counts the player-submittable set (PRD section 10: "replies available
+    // to the player"), so it is larger than the computer-playable tier.
+    expect(replyCountForLetter('s', new Set())).toBeGreaterThan(10_000);
+    expect(replyCountForLetter('x', new Set())).toBeGreaterThan(0);
+    expect(replyCountForLetter('x', new Set())).toBeLessThan(
+      replyCountForLetter('s', new Set()),
+    );
+  });
+
+  it('is case-insensitive', () => {
+    expect(replyCountForLetter('S', new Set())).toBe(replyCountForLetter('s', new Set()));
+  });
+
+  it('subtracts used words that start with the letter', () => {
+    const base = replyCountForLetter('c', new Set());
+    const used = new Set(['cat', 'cats', 'apple']);
+    // 'apple' must not count against 'c'.
+    expect(replyCountForLetter('c', used)).toBe(base - 2);
+  });
+
+  it('never returns a negative count', () => {
+    const used = new Set(Array.from({ length: 5 }, (_, i) => `x${i}`));
+    expect(replyCountForLetter('x', used)).toBeGreaterThanOrEqual(0);
+  });
+
+  it('returns 0 for a non-letter', () => {
+    expect(replyCountForLetter('1', new Set())).toBe(0);
+    expect(replyCountForLetter('', new Set())).toBe(0);
+  });
+
+  it('exposes the maximum per-letter count for normalization', () => {
+    expect(maxReplyCount()).toBe(replyCountForLetter('s', new Set()));
+  });
+});
+
+describe('computerPlayableEntriesStartingWith (WL-106 measurement support)', () => {
+  const wordsOf = (letter: string) =>
+    computerPlayableEntriesStartingWith(letter).map(e => e.normalizedWord);
+
+  it('returns only words starting with the requested letter', () => {
+    const words = wordsOf('q');
+    expect(words.length).toBeGreaterThan(0);
+    expect(words.every(w => w.startsWith('q'))).toBe(true);
+  });
+
+  it('returns only computer-playable entries', () => {
+    // Decoded in the walk, so no second lookup is needed to check this.
+    const entries = computerPlayableEntriesStartingWith('x');
+    expect(entries.length).toBeGreaterThan(0);
+    expect(entries.every(e => e.isComputerPlayable)).toBe(true);
+    expect(entries.every(e => e.isAllowed && !e.isObscure)).toBe(true);
+  });
+
+  it('excludes proper nouns and obscure words', () => {
+    // 'edward' is a proper noun, 'aalborg' is obscure — neither is a legal
+    // computer move (PRD sections 8.5 and 8.7).
+    expect(wordsOf('e')).not.toContain('edward');
+    expect(wordsOf('a')).not.toContain('aalborg');
+  });
+
+  it('finds a known common word in its letter block', () => {
+    expect(wordsOf('r')).toContain('rose');
+  });
+
+  it('returns an empty list for a non-letter', () => {
+    expect(computerPlayableEntriesStartingWith('1')).toEqual([]);
+  });
+
+  it('covers every letter of the alphabet', () => {
+    for (const letter of 'abcdefghijklmnopqrstuvwxyz') {
+      expect(computerPlayableEntriesStartingWith(letter).length).toBeGreaterThan(0);
+    }
+  });
+
+  it('enumerates the worst-case letter without scanning the whole dictionary', () => {
+    // 's' is the largest block; guards against a regression to a full scan.
+    expect(computerPlayableEntriesStartingWith('s').length).toBeGreaterThan(5_000);
   });
 });

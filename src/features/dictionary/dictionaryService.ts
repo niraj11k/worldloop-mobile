@@ -217,6 +217,106 @@ export async function lookupWord(normalizedWord: string): Promise<DictionaryLook
   return { found: false, entry: null };
 }
 
+const LETTER_A = 97; // 'a'
+const ALPHABET_SIZE = 26;
+
+function letterIndex(letter: string): number {
+  return letter.toLowerCase().charCodeAt(0) - LETTER_A;
+}
+
+/**
+ * How many words the player could still play starting with `letter` (WL-106).
+ *
+ * This is the difficulty engine's `option_reduction_score` input — PRD
+ * section 10 defines it, for both Medium and Hard, as the number of valid
+ * replies available to *the player*, so it counts the player-submittable set
+ * rather than the narrower tier the computer draws from.
+ *
+ * The per-letter totals are precomputed at pipeline time because doing this
+ * per turn is O(candidates x dictionary) and would stall the computer's
+ * turn. All that is left at runtime is subtracting the words already used
+ * this round, which is O(chain length) — chains are tens of words, not
+ * thousands.
+ */
+export function replyCountForLetter(letter: string, usedWords: Iterable<string>): number {
+  const i = letterIndex(letter);
+  if (i < 0 || i >= ALPHABET_SIZE) {
+    return 0;
+  }
+  const total = packedAsset.replyCounts[i] ?? 0;
+
+  // Every word in the chain passed validation, so each one that starts with
+  // this letter is necessarily part of the precomputed allowed total.
+  let used = 0;
+  for (const word of usedWords) {
+    if (word.length > 0 && letterIndex(word) === i) {
+      used += 1;
+    }
+  }
+  return Math.max(0, total - used);
+}
+
+/** Largest per-letter reply count, for normalizing option-reduction scores. */
+export function maxReplyCount(): number {
+  return Math.max(...packedAsset.replyCounts);
+}
+
+/**
+ * Every computer-playable entry starting with `letter`.
+ *
+ * Per PRD section 8.7 the computer draws from the narrower tier while the
+ * player may submit the wider accepted set. Records are sorted, so this is a
+ * binary search for the letter boundary followed by a linear walk of that
+ * letter's block — no scan of the other 25.
+ *
+ * Returns decoded entries rather than bare words because the walk has to
+ * decode each record anyway to test `isComputerPlayable`, and scoring needs
+ * `frequencyScore` and `isObscure` — handing back strings would force the
+ * caller into a second binary search per candidate (~10k of them for the
+ * worst letter).
+ *
+ * Full scored-candidate assembly is WL-108; this is the enumeration WL-106
+ * needs to demonstrate its own scoring budget.
+ */
+export function computerPlayableEntriesStartingWith(letter: string): DictionaryWord[] {
+  if (index === null) {
+    index = buildIndex();
+  }
+  const idx = index;
+
+  const i = letterIndex(letter);
+  if (i < 0 || i >= ALPHABET_SIZE) {
+    return [];
+  }
+  const target = String.fromCharCode(LETTER_A + i);
+
+  // Lower bound: first record whose first character is >= target.
+  let lo = 0;
+  let hi = idx.count - 1;
+  let start = idx.count;
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (idx.records.charAt(recordStart(idx, mid)) >= target) {
+      start = mid;
+      hi = mid - 1;
+    } else {
+      lo = mid + 1;
+    }
+  }
+
+  const entries: DictionaryWord[] = [];
+  for (let j = start; j < idx.count; j++) {
+    if (idx.records.charAt(recordStart(idx, j)) !== target) {
+      break;
+    }
+    const entry = decodeAt(idx, j);
+    if (entry.isComputerPlayable) {
+      entries.push(entry);
+    }
+  }
+  return entries;
+}
+
 export interface DefinitionResult {
   word: string;
   partOfSpeech: string;

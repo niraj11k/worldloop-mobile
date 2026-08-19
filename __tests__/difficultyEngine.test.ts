@@ -1,4 +1,9 @@
-import { scoreCandidate, selectComputerWord, type CandidateWord } from '@features/difficulty/difficultyEngine';
+import {
+  scoreCandidate,
+  selectComputerWord,
+  optionReductionScore,
+  type CandidateWord,
+} from '@features/difficulty/difficultyEngine';
 
 describe('difficultyEngine', () => {
   describe('scoreCandidate', () => {
@@ -95,5 +100,84 @@ describe('difficultyEngine', () => {
       expect(selectComputerWord([worst, best], 'medium')).toEqual(best);
       expect(selectComputerWord([worst, best], 'hard')).toEqual(best);
     });
+  });
+});
+
+describe('optionReductionScore (WL-106)', () => {
+  it('scores a dead letter highest', () => {
+    // No replies left for the player is maximum option reduction.
+    expect(optionReductionScore(0, 15207)).toBe(1);
+  });
+
+  it('scores the most open letter lowest', () => {
+    expect(optionReductionScore(15207, 15207)).toBe(0);
+  });
+
+  it('is monotonically decreasing in reply count', () => {
+    // PRD section 10: Hard ranks "from fewest replies to most replies", so
+    // more replies must never score higher.
+    const scores = [0, 100, 1000, 5000, 15207].map(n => optionReductionScore(n, 15207));
+    for (let i = 1; i < scores.length; i++) {
+      expect(scores[i]!).toBeLessThan(scores[i - 1]!);
+    }
+  });
+
+  it('stays within 0..1 so it cannot swamp the other weighted terms', () => {
+    // Architecture section 6 sums this against commonnessScore, which is
+    // already 0..1; a raw count in the thousands would dominate the formula.
+    for (const n of [-50, 0, 7000, 15207, 99999]) {
+      const score = optionReductionScore(n, 15207);
+      expect(score).toBeGreaterThanOrEqual(0);
+      expect(score).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('returns 0 rather than dividing by zero on an empty dictionary', () => {
+    expect(optionReductionScore(0, 0)).toBe(0);
+  });
+});
+
+describe('selectComputerWord tie-breaking (WL-106 linear selection)', () => {
+  it('returns the earliest candidate when scores tie', () => {
+    // The full sort this replaced was stable, so [0] of equal-scoring
+    // candidates was the earliest one. The linear scan uses a strict '>'
+    // to preserve exactly that; a '>=' would silently return the last.
+    const identical: CandidateWord[] = ['first', 'second', 'third'].map(word => ({
+      word,
+      optionReductionScore: 1,
+      commonnessScore: 1,
+      difficultyScore: 1,
+      obscurityPenalty: 0,
+      repetitionPenalty: 0,
+    }));
+    expect(selectComputerWord(identical, 'hard')?.word).toBe('first');
+    expect(selectComputerWord(identical, 'easy')?.word).toBe('first');
+  });
+
+  it('scores each candidate exactly once', () => {
+    // Guards the reason for the change: the previous comparator re-scored on
+    // every comparison (~266k calls for the worst-case letter).
+    const candidates: CandidateWord[] = Array.from({ length: 50 }, (_, i) => ({
+      word: `w${i}`,
+      optionReductionScore: i,
+      commonnessScore: 0,
+      difficultyScore: 0,
+      obscurityPenalty: 0,
+      repetitionPenalty: 0,
+    }));
+    const seen = candidates.map(c => c.word);
+    const counts = new Map<string, number>();
+    const proxied = candidates.map(c => ({
+      ...c,
+      get optionReductionScore() {
+        counts.set(c.word, (counts.get(c.word) ?? 0) + 1);
+        return c.optionReductionScore;
+      },
+    })) as CandidateWord[];
+
+    selectComputerWord(proxied, 'hard');
+    for (const word of seen) {
+      expect(counts.get(word)).toBe(1);
+    }
   });
 });

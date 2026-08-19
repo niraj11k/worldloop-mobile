@@ -16,6 +16,8 @@ declare module '@assets/dictionary/dictionary.pack.json' {
     wordCount: number;
     /** Word-list size tiers; a record's flag byte indexes into this. */
     sizeTiers: number[];
+    /** WL-106: count of allowed words per first letter, a-z. */
+    replyCounts: number[];
     /** Newline-separated `word` + flag-character records, sorted ascending. */
     records: string;
   };
