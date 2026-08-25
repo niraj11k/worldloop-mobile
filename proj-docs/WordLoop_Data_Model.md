@@ -225,15 +225,28 @@ is_personal_best
 created_at
 ```
 
-**Open item this review surfaced, not resolved:** neither `GameStatus` nor this `result`
-field has a distinct value for Wireframe §14's fifth state, "technical failure" — both
-currently conflate it with whatever the nearest existing status is (most likely
-`abandoned`, but that's not written down anywhere as a decision). This isn't a doc-only
-fix: `GameStatus` is shipped, committed TypeScript, and adding a value to it is a code
-change, not something this ratification pass should do unilaterally. Flagged as a small
-follow-up for whichever of `WL-110` (session state machine) or `WL-308` (game-over screen,
-which explicitly needs to render a "technical failure" state) picks it up first — it
-should be decided once, not implemented twice with two different answers.
+**~~Open item this review surfaced, not resolved~~ — RESOLVED 2026-08-19 in `WL-110`.**
+Neither `GameStatus` nor this `result` field had a distinct value for Wireframe §14's fifth
+state, "technical failure", so it was being conflated with whatever status was nearest
+(most likely `abandoned`, though that was never written down as a decision). This review
+flagged it for whichever of `WL-110` or `WL-308` reached it first, to be decided once;
+`WL-110` got there first.
+
+**Decision: `technical_failure` was added to `GameStatus`**, which is now
+`active / player_win / computer_win / draw / abandoned / technical_failure`. `result` above
+reuses the union, so it inherits the value and needs no separate change. Reasoning:
+
+- Wireframe §14 requires the game-over screen to render five distinct result states.
+  Without a distinct value, `WL-308` could not tell this state from the others — the
+  screen would have had to invent its own vocabulary, which is exactly the duplication
+  this section fixed for `result` in the first place.
+- Conflating it with `abandoned` tells the player "you exited" when the app in fact broke,
+  and buries genuine failures inside an ordinary-looking metric (PRD §23).
+- It is reachable, not hypothetical: a corrupt packed dictionary asset throws during index
+  construction (`dictionaryService`, WL-105), and Wireframe §17 specifies a "dictionary
+  unavailable" state.
+
+`WL-308` should render this state and must not re-decide it.
 
 ---
 

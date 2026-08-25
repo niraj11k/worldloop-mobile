@@ -31,7 +31,7 @@ downstream of them.
 | `ios/` and `android/` | **Do not exist.** Never generated. Nothing has been compiled or run on a device or simulator |
 | Rule engine | Chaining, normalization, min length, duplicates, symbol rejection — implemented + unit tested. Proper-noun and offensive-word rejection blocked on the dictionary |
 | Scoring engine | Formula implemented and unit-tested. `rarity_bonus` is inert until word frequency data exists |
-| Difficulty engine | Candidate *ranking* implemented and unit-tested per Architecture §6 weights. Selection (random / weighted-random / top-pick) not implemented — `WL-109` — current stub behavior (always top-ranked) is itself now locked in by a test, so a change won't go unnoticed. Candidate *generation* blocked on the dictionary |
+| Difficulty engine | **Complete as of 2026-08-19.** Ranking per Architecture §6 weights, candidate *generation* against the bundled dictionary (`WL-108`), and per-difficulty *selection* — easy random / medium weighted-random / hard top-pick with occasional second-best (`WL-109`), seedable and asserted over 1,000 turns each. Component score definitions beyond `option_reduction_score` are the implementation's own; see WL-108. Not yet wired into the game screen — that needs `WL-110` |
 | Account prompt policy | Cooldown/cycle logic implemented and unit-tested per Architecture §8.3, including the 30-day cooldown-elapsed cycle-reset case |
 | Dictionary service | Stub. Returns not-found for every word. **No word list is bundled** |
 | Storage | No-op stub. Library decided — MMKV (D-07) — implementation is `WL-002`, gated on native projects |
@@ -397,31 +397,167 @@ exist yet — this task was started ahead of them:
 >   reasons only: no computer opponent (WL-108/WL-109/WL-110) and the safe-area defect
 >   logged under WL-401.
 
-**WL-108 · Candidate generation** — M · 1.5d · WL-105, WL-106
+**WL-108 · Candidate generation** — M · 1.5d · WL-105, WL-106 — **DONE 2026-08-19**
 Given a required letter and the used-word set, return scored candidates. Computer draws
 only from the computer-playable tier (PRD §8.7); the player may submit from the wider
 accepted set.
 *Done when:* generation returns correctly filtered, correctly scored candidates for all 26
-letters, including the sparse ones.
+letters, including the sparse ones. ✅ — `generateCandidates()` in `difficultyEngine.ts`,
+covered per-letter for all 26 against the real bundle plus synthetic-source unit tests
+(the real dictionary cannot produce a letter with exactly two candidates on demand).
 
-**WL-109 · Difficulty selection strategies** — M · 1.5d · WL-108
+> **Bug found and fixed: the computer could play a word shorter than the minimum.**
+> `MIN_WORD_LENGTH` (PRD §8.3) was only ever enforced in the *rule engine*, which
+> validates **player** input — nothing constrained the computer's own move, and the
+> dictionary carries **240 computer-playable words under three letters** (`a`, `ax`, `be`
+> …). WL-108 is the first task where the computer picks a word, so this is where it
+> surfaced; generation now filters on length. Every letter still has candidates
+> afterwards (sparsest is `x` at 34), so no letter becomes a dead end.
+>
+> While fixing it: `MIN_WORD_LENGTH` was declared **four times** — in `gameConstants.ts`
+> (exported, unused) and re-declared locally in `ruleEngine`, `scoringEngine` and the new
+> code. PRD §8.3 calls the value "recommended", i.e. tunable, so four copies would have
+> drifted the moment anyone tuned it. All three now import the shared constant.
+
+**Score component definitions are this implementation's, not the docs'.** Architecture §6
+and PRD §10 give the formula and the per-difficulty weights, but of the five terms only
+`option_reduction_score` is defined anywhere. The rest are defined in the
+`difficultyEngine.ts` module docblock and flagged there as such. Two findings that matter
+for WL-605's tuning pass:
+
+1. **`obscurity_penalty` is inert as a binary flag.** The computer draws only from the
+   computer-playable tier, which already excludes obscure words outright — so
+   "is it obscure" is always false and w4 (0.5 on Easy and Hard) multiplies zero. It is
+   implemented as a graded hinge on the commonness tier instead, so it discriminates
+   within the band that actually occurs.
+2. **The model has fewer free parameters than it looks.** `commonness_score` and
+   `obscurity_penalty` both derive from the same frequency tier and so cannot be tuned
+   independently. `difficulty_score` deliberately uses **word length** rather than rarity;
+   defining it as rarity would have made it a linear restatement of `commonness_score`,
+   collapsing three of the five terms onto one signal.
+
+*Measured* (worst-case letter `s`, 9,986 candidates, 26-word chain, generation + selection):
+
+| | Budget (WL-106) | iOS | Android |
+|---|---|---|---|
+| Candidate generation + selection | ≤ 50ms | 26–**36**ms | 23–**47**ms |
+
+> **Thinner margin than WL-105, and worth watching.** Android's 47ms is a first-run
+> JIT-warmup spike against a 50ms budget, on an emulator faster than the physical WL-005
+> devices; steady state is 23–25ms. WL-106's 19ms figure is not comparable — it ran with an
+> **empty** chain and before the full five-term scoring existed. Re-measure on real
+> hardware at WL-310. If a physical device misses, the available win is avoiding the ~25k
+> intermediate object allocations per turn (a `DictionaryWord` per record decoded, then a
+> `CandidateWord` per survivor), not the reply-count work.
+>
+> The used-word histograms in `generateCandidates` exist for the same reason: both the
+> reply count and the repetition term otherwise walk the chain per candidate, which is
+> O(candidates × chain) — invisible on the empty chain WL-106 measured, ~260k operations
+> on the 26-word chain measured here.
+
+**WL-109 · Difficulty selection strategies** — M · 1.5d · WL-108 — **DONE 2026-08-19**
 Implement the three selection methods from Architecture §6 that ranking alone doesn't
 cover: Easy = random from top candidates; Medium = weighted random from top 3–5; Hard =
 top-ranked with occasional second-best. Seedable RNG so tests are deterministic.
 *Done when:* over 1000 simulated turns per difficulty, selection distributions match the
-spec, and Hard never picks a word outside the top 2.
+spec, and Hard never picks a word outside the top 2. ✅ — all three asserted over 1,000
+seeded turns each, including the Hard top-2 guarantee.
 
-**WL-110 · Game session state machine** — L · 2d · WL-107, WL-109
+Pool sizes are `SELECTION_POOL_SIZE` (easy 10 / medium 5 / hard 2) and Hard's second-best
+rate is `HARD_SECOND_BEST_CHANCE` (0.15) — Architecture §6 says "occasional" without a
+number, so that constant is a WL-605 tuning input, not a fixed truth. `createSeededRandom`
+is a mulberry32 PRNG; the seedable source is what makes a *distribution* testable at all
+without either flaky thresholds or mocking a global.
+
+> **Doc contradiction, resolved in favour of the Architecture doc — flagged, not silently
+> picked.** PRD §10's Easy algorithm says to "choose one randomly" from *all* valid
+> candidates; Architecture §6 says "random pick from **top** candidates". These differ
+> sharply: **23% of computer-playable words sit in the uncommon tiers (60/65)**, so uniform
+> selection over everything would have Easy playing less familiar vocabulary than Medium or
+> Hard — inverting the difficulty it is named for — and would make Easy's
+> `w2_commonness = 1.0` weight meaningless, since the score would never be consulted.
+> Architecture's reading is implemented. If Product prefers the PRD reading, the fix is one
+> constant, but the weights table should change with it.
+
+**Ties are broken by a random key, reversing WL-106's deterministic tie-break on purpose.**
+Easy's weights give every common word an identical score, so list-order tie-breaking would
+have the computer play the same alphabetically-first word every single game. Each candidate
+that could make the cut draws a random key and is compared on `(score, key)`, which yields
+a uniform sample of the tied group. The WL-106 test that pinned "earliest candidate wins on
+a tie" was replaced rather than worked around — that behaviour was correct only while
+selection was "always top-ranked".
+
+Selection stays a **bounded insertion buffer, not a sort**, per WL-106's finding: one pass,
+each candidate scored exactly once, an allocation only for the few that make the cut, and a
+cheap score-only reject before spending a random draw.
+
+*Measured* (worst-case letter `s`, 9,986 candidates, 26-word chain, generation + selection):
+
+| Difficulty | Budget | iOS | Android |
+|---|---|---|---|
+| Easy (largest pool, most ties) | ≤ 50ms | 26–**31**ms | 23–**32**ms |
+| Medium | ≤ 50ms | 22–31ms | 23–28ms |
+| Hard | ≤ 50ms | 23–27ms | 21–29ms |
+
+No regression against WL-108 — its 47ms Android figure was a cold-JIT first-run spike, and
+these run with the runtime already warm. Easy is measured explicitly because it is the
+worst case for the tie-breaking path, not because it is the most expensive to score.
+
+**WL-110 · Game session state machine** — L · 2d · WL-107, WL-109 — **DONE 2026-08-19**
 Own the 7 `TurnPhase` values and the 5 `GameStatus` values already declared in
 `types/game.ts`. Detect both no-valid-move conditions (PRD §24 "Game ending") and
-dictionary exhaustion (draw). **Decide here or in WL-308, not both:** the Data Model doc's
-ratification pass (§12 item 8) found that no status value anywhere — not `GameStatus`, not
-`RoundSummary.result` — distinctly represents Wireframe §14's "technical failure" result
-state; it's currently silently absorbed into whichever status is closest. Either add a
-`GameStatus` value for it here, or explicitly decide it's out of scope and document why.
+dictionary exhaustion (draw).
 *Done when:* transitions are exhaustively tested, including player-has-no-move,
 computer-has-no-move, draw, and a deliberate (not accidental) answer for technical
-failure.
+failure. ✅ — `src/features/game/gameSession.ts`, 24 tests. Both unions are asserted
+*reachable*, not merely declared: one test walks a turn cycle touching all seven
+`TurnPhase` values, another collects all six `GameStatus` values.
+
+**The technical-failure question is decided: `technical_failure` was added to
+`GameStatus`.** The Data Model doc (§6) asked for this to be settled once, in whichever of
+WL-110 or WL-308 reached it first. Wireframe §14 requires five result states against a
+union offering four, so the fifth was being absorbed into whichever status was nearest —
+telling the player "you exited" when the app had actually broken, and hiding real failures
+inside an ordinary-looking metric. It is reachable rather than hypothetical: a corrupt
+packed asset throws during index construction (WL-105), and Wireframe §17 specifies a
+"dictionary unavailable" state. **WL-308 renders this state and must not re-decide it.**
+
+**The machine is pure and synchronous** — every transition takes the facts it needs as
+arguments and never calls the dictionary or the engines itself. The transient phases
+(`validating`, `computer_thinking`) exist so the UI can *render* them, which is impossible
+if a transition awaits the work internally; and endings that are rare or unreachable
+through the real dictionary still have to be testable. Turn *timing* — minimum think delay,
+timeout path — stays with WL-306.
+
+**How a round ends** (PRD §24 requires detecting both no-move conditions):
+
+| Situation | Status |
+|---|---|
+| Player's turn, no reply exists for the required letter | `computer_win` |
+| Computer has no candidate, but the player would have had a reply | `player_win` |
+| Neither side can move from the required letter | `draw` |
+| Player leaves the round | `abandoned` |
+| Something broke | `technical_failure` |
+
+The first row is load-bearing rather than an edge case: blocking the player is precisely
+what `option_reduction_score` exists to do, so it is the computer's main route to winning,
+and PRD §9.4's 20–40% player-win target on Hard is only reachable that way. `draw` stays
+distinct from `player_win` because the computer draws from a *subset* of what the player
+may submit — a stuck computer usually means a human could have continued, so only an empty
+player set means the dictionary genuinely ran out (Wireframe §14's "draw or exhausted
+dictionary").
+
+Two smaller decisions worth knowing:
+
+- **The starting word is seeded into the chain as the computer's opening move**, not held
+  alongside it. `usedWords` reads the chain, so keeping the opener outside it would let
+  either side replay it later in the round without the duplicate rule (PRD §8.4) ever
+  seeing it.
+- **Transitions are inert once a round is over, except `failSession`.** A late tap or a
+  queued computer move is an ordinary race in a UI with async turns, not a programming
+  error, and must not resurrect a finished round or overwrite its result. A technical
+  failure is the deliberate exception: a build that breaks after a round ended should not
+  look healthy in the metrics.
 
 **WL-111 · Wire rarity bonus into scoring** — S · 0.5d · WL-102, WL-110
 Feed the commonness tier into the existing `rarity_bonus` (0 / +5 / +10 per Architecture
@@ -558,6 +694,9 @@ hint penalty (−5 / −10) reaches the score.
 Wireframe §14: all 5 result states (player win, computer win, draw/exhausted, player exit,
 technical failure), score, words played, longest chain, and the three actions. Encouraging
 rather than competitive tone per §14.
+**The technical-failure question is already answered** — WL-110 added `technical_failure`
+to `GameStatus` (2026-08-19). Render it; do not re-decide it, and do not introduce a
+separate result vocabulary for it.
 *Done when:* all 5 states render, and Play Again returns to difficulty selection with no
 state leaking from the previous round.
 
@@ -993,8 +1132,10 @@ way.
      duplicated `GameStatus` under different names. Fixed by reusing `GameStatus`
      directly — which surfaced a real, previously invisible gap: **nothing in the system
      distinctly represents "technical failure,"** one of those five required states. That
-     can't be fixed in a doc; it needs a value added to the shipped `GameStatus` type.
-     Flagged against `WL-110`/`WL-308` (updated above) so it's decided once, not twice.
+     couldn't be fixed in a doc; it needed a value added to the shipped `GameStatus` type.
+     **Closed 2026-08-19 by `WL-110`**, which added `technical_failure` to `GameStatus`.
+     `RoundSummary.result` reuses that union, so it inherits the value; `WL-308` renders
+     the state rather than re-deciding it.
 4. ~~**Doc status lines are stale.**~~ **Resolved, both docs.** `WordLoop_Data_Model.md`
    and `WordLoop_Architecture.md` now both say "Active build" with an accurate account of
    what's been reviewed/closed. As of D-04 closing, `WordLoop_Architecture.md`'s status

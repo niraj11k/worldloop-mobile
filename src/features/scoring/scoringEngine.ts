@@ -5,12 +5,13 @@
  * (PRD section 16).
  */
 
+import { MIN_WORD_LENGTH } from '@constants/gameConstants';
+
 export type RarityTier = 'common' | 'uncommon' | 'rare';
 
 const BASE_POINTS = 10;
 const LENGTH_BONUS_CAP = 20;
 const LENGTH_BONUS_PER_LETTER = 2;
-const MIN_WORD_LENGTH = 3;
 
 const RARITY_BONUS: Record<RarityTier, number> = {
   common: 0,
