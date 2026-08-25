@@ -1,6 +1,10 @@
 import type { InvalidReason } from '@app-types/game';
 import { MIN_WORD_LENGTH } from '@constants/gameConstants';
-import { lookupWord, type DictionaryLookupResult } from '@features/dictionary/dictionaryService';
+import {
+  lookupWord,
+  type DictionaryLookupResult,
+  type DictionaryWord,
+} from '@features/dictionary/dictionaryService';
 
 /**
  * Local (client-side) rule engine.
@@ -26,6 +30,12 @@ export interface ValidationResult {
   isValid: boolean;
   normalizedWord: string;
   reason: InvalidReason | null;
+  /**
+   * The matched entry, non-null only on a valid word. Carried out of
+   * validation so scoring can read the commonness tier (WL-111) from the
+   * lookup that already happened, rather than repeating it every turn.
+   */
+  entry: DictionaryWord | null;
 }
 
 /** Injectable so the engine stays unit-testable without a bundled dictionary. */
@@ -60,23 +70,23 @@ function validateStructure(params: {
   if (normalizedWord.length === 0) {
     // Empty state, not an error state — Wireframe doc section 9 ("input empty")
     // treats this as a distinct, non-error phase with Submit disabled.
-    return { isValid: false, normalizedWord, reason: null };
+    return { isValid: false, normalizedWord, reason: null, entry: null };
   }
 
   if (!VALID_WORD_PATTERN.test(normalizedWord)) {
-    return { isValid: false, normalizedWord, reason: 'unsupported_symbols' };
+    return { isValid: false, normalizedWord, reason: 'unsupported_symbols', entry: null };
   }
 
   if (normalizedWord.length < MIN_WORD_LENGTH) {
-    return { isValid: false, normalizedWord, reason: 'too_short' };
+    return { isValid: false, normalizedWord, reason: 'too_short', entry: null };
   }
 
   if (normalizedWord[0] !== params.requiredLetter.toLowerCase()) {
-    return { isValid: false, normalizedWord, reason: 'wrong_letter' };
+    return { isValid: false, normalizedWord, reason: 'wrong_letter', entry: null };
   }
 
   if (params.usedWords.has(normalizedWord)) {
-    return { isValid: false, normalizedWord, reason: 'duplicate' };
+    return { isValid: false, normalizedWord, reason: 'duplicate', entry: null };
   }
 
   return null;
@@ -110,7 +120,7 @@ export async function validateMove(
   const { found, entry } = await lookup(normalizedWord);
 
   if (!found || entry === null) {
-    return { isValid: false, normalizedWord, reason: 'unknown_word' };
+    return { isValid: false, normalizedWord, reason: 'unknown_word', entry: null };
   }
 
   // Offensive before proper-noun: a word classified as both should surface the
@@ -118,11 +128,11 @@ export async function validateMove(
   // naming the category (Wireframe doc section 10 — avoid exposing internal
   // dictionary detail).
   if (entry.isOffensive) {
-    return { isValid: false, normalizedWord, reason: 'offensive_excluded' };
+    return { isValid: false, normalizedWord, reason: 'offensive_excluded', entry: null };
   }
 
   if (entry.isProperNoun) {
-    return { isValid: false, normalizedWord, reason: 'proper_noun' };
+    return { isValid: false, normalizedWord, reason: 'proper_noun', entry: null };
   }
 
   if (!entry.isAllowed) {
@@ -132,14 +142,14 @@ export async function validateMove(
     // make disallowed words playable. unknown_word is the safe fallback —
     // it leaks nothing and the suggested action ("try another word") is
     // still correct.
-    return { isValid: false, normalizedWord, reason: 'unknown_word' };
+    return { isValid: false, normalizedWord, reason: 'unknown_word', entry: null };
   }
 
   // Deliberately NOT rejected here: isObscure. Per PRD section 8.7 the player
   // may submit a wider vocabulary than the computer draws from — obscurity
   // constrains computer selection (isComputerPlayable, used by the difficulty
   // engine), not player submissions.
-  return { isValid: true, normalizedWord, reason: null };
+  return { isValid: true, normalizedWord, reason: null, entry };
 }
 
 /**

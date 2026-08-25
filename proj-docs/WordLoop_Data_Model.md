@@ -136,7 +136,8 @@ sessionId
 difficulty             (easy / medium / hard)
 currentWord
 requiredLetter
-status                 (active / player_win / computer_win / draw / abandoned)
+status                 (active / player_win / computer_win / draw / abandoned /
+                        technical_failure)
 phase                  (player_turn / input_empty / validating / computer_thinking /
                         invalid_word / valid_move / no_computer_move)
 chain                  (Move[] — the round's move history, embedded rather than
@@ -144,9 +145,22 @@ chain                  (Move[] — the round's move history, embedded rather tha
 score
 hintsUsed
 isOfflineSession
+previousBestChainLength (number | null — the player's longest chain before this
+                        round, for the round-end personal-best bonus)
 ```
 
 Notes:
+
+- `status` includes `technical_failure`, added to `GameStatus` by WL-110 (see section 6's
+  note on `RoundSummary.result`). This line previously listed only five values, predating
+  that change.
+- `previousBestChainLength` is a **baseline copied in at session creation** (WL-111), not
+  a running statistic the round updates — the round-end bonus needs a value to compare
+  against, and reading the live profile mid-round would let a concurrent write change the
+  payout. `null` means no profile has been loaded, which is deliberately distinct from a
+  real best of `0`: an unknown baseline awards no milestone, whereas a genuine first
+  round beats zero and earns one. WL-402 is what will supply the real value; until then
+  every session runs with `null`.
 
 - `phase` is the `TurnPhase` union also declared in `types/game.ts`; it's UI/interaction
   state that has no reason to exist in a server-persisted `GameSession`, only in the

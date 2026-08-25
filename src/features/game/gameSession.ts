@@ -49,14 +49,26 @@
 import type { GameSessionState, GameStatus, Move, TurnPhase } from '@app-types/game';
 import type { ValidationResult } from '@features/game/ruleEngine';
 import { getRequiredLetter, normalizeWord } from '@features/game/ruleEngine';
+import { roundEndBonus } from '@features/scoring/scoringEngine';
 
 /** A completed round: every status except `active`. */
 export function isRoundOver(state: GameSessionState): boolean {
   return state.status !== 'active';
 }
 
+/**
+ * The single place a round's score is finalized, so every ending path — win,
+ * loss, draw, abandonment, failure — prices itself the same way (WL-111).
+ * `roundEndBonus` decides which of those actually pay out.
+ */
 function endRound(state: GameSessionState, status: GameStatus): GameSessionState {
-  return { ...state, status, phase: 'no_computer_move' };
+  const bonus = roundEndBonus({
+    status,
+    chainLength: state.chain.length,
+    previousBestChainLength: state.previousBestChainLength,
+  });
+
+  return { ...state, status, phase: 'no_computer_move', score: state.score + bonus };
 }
 
 /**
@@ -78,6 +90,12 @@ export function createSession(params: {
   difficulty: GameSessionState['difficulty'];
   startingWord: string;
   isOfflineSession?: boolean;
+  /**
+   * The player's longest chain so far, for the personal-best bonus. Omit
+   * when no profile has been loaded — WL-402 supplies the real value, and
+   * until then no milestone should be invented.
+   */
+  previousBestChainLength?: number | null;
 }): GameSessionState {
   const startingWord = normalizeWord(params.startingWord);
 
@@ -110,6 +128,7 @@ export function createSession(params: {
     score: 0,
     hintsUsed: 0,
     isOfflineSession: params.isOfflineSession ?? true,
+    previousBestChainLength: params.previousBestChainLength ?? null,
   };
 }
 

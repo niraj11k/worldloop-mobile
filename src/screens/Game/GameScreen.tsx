@@ -15,6 +15,7 @@ import {
   usedWords,
 } from '@features/game/gameSession';
 import { generateCandidates, selectComputerWord } from '@features/difficulty/difficultyEngine';
+import { rarityForEntry, scoreWord } from '@features/scoring/scoringEngine';
 import { replyCountForLetter } from '@features/dictionary/dictionaryService';
 import { INVALID_WORD_MESSAGES } from '@constants/gameConstants';
 import type { GameStatus, InvalidReason } from '@app-types/game';
@@ -55,8 +56,9 @@ const ROUND_OVER_MESSAGES: Record<Exclude<GameStatus, 'active'>, string> = {
  * grayscale skeleton: the layout, the seven Wireframe section 9 states and
  * the game-over screen are WL-301/302/308, gated on the design system.
  *
- * Not yet wired: hint sheet, definition overlay, persistence (WL-403), and
- * per-word scoring, which stays 0 until WL-111 feeds the rarity tier in.
+ * Not yet wired: hint sheet, definition overlay, and persistence (WL-403) —
+ * the last of which is also what will supply the personal-best baseline the
+ * round-end bonus needs (WL-402).
  */
 export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   const { difficulty } = route.params;
@@ -91,7 +93,21 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
       usedWords: usedWords(validating),
     });
 
-    const afterPlayer = applyValidation(validating, { submittedWord: input, result });
+    const afterPlayer = applyValidation(validating, {
+      submittedWord: input,
+      result,
+      scoreAwarded:
+        result.entry === null
+          ? 0
+          : scoreWord({
+              wordLength: result.normalizedWord.length,
+              rarity: rarityForEntry(result.entry),
+              // TODO(WL-307): the hint sheet is the only thing that can set
+              // these; until it exists no turn can carry a penalty.
+              hintUsed: false,
+              hintRevealedWord: false,
+            }),
+    });
     if (!result.isValid) {
       setErrorReason(result.reason);
       setSession(afterPlayer);
