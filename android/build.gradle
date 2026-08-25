@@ -15,6 +15,14 @@ buildscript {
         classpath("com.android.tools.build:gradle")
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+        // WL-003: processes android/app/google-services.json into resources the
+        // Firebase SDK reads at runtime (google_app_id etc). Without this plugin
+        // applied in app/build.gradle, the config file sits on disk unused.
+        classpath("com.google.gms:google-services:4.5.0")
+        // WL-003: uploads the ProGuard/R8 mapping file and NDK symbols so a
+        // crash in a release build symbolicates in the dashboard instead of
+        // showing obfuscated method names.
+        classpath("com.google.firebase:firebase-crashlytics-gradle:3.0.8")
     }
 }
 

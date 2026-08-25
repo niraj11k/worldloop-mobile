@@ -2,6 +2,7 @@ import UIKit
 import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
+import FirebaseCore
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -14,6 +15,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+    // WL-003: must run before startReactNative below — the JS layer calls
+    // getApp() at module-load time (firebaseCrashReporter.ts), and that
+    // throws "No Firebase App '[DEFAULT]' has been created" if the native
+    // SDK hasn't configured itself yet. react-native-firebase's CocoaPods
+    // integration handles firebase.json processing and Crashlytics symbol
+    // upload automatically, but this actual init call is not auto-injected
+    // and is a required manual step.
+    FirebaseApp.configure()
+
     let delegate = ReactNativeDelegate()
     let factory = RCTReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()
