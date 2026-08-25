@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 """
-WordLoop dictionary data fixtures (Delivery Plan WL-103 "Done when": a
-fixture test covering >=50 proper-noun cases; plus WL-107's PRD section 8.6
-inflected-form confirmation).
+WordLoop dictionary data fixtures.
+
+Covers three Delivery Plan "Done when" clauses against the generated data:
+  - WL-103: >=50 proper-noun classification cases
+  - WL-107: PRD section 8.6 inflected forms are accepted
+  - WL-104: every word in data/excluded-words.txt is flagged and unplayable,
+    and nothing outside that file is flagged (the list stays the single
+    source of the exclusion policy, per PRD section 8.8)
 
 Verifies scripts/generate-dictionary.py's output against real words with a
 known-correct classification, so a future change to the pipeline's
@@ -33,6 +38,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DICTIONARY_PATH = REPO_ROOT / "src" / "assets" / "dictionary" / "dictionary.json"
+EXCLUSIONS_PATH = REPO_ROOT / "data" / "excluded-words.txt"
 
 # Proper nouns per PRD section 8.5 / licence review section 5: rejected via
 # is_proper_noun, no independent common-word reading in ESDB.
@@ -69,6 +75,15 @@ INFLECTED_FORMS = [
 ]
 
 
+def load_exclusions() -> set[str]:
+    words: set[str] = set()
+    for line in EXCLUSIONS_PATH.read_text(encoding="utf-8").splitlines():
+        entry = line.strip().lower()
+        if entry and not entry.startswith("#"):
+            words.add(entry)
+    return words
+
+
 def main() -> int:
     if not DICTIONARY_PATH.exists():
         print(f"error: {DICTIONARY_PATH} does not exist.")
@@ -98,11 +113,32 @@ def main() -> int:
         elif not entry["isAllowed"]:
             failures.append(f"{word}: expected isAllowed=True, got False")
 
-    total_cases = len(REJECT_WORDS) + len(ACCEPT_WORDS) + len(INFLECTED_FORMS)
+    # WL-104: every listed exclusion must actually be marked in the generated
+    # data, and must still be PRESENT as an entry -- a word that vanished
+    # entirely would be reported to the player as unknown_word rather than
+    # offensive_excluded, losing the distinction Wireframe section 10 draws.
+    exclusions = load_exclusions()
+    for word in sorted(exclusions):
+        entry = by_word.get(word)
+        if entry is None:
+            failures.append(f"{word}: excluded but not present in the dictionary at all")
+        elif not entry["isOffensive"]:
+            failures.append(f"{word}: listed in excluded-words.txt but isOffensive=False")
+        elif entry["isAllowed"] or entry["isComputerPlayable"]:
+            failures.append(f"{word}: excluded but still playable")
+
+    # And nothing outside the list may be flagged, so the file stays the single
+    # source of the exclusion policy (PRD section 8.8).
+    stray = sorted(e["normalizedWord"] for e in entries if e["isOffensive"])
+    for word in stray:
+        if word not in exclusions:
+            failures.append(f"{word}: flagged offensive but absent from excluded-words.txt")
+
+    total_cases = len(REJECT_WORDS) + len(ACCEPT_WORDS) + len(INFLECTED_FORMS) + len(exclusions)
     print(
         f"Fixture cases: {total_cases} "
         f"({len(REJECT_WORDS)} reject, {len(ACCEPT_WORDS)} accept, "
-        f"{len(INFLECTED_FORMS)} inflected)"
+        f"{len(INFLECTED_FORMS)} inflected, {len(exclusions)} excluded)"
     )
 
     if failures:

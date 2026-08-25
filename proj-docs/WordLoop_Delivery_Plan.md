@@ -231,11 +231,56 @@ gap: `robert`/`nike`/`pepsi` come out accepted because ESDB left their `POS-CLAS
 instead of `person`/`trademark` — a source data-tagging gap, not a pipeline bug, excluded
 from the fixture list rather than chased here.
 
-**WL-104 · Offensive/excluded word list** — S · 1d · WL-102
+**WL-104 · Offensive/excluded word list** — S · 1d · WL-102 — **DONE 2026-08-19**
 Per PRD §8.8 this must be configurable data, not code. Sourced list plus a manual review
 pass, applied at pipeline time and overridable at runtime.
 *Done when:* the exclusion list is a standalone reviewable data file, and excluded words
-reject with reason `offensive_excluded`.
+reject with reason `offensive_excluded`. ✅
+
+The list lives at **`data/excluded-words.txt`** — plain text, one word per line, comments
+allowed, read by the pipeline and by `npm run dictionary:verify`. Editing that file and
+regenerating is the entire change; no code moves, which is what PRD §8.8 asks for.
+Excluded words stay *present* in the dictionary rather than being deleted, so the player
+gets "That word cannot be used in WordLoop" (Wireframe §10) instead of the misleading
+unknown-word message.
+
+**Source:** seeded from LDNOOBW (`github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-
+Otherwise-Bad-Words`). That list targets user-generated text, so most of it is irrelevant
+here: of its 403 entries, 275 are single words and only **154 exist in WordLoop's
+dictionary at all**. **136 are excluded** after the review pass; 141,217 words remain
+playable (down 134 — `lolita` and `viagra` were already proper nouns).
+
+> **New licence obligation:** LDNOOBW is **CC-BY-4.0**, which requires attribution. That
+> notice must join ESDB's and WordNet's in Settings → Attributions (**WL-407**). This is a
+> third attribution WordLoop did not previously carry — cheap, but it is a real
+> obligation, so it is recorded here rather than assumed. If that is unwanted, the
+> alternative is curating the list from scratch with no third-party lineage.
+
+**Review pass — 18 words put back.** PRD §8.5 already forbids rejecting a common word just
+because it has an objectionable reading ("rose" stays playable), and the same restraint
+applies here: `butt`, `escort`, `scat`, `skeet`, `snatch`, `shrimping`, `snowballing`,
+`pegging`, `bareback`, `hardcore`, `playboy`, `eunuch`, `fecal`, `domination`, `suck`,
+`sucks`, `bastinado`, `strappado`. Each is listed in the data file with the sense that
+keeps it in, so the judgement is auditable rather than implicit.
+
+> **Open judgement, deliberately conservative.** The store age rating is still undecided
+> (Store Submission Checklist §D), and the audience includes parents and a possible school
+> version, so borderline words are left excluded — a false block is cheaper than a false
+> allow. The most arguable are **`sex`/`sexual`/`sexuality`/`sexually`**, which are neutral
+> and very common, and the clinical anatomy terms. All are called out in the data file's
+> header for a product decision, not buried.
+
+**Runtime override** (`setRuntimeExclusions`) sits on top of the baked flag and feeds
+`isAllowed`/`isComputerPlayable` too, so PRD §24's "the computer does not select forbidden
+words" holds for overrides as well. It matters because v1 ships no backend (D-03): without
+it, a word slipping through review would need a full store update to remove. It is also
+the hook WL-505's report-a-word loop writes into.
+
+*Verification:* `npm run dictionary:verify` now checks all 136 exclusions are flagged and
+unplayable **and** that nothing outside the file is flagged (208 fixture cases total); the
+guard was negative-tested by adding a word and confirming it fails. `ruleEngine.test.ts`
+additionally drives `validateMove` against the real bundled asset to confirm
+`offensive_excluded` — not `unknown_word` — is what actually reaches the player.
 
 **WL-105 · Bundle format and lookup performance** — L · 2d · WL-102
 Decide the on-device representation. A parsed JSON blob of 50k+ entries will cost visible
@@ -592,6 +637,8 @@ apple→elephant→table example, not abstract rules.
 Wireframe §16 minus whatever D-04 and D-05 remove: sound, haptics, text size, reset
 statistics, privacy policy, terms, report a word, contact support. Plus the Attributions
 screen carrying the WL-101 notices, and "Delete guest data" per the Guest Deletion doc.
+**Three notices, not two:** ESDB and WordNet (WL-101, text in the licence review §7), plus
+**LDNOOBW under CC-BY-4.0**, added by WL-104 as the source of the excluded-word list.
 **The Account row is already done** — D-04 closed, and `SettingsScreen.tsx` shows only
 "Continue as guest," gated behind `ACCOUNTS_ENABLED_V1`, ahead of the rest of this task.
 *Done when:* every toggle persists and takes effect immediately; reset and delete both

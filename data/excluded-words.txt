@@ -1,0 +1,213 @@
+# WordLoop excluded-word list (Delivery Plan WL-104)
+#
+# Words that must never be playable, by either the player or the computer.
+# PRD section 8.8 requires this to be configurable DATA, not logic — so this
+# file is the single place the exclusion policy lives. Editing it and
+# re-running `npm run dictionary:generate` is the whole change; no code moves.
+#
+# Format: one lowercase word per line. Blank lines and lines starting with
+# '#' are ignored. Order is alphabetical and has no meaning.
+#
+# A word listed here that is not in the dictionary is harmless (it simply
+# never matches); the generator reports the count so a typo does not pass
+# unnoticed.
+#
+# ---------------------------------------------------------------------------
+# Source and licence
+# ---------------------------------------------------------------------------
+# Seeded from the "List of Dirty, Naughty, Obscene, and Otherwise Bad Words"
+# (github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words),
+# licensed CC-BY-4.0. That list is built for filtering user-generated text, so
+# most of it is irrelevant here: of its 403 entries, 275 are single words and
+# only 154 exist in WordLoop's dictionary at all.
+#
+# CC-BY-4.0 requires attribution. That notice belongs in Settings →
+# Attributions alongside ESDB and WordNet (WL-407).
+#
+# ---------------------------------------------------------------------------
+# Review policy
+# ---------------------------------------------------------------------------
+# Audience is casual players and learners, and PRD section 6 names parents as
+# valuing "a safe game", with a school version as a possible future product.
+# The list is therefore tuned to a family-safe bar. Note the store age rating
+# is still an open question (Store Submission Checklist section D) — if it
+# lands somewhere other than all-ages, revisit this file.
+#
+# The counter-risk is over-blocking. PRD section 8.5 is explicit that a common
+# word must not be rejected merely because it has an objectionable reading —
+# "rose" stays playable. The same restraint applies here: a word whose
+# everyday sense is innocent and common is NOT excluded, even when the source
+# list flags it.
+#
+# Reviewed and deliberately NOT excluded, with the sense that keeps them in:
+#
+#   bareback     riding a horse without a saddle
+#   bastinado    historical form of punishment
+#   butt         to butt; rifle butt; butt of a joke; water butt
+#   domination   world domination; chess domination
+#   escort       to escort someone
+#   eunuch       standard historical term
+#   fecal        clinical/medical term
+#   hardcore     hardcore fan; hardcore music
+#   pegging      pegging out laundry; pegging a price
+#   playboy      an idle wealthy man
+#   scat         jazz scat singing; "scat!" meaning go away
+#   shrimping    catching shrimp
+#   skeet        skeet shooting, an Olympic sport
+#   snatch       to snatch something; a weightlifting lift
+#   snowballing  a snowball effect
+#   strappado    historical form of punishment
+#   suck/sucks   to suck through a straw
+#
+# Known debatable calls, left excluded because the audience skews family and
+# a false block is cheaper than a false allow — flip them here if that
+# judgement changes:
+#
+#   - Clinical anatomy and biology terms (anus, penis, semen, vagina, vulva,
+#     nipple, rectum, clitoris, genitals) are ordinary vocabulary in a
+#     learning context, but read as deliberate to a parent watching a child
+#     play.
+#   - "sex", "sexual", "sexuality", "sexually" are neutral, extremely common
+#     English words. This is the single most arguable exclusion in the file.
+#   - Words with a real innocent sense that is now clearly secondary in
+#     everyday use: ass (donkey), cock (rooster), bitch (female dog),
+#     fingering (musical technique), boob (a blunder), hooker (rugby
+#     position), topless (an open-topped car), cum (as in "kitchen-cum-diner").
+#
+# ---------------------------------------------------------------------------
+anal
+anilingus
+anus
+arsehole
+ass
+asshole
+autoerotic
+bastard
+bestiality
+bimbos
+bitch
+bitches
+blowjob
+bollocks
+bondage
+boner
+boob
+boobs
+bulldyke
+bullshit
+bunghole
+busty
+clit
+clitoris
+cock
+cocks
+coon
+coons
+coprophilia
+cum
+cumming
+cunnilingus
+cunt
+darkie
+dick
+dildo
+dominatrix
+ejaculation
+erotic
+fag
+faggot
+fellatio
+fingering
+fuck
+fucking
+genitals
+grope
+homoerotic
+honkey
+hooker
+horny
+humping
+incest
+intercourse
+jigaboo
+kike
+kinky
+lolita
+lovemaking
+masturbate
+masturbating
+masturbation
+milf
+mong
+motherfucker
+negro
+nigga
+nigger
+nipple
+nipples
+nsfw
+nude
+nudity
+nympho
+nymphomania
+orgasm
+orgy
+paedophile
+paki
+panties
+panty
+pedophile
+penis
+pissing
+poof
+poon
+porn
+porno
+pornography
+pubes
+pussy
+rape
+raping
+rapist
+rectum
+rimming
+sadism
+scissoring
+semen
+sex
+sexual
+sexuality
+sexually
+sexy
+shit
+shitty
+slut
+smut
+sodomize
+sodomy
+spastic
+spic
+spunk
+swastika
+swinger
+threesome
+tit
+tits
+titties
+titty
+topless
+tosser
+tranny
+tribadism
+tushy
+twat
+undressing
+vagina
+viagra
+vibrator
+voyeur
+vulva
+wank
+wetback
+whore
+zoophilia

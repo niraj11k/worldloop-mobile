@@ -10,12 +10,16 @@ import type { InvalidReason } from '@app-types/game';
 /**
  * Builds a fake dictionary lookup (WL-107).
  *
- * Injected rather than hitting the real bundle: the generated dictionary is
- * a gitignored build artifact (see src/assets/dictionary/README.md), so a
- * test depending on it would fail on a fresh checkout and in CI. Data-level
- * assertions about the real word list live in
- * scripts/verify-dictionary-fixtures.py instead; this file covers the
- * engine's decision logic.
+ * Injected so these cases test the engine's decision logic in isolation:
+ * each one pins a single rule, and a fixture makes the input to that rule
+ * explicit instead of depending on how a real word happens to be
+ * classified. It also keeps rare branches reachable — `ersatz` below stands
+ * in for `isAllowed: false` with no flag explaining it, which no real entry
+ * currently produces.
+ *
+ * The suite at the bottom of this file does the opposite, running
+ * `validateMove` against the real bundled asset, so both the wiring and the
+ * logic are covered.
  */
 function fakeDictionary(entries: Record<string, Partial<DictionaryWord>>): WordLookup {
   return async (normalizedWord: string) => {
@@ -193,5 +197,46 @@ describe('ruleEngine', () => {
         'duplicate',
       );
     });
+  });
+});
+
+describe('validateMove against the real bundled dictionary (WL-104/WL-105)', () => {
+  // No injected lookup: these exercise the shipped asset end to end, which is
+  // what WL-104's "excluded words reject with reason offensive_excluded"
+  // actually asks for.
+  const usedWords = new Set<string>();
+
+  it('rejects an excluded word with offensive_excluded, not unknown_word', async () => {
+    const result = await validateMove({
+      rawInput: 'bullshit',
+      requiredLetter: 'b',
+      usedWords,
+    });
+    expect(result.isValid).toBe(false);
+    expect(result.reason).toBe('offensive_excluded');
+  });
+
+  it('accepts an ordinary word', async () => {
+    const result = await validateMove({
+      rawInput: 'elephant',
+      requiredLetter: 'e',
+      usedWords,
+    });
+    expect(result.isValid).toBe(true);
+  });
+
+  it('accepts a word reviewed out of the exclusion list', async () => {
+    const result = await validateMove({ rawInput: 'snatch', requiredLetter: 's', usedWords });
+    expect(result.isValid).toBe(true);
+  });
+
+  it('still rejects a proper noun as proper_noun', async () => {
+    const result = await validateMove({ rawInput: 'london', requiredLetter: 'l', usedWords });
+    expect(result.reason).toBe('proper_noun');
+  });
+
+  it('still rejects a non-word as unknown_word', async () => {
+    const result = await validateMove({ rawInput: 'zzzzqqqx', requiredLetter: 'z', usedWords });
+    expect(result.reason).toBe('unknown_word');
   });
 });
