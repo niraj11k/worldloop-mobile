@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "207828257052",
+    "project_id": "wordloop-52618",
+    "storage_bucket": "wordloop-52618.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:207828257052:android:bb8c169830c4604cf012d9",
+        "android_client_info": {
+          "package_name": "com.wordloop.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyABM2PvThJDD2jvElEPlJYFFNWrEUl16f8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

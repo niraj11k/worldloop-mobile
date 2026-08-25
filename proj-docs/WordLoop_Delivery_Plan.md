@@ -151,11 +151,95 @@ to reverse.
 *Done when:* a round-trip write/read/remove test passes on both platforms, and a written
 value survives an app kill and relaunch.
 
-**WL-003 · Crash and error reporting** — S · 0.5d · WL-001
+**WL-003 · Crash and error reporting** — S · 0.5d · WL-001 — **DONE 2026-08-25**
 Wire a crash reporter (Sentry or Crashlytics) with source maps for both platforms, behind
 a config flag so it's inert in dev.
 *Done when:* a deliberately thrown error appears in the dashboard with a symbolicated
-stack from a release build.
+stack from a release build. ✅
+
+**Provider: Firebase Crashlytics** (decided 2026-08-19). `google-services.json` and
+`GoogleService-Info.plist` landed from a real Firebase project (`wordloop-52618`,
+`com.wordloop.mobile` on both platforms) on 2026-08-19 and are **committed to git** — a
+deliberate call, not an oversight: neither file is a secret in the traditional sense
+(Google's guidance is that access is controlled by Security Rules / App Check / API key
+restrictions in Cloud Console, not file secrecy), and gitignoring them would break the
+WL-004 native CI jobs on every fresh checkout, the same way the missing files broke local
+builds before they existed. If that judgement is ever revisited, the CI jobs need a
+secrets-injection step added at the same time — the two changes aren't independent.
+
+**Done:**
+
+- `src/services/crashReporting/crashReporting.ts` — the seam: `reportError` /
+  `logBreadcrumb` / `setCrashReporter`, inert in dev via `!__DEV__`, never throws (a
+  failure inside error reporting must not become a second error on a path already
+  handling one). Unit-tested.
+- `src/services/crashReporting/firebaseCrashReporter.ts` — the only file that imports
+  `@react-native-firebase/*`, so the provider stays a one-file decision (same pattern as
+  `StorageAdapter` keeping D-07 reversible). Installed at the top of `index.js`, before
+  `AppRegistry.registerComponent`, so early-render errors are still caught.
+- `@react-native-firebase/app` + `/crashlytics` installed; native wiring on both
+  platforms; **verified with real builds and real launches on both**, not just a
+  successful compile — a `tsc` pass would not have caught either bug below.
+
+**Two real integration bugs found and fixed, both by actually building and launching
+rather than trusting the edit:**
+
+1. **iOS: `pod install` failed outright** — `@react-native-firebase` resolves Firebase via
+   Swift Package Manager by default, whose static-library products collide at link time
+   under this project's default (non-`use_frameworks!`) linkage. Fixed by setting
+   `$RNFirebaseDisableSPM = true` in the Podfile, falling back to Firebase's traditional
+   CocoaPods resolution — the surgical fix; switching to `use_frameworks! :linkage =>
+   :dynamic` instead would have changed how every pod in the project links, not just
+   Firebase's. That in turn needed `use_modular_headers!` globally, since several Firebase
+   Swift pods depend on Objective-C pods that don't define Clang modules.
+2. **iOS: a scripted `project.pbxproj` edit added a *dangling* build-phase reference** — a
+   UUID present in the target's build-phase list with no corresponding object definition
+   anywhere in the file, which would have corrupted the Xcode project. Caught by reopening
+   the saved file fresh and checking every referenced UUID resolves, not by trusting the
+   edit script's own success message. Root cause: the `WordLoop` group carries no `path`
+   of its own (every sibling file — `AppDelegate.swift`, `Info.plist` — sets its own
+   `path` to `WordLoop/<file>` instead), so a file reference created with just the bare
+   filename resolved one directory too high; a real build failed with "Build input file
+   cannot be found" before this was caught. Fixed, and separately: the manually-added
+   Crashlytics dSYM-upload build phase this edit also added turned out to be **entirely
+   redundant** — `pod install` already auto-injects a complete `[CP-User] [RNFB]
+   Crashlytics Configuration` phase with CocoaPods/framework/SPM fallback logic. Removed.
+3. **iOS: `FirebaseApp.configure()` is not auto-injected** — `getApp()` at JS module-load
+   time threw `No Firebase App '[DEFAULT]' has been created`, confirmed by an actual
+   simulator launch (a native-only build could not have caught this — the failure is at
+   JS/native handoff). RNFB's CocoaPods integration handles `firebase.json` processing and
+   Crashlytics symbol upload automatically, but the native init call itself is a documented
+   manual step. Added to `AppDelegate.swift`, before `startReactNative`. **Android needed
+   no equivalent fix** — confirmed by an actual launch, not assumed: its SDK
+   auto-initializes via a manifest-merged `ContentProvider`.
+
+**Release-build crash verified on-device, both platforms, 2026-08-25** — the engineering
+side of this task is complete. `forceCrashForVerification()` was temporarily wired into
+`App.tsx` (a 2-second post-mount timer, removed immediately after; the working tree is
+clean of it), Release configurations were built on both platforms, and both crashed for
+the deliberate reason rather than something incidental:
+
+- **iOS:** the OS-level `.ips` crash report's crashed thread has
+  `-[RNFBCrashlyticsModule crash]` as its top frame — the exact native method
+  `forceCrashForVerification()` calls, reached through the TurboModule bridge. Not
+  inferred from the app disappearing; read directly from
+  `~/Library/Logs/DiagnosticReports/WordLoop-2026-08-25-225025.ips`.
+- **Android:** `adb logcat` shows `FATAL EXCEPTION: mqt_v_native` /
+  `java.lang.RuntimeException: Crash Test` at
+  `io.invertase.firebase.crashlytics.NativeRNFBTurboCrashlytics$1.run`, with
+  `libcrashlytics: Initializing native crash handling successful` logged immediately
+  before it — the native crash handler was active and caught it.
+
+Both apps were relaunched once afterward — required, not optional: Crashlytics uploads
+the *previous* run's report on the next launch, not the one that's currently crashing.
+Android's logcat then showed a real outbound request,
+`Making request to: https://crashlyticsreports-pa.googleapis.com/v1/firelog/legacy/batchlog`
+— confirming the report was actually sent, not merely queued. No equivalent request-level
+log exists on iOS to quote, which is a real gap in what could be confirmed this way, not
+assumed away.
+
+**Confirmed in the Firebase console 2026-08-25 by the project owner** — both crash
+reports (iOS and Android) render with symbolicated stacks. This closes the task.
 
 **WL-004 · Extend CI to build both native platforms** — M · 1d · WL-001
 Add iOS and Android compile jobs to `.github/workflows/ci.yml` alongside the existing
