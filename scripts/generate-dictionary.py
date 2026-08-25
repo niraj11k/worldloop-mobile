@@ -26,9 +26,10 @@ legal constraint), and are called out here so they're easy to revisit:
     lookup (Architecture doc section 5), so a dictionary entry for them
     would be unreachable dead weight.
 
-is_offensive is always False here — WL-104 (a separately curated,
-configurable exclusion list) is a distinct, not-yet-built task per the
-licence review section 6 ("ESDB has no offensiveness signal").
+is_offensive comes from data/excluded-words.txt (WL-104), not from ESDB —
+the licence review section 6 confirms ESDB carries no offensiveness signal,
+so that list is separately sourced and curated. PRD section 8.8 requires it
+to stay configurable data rather than logic, so this script only reads it.
 
 base_word is always None for this pass: WL-102's explicit required-field
 list (Delivery Plan Phase 1) is normalized form, allowed/proper-noun/
@@ -57,6 +58,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CACHE_DIR = REPO_ROOT / ".cache" / "esdb"
 OUTPUT_DIR = REPO_ROOT / "src" / "assets" / "dictionary"
+EXCLUSIONS_PATH = REPO_ROOT / "data" / "excluded-words.txt"
 
 ESDB_REPO = "https://github.com/en-wl/wordlist.git"
 ESDB_TAG = "rel-2026.02.25"
@@ -141,7 +143,29 @@ def fetch_rows(db_path: Path) -> list[sqlite3.Row]:
     return rows
 
 
-def build_dictionary(rows: list[sqlite3.Row]) -> tuple[list[dict], int]:
+def load_exclusions() -> set[str]:
+    """Reads the WL-104 excluded-word list.
+
+    PRD section 8.8 requires the exclusion policy to be configurable data
+    rather than logic, so it lives in data/excluded-words.txt and is read
+    here. A missing file is a hard error, not a silent empty set — shipping
+    a dictionary with no exclusions because of a path typo is exactly the
+    failure this task exists to prevent.
+    """
+    if not EXCLUSIONS_PATH.exists():
+        raise FileNotFoundError(
+            f"Excluded-word list not found at {EXCLUSIONS_PATH}. "
+            "It is required (Delivery Plan WL-104, PRD section 8.8)."
+        )
+    words: set[str] = set()
+    for line in EXCLUSIONS_PATH.read_text(encoding="utf-8").splitlines():
+        entry = line.strip().lower()
+        if entry and not entry.startswith("#"):
+            words.add(entry)
+    return words
+
+
+def build_dictionary(rows: list[sqlite3.Row], exclusions: set[str]) -> tuple[list[dict], int]:
     groups: dict[str, list[dict]] = {}
     dropped_non_letters = 0
 
@@ -166,7 +190,7 @@ def build_dictionary(rows: list[sqlite3.Row]) -> tuple[list[dict], int]:
         best = min(representative_rows, key=lambda r: r["size"])
         size = best["size"]
 
-        is_offensive = False  # WL-104, not yet built
+        is_offensive = normalized_word in exclusions
         is_allowed = (not is_proper_noun) and (not is_offensive)
         is_common_word = size <= 50
         is_obscure = size >= 70
@@ -275,7 +299,8 @@ def main() -> None:
     esdb_dir = ensure_esdb_source()
     db_path = ensure_scowl_db(esdb_dir)
     rows = fetch_rows(db_path)
-    entries, dropped_non_letters = build_dictionary(rows)
+    exclusions = load_exclusions()
+    entries, dropped_non_letters = build_dictionary(rows, exclusions)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     dict_path = OUTPUT_DIR / "dictionary.json"
@@ -311,6 +336,13 @@ def main() -> None:
     packed_path = OUTPUT_DIR / "dictionary.pack.json"
     with packed_path.open("w", encoding="utf-8") as f:
         json.dump(packed, f, separators=(",", ":"))
+
+    matched = {e["normalizedWord"] for e in entries if e["isOffensive"]}
+    unmatched = sorted(exclusions - matched)
+    print()
+    print(f"Exclusions (WL-104): {len(exclusions)} listed, {len(matched)} matched in dictionary")
+    if unmatched:
+        print(f"  not present in dictionary ({len(unmatched)}, harmless): {', '.join(unmatched)}")
 
     print_stats(entries, dropped_non_letters)
     size_mb = dict_path.stat().st_size / 1_000_000

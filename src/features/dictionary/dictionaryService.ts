@@ -74,6 +74,36 @@ interface DictionaryIndex {
 
 let index: DictionaryIndex | null = null;
 
+/**
+ * Extra exclusions applied on top of the ones baked into the asset (WL-104).
+ *
+ * The Delivery Plan requires the exclusion list to be overridable at runtime,
+ * not only at pipeline time. That matters because v1 ships no backend
+ * (D-03): without this, a word that slips through review could only be
+ * removed by regenerating the dictionary and shipping a store update. This
+ * is the hook a local override — or WL-505's report-a-word feedback loop —
+ * writes into.
+ */
+let runtimeExclusions: Set<string> = new Set();
+
+/** Replaces the runtime exclusion set. Words are normalized like input is. */
+export function setRuntimeExclusions(words: Iterable<string>): void {
+  runtimeExclusions = new Set(
+    Array.from(words, word => word.trim().toLowerCase()).filter(word => word.length > 0),
+  );
+}
+
+export function getRuntimeExclusions(): ReadonlySet<string> {
+  return runtimeExclusions;
+}
+
+function isRuntimeExcluded(normalizedWord: string): boolean {
+  // Size check first so the ordinary case (no overrides) costs nothing in
+  // the candidate-enumeration loop, which decodes ~15k records for the
+  // worst letter and has a 50ms budget (WL-106).
+  return runtimeExclusions.size > 0 && runtimeExclusions.has(normalizedWord);
+}
+
 function buildIndex(): DictionaryIndex {
   const { records, wordCount, sizeTiers } = packedAsset;
   const offsets = new Int32Array(wordCount);
@@ -133,11 +163,16 @@ function decodeFlags(code: number): {
 function decodeAt(idx: DictionaryIndex, i: number): DictionaryWord {
   const end = recordEnd(idx, i);
   const normalizedWord = idx.records.slice(recordStart(idx, i), end - 1);
-  const { tierIndex, isProperNoun, isOffensive } = decodeFlags(
+  const { tierIndex, isProperNoun, isOffensive: isBakedOffensive } = decodeFlags(
     idx.records.charCodeAt(end - 1) - FLAG_BASE,
   );
 
   const tier = idx.sizeTiers[tierIndex] ?? FREQUENCY_MAX_TIER;
+  // Runtime overrides sit on top of the baked flag, and deliberately feed
+  // isAllowed/isComputerPlayable too: PRD section 24 requires that the
+  // computer never selects a forbidden word, not just that the player
+  // cannot play one.
+  const isOffensive = isBakedOffensive || isRuntimeExcluded(normalizedWord);
   const isAllowed = !isProperNoun && !isOffensive;
   const isObscure = tier >= OBSCURE_MIN_TIER;
 

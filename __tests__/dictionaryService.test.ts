@@ -7,6 +7,8 @@ import {
   replyCountForLetter,
   maxReplyCount,
   computerPlayableEntriesStartingWith,
+  setRuntimeExclusions,
+  getRuntimeExclusions,
 } from '@features/dictionary/dictionaryService';
 
 /**
@@ -203,5 +205,78 @@ describe('computerPlayableEntriesStartingWith (WL-106 measurement support)', () 
   it('enumerates the worst-case letter without scanning the whole dictionary', () => {
     // 's' is the largest block; guards against a regression to a full scan.
     expect(computerPlayableEntriesStartingWith('s').length).toBeGreaterThan(5_000);
+  });
+});
+
+describe('excluded words (WL-104)', () => {
+  afterEach(() => {
+    setRuntimeExclusions([]);
+  });
+
+  it('flags a baked-in excluded word as offensive and disallowed', async () => {
+    const { found, entry } = await lookupWord('bullshit');
+    // Still present in the dictionary — it has to be, so the rule engine can
+    // answer offensive_excluded rather than unknown_word.
+    expect(found).toBe(true);
+    expect(entry).toMatchObject({
+      isOffensive: true,
+      isAllowed: false,
+      isComputerPlayable: false,
+    });
+  });
+
+  it('keeps words whose everyday sense is innocent (the PRD 8.5 restraint)', async () => {
+    // Reviewed out of the source list by hand; see data/excluded-words.txt.
+    for (const word of ['butt', 'scat', 'skeet', 'snatch', 'shrimping', 'escort']) {
+      const { entry } = await lookupWord(word);
+      expect(entry?.isOffensive).toBe(false);
+      expect(entry?.isAllowed).toBe(true);
+    }
+  });
+
+  it('never offers an excluded word as a computer candidate', () => {
+    // PRD section 24: "The computer does not select forbidden or
+    // inappropriate words."
+    for (const letter of 'abcdefghijklmnopqrstuvwxyz') {
+      const entries = computerPlayableEntriesStartingWith(letter);
+      expect(entries.every(e => !e.isOffensive)).toBe(true);
+    }
+  });
+
+  it('applies runtime exclusions on top of the baked list', async () => {
+    const before = await lookupWord('elephant');
+    expect(before.entry?.isAllowed).toBe(true);
+
+    setRuntimeExclusions(['elephant']);
+    const after = await lookupWord('elephant');
+    expect(after.found).toBe(true);
+    expect(after.entry).toMatchObject({
+      isOffensive: true,
+      isAllowed: false,
+      isComputerPlayable: false,
+    });
+  });
+
+  it('removes runtime exclusions from computer candidates too', () => {
+    expect(computerPlayableEntriesStartingWith('e').map(e => e.normalizedWord)).toContain(
+      'elephant',
+    );
+    setRuntimeExclusions(['elephant']);
+    expect(computerPlayableEntriesStartingWith('e').map(e => e.normalizedWord)).not.toContain(
+      'elephant',
+    );
+  });
+
+  it('normalizes runtime exclusions and ignores blanks', () => {
+    setRuntimeExclusions(['  ELEPHANT ', '', '   ']);
+    expect(getRuntimeExclusions().has('elephant')).toBe(true);
+    expect(getRuntimeExclusions().size).toBe(1);
+  });
+
+  it('clears runtime exclusions when set to an empty list', async () => {
+    setRuntimeExclusions(['elephant']);
+    setRuntimeExclusions([]);
+    const { entry } = await lookupWord('elephant');
+    expect(entry?.isAllowed).toBe(true);
   });
 });
