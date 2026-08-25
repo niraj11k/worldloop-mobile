@@ -641,6 +641,19 @@ matching component border weight.
 
 ### Phase 3 — Playable core loop → **M1**
 
+> **The game screen was minimally wired to the engine on 2026-08-19**, ahead of this
+> phase, because the engine was complete (WL-107 through WL-110) while the screen still
+> carried a `TODO` where the computer's turn belonged — so the app looked broken to
+> anyone playing it: your own word came back relabelled "Computer" and no reply ever
+> came. `GameScreen` now holds a `GameSessionState` and drives
+> generate → select → apply, so a full round alternates turns and reaches its end states.
+> Verified on the simulator: `apple → eagle → envied → dragons → subdivision`.
+>
+> This is wiring only, not this phase's work. The layout, the seven Wireframe §9 states,
+> the chain display, the hint sheet and the game-over screen are still WL-301 through
+> WL-308 and still gated on the design system. Per-word scoring still reads 0 until
+> WL-111, and the starting word is still fixed until WL-112.
+
 Goal: the thing the whole product rests on. Wireframe §21 says design the game screen
 first; the same applies to building it.
 
@@ -657,6 +670,16 @@ move, no computer move. Each has specific input/submit/message behaviour.
 *Done when:* all seven are individually reachable and each matches its §9 spec exactly.
 
 **WL-303 · Input behaviour** — M · 1.5d · WL-301
+
+> **Observed 2026-08-19 while play-testing the wired game screen:** the controlled
+> `TextInput` can desync from React state under fast input — the native field showed
+> "Dragon" while state still held "D", so a six-letter word was rejected as `too_short`.
+> Reproduced twice on the iOS simulator, and it predates the WL-108/109/110 wiring. Most
+> likely an artifact of the simulator injecting keystrokes faster than a human types
+> (adding any pause made it disappear), but controlled-`TextInput` character loss is a
+> real React Native failure mode, so **verify this on a physical device before assuming
+> it is only a harness artifact.** If it reproduces, the fix is to read the submitted
+> value from the change event rather than from state.
 Wireframe §8: autofocus on turn start, keyboard submit, submit disabled while empty, trim
 spaces, case-insensitive, submission blocked while the computer responds. Plus keyboard
 avoidance — §19 requires input and Submit to stay visible above the keyboard.
