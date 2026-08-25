@@ -1,4 +1,5 @@
 import type { InvalidReason } from '@app-types/game';
+import { MIN_WORD_LENGTH } from '@constants/gameConstants';
 import { lookupWord, type DictionaryLookupResult } from '@features/dictionary/dictionaryService';
 
 /**
@@ -19,7 +20,6 @@ import { lookupWord, type DictionaryLookupResult } from '@features/dictionary/di
  * - Respect configurable exclusion list (offensive/inappropriate terms)
  */
 
-const MIN_WORD_LENGTH = 3;
 const VALID_WORD_PATTERN = /^[a-z]+$/;
 
 export interface ValidationResult {
