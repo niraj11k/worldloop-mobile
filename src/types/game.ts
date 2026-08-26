@@ -67,4 +67,6 @@ export interface GameSessionState {
   score: number;
   hintsUsed: number;
   isOfflineSession: boolean;
+  /** Longest chain the player has recorded before this round; null if unknown. */
+  previousBestChainLength: number | null;
 }

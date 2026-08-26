@@ -643,11 +643,62 @@ Two smaller decisions worth knowing:
   failure is the deliberate exception: a build that breaks after a round ended should not
   look healthy in the metrics.
 
-**WL-111 · Wire rarity bonus into scoring** — S · 0.5d · WL-102, WL-110
+**WL-111 · Wire rarity bonus into scoring** — S · 0.5d · WL-102, WL-110 — **DONE 2026-08-26**
 Feed the commonness tier into the existing `rarity_bonus` (0 / +5 / +10 per Architecture
 §7). Add round-level bonuses (+20 win, +5 per personal-best milestone).
 *Done when:* scoring tests cover all three rarity tiers, the hint penalties (−5 / −10), and
-the length-bonus cap of 20.
+the length-bonus cap of 20. ✅ — `__tests__/scoringEngine.test.ts` (24 tests), plus five
+session-level tests confirming the round-end bonus actually reaches `session.score`.
+
+**`rarity` is derived from `isCommonWord` / `isObscure`, not from a fourth tier
+threshold.** Those two booleans already encode the pipeline's cutoffs (common ≤ 50,
+obscure ≥ 70), so a private copy in the scoring engine would drift the moment WL-605
+retunes them. Worth knowing that `rare` maps to `isObscure`: obscure words remain
+*player*-submittable (PRD §8.7 constrains only the computer), which is exactly the "rare
+but allowed" band Architecture §7 prices — so **the computer can never earn this bonus**,
+by construction rather than by a rule.
+
+**The dictionary entry is now carried out of validation** (`ValidationResult.entry`,
+non-null only on a valid word) rather than looked up a second time for scoring. The
+lookup has already happened by then; repeating it per turn would be pure waste.
+
+**Two judgement calls, flagged rather than assumed:**
+
+1. **Architecture §7 governs the formula, not PRD §16.** They disagree — §16 gives
+   `length_bonus = word_length - 3` with no multiplier and no cap, §7 gives
+   `(word_length - 3) × 2` capped at 20. The shipped code has followed §7 since the
+   engine was first written, and this task's own "Done when" cites §7's numbers, so §7 is
+   treated as the ratified version and §16 as the earlier sketch. **Not silently
+   resolved — if Product intended §16, this is the moment to say so**, since WL-605 will
+   otherwise tune §7's shape.
+2. **"+5 per personal-best chain-length milestone" (§7) is ambiguous** and was read as
+   *once per round that sets a new best*, not as a recurring award every N words. The
+   alternative reading (a milestone every 5 or 10 words) would need a threshold nobody has
+   specified. Implemented as `roundEndBonus()`, a single function, so the other reading is
+   a one-place change if WL-605 prefers it.
+
+**Scope boundaries this task deliberately did not cross:**
+
+- **The personal-best baseline is a session field, not a live profile read.**
+  `previousBestChainLength` is copied in at `createSession` (Data Model §4.1, updated).
+  `null` — no profile loaded — is distinct from a real best of `0`: an unknown baseline
+  awards nothing, a genuine first round beats zero and earns the milestone. **Every
+  session runs with `null` until WL-402 supplies the real value**, so the milestone bonus
+  is implemented and tested but cannot yet fire in the app. Stated plainly rather than
+  left to look finished.
+- **Only settled rounds pay out.** `player_win` / `computer_win` / `draw` are eligible;
+  `abandoned` and `technical_failure` award nothing — an abandonment is not an
+  achievement, and a build that breaks must not read as a generous one in the metrics.
+- **Hint penalties are unreachable in the app**, since nothing can set them until the
+  hint sheet exists (WL-307). Covered by tests; wired as `false` at the call site.
+- **The computer's moves still score 0.** `session.score` is the player's score, which is
+  what the game screen labels it.
+
+> **Observation for WL-605, not a defect:** ESDB's tier granularity puts some
+> intuitively-rare words in the `common` band — `quixotic` and `zwieback` both come out
+> tier ≤ 50. The rarity bonus will therefore fire less often than the three-band split
+> suggests. Worth measuring against real play before assuming the 0/+5/+10 spread is
+> doing any work.
 
 **WL-112 · Starting-word selection** — S · 0.5d · WL-108
 Pick starting words that don't hand the player an immediately dead letter, and vary them

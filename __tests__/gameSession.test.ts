@@ -14,17 +14,20 @@ import {
 } from '@features/game/gameSession';
 import type { GameSessionState, GameStatus, TurnPhase } from '@app-types/game';
 import type { ValidationResult } from '@features/game/ruleEngine';
+import { ROUND_WIN_BONUS, PERSONAL_BEST_MILESTONE_BONUS } from '@features/scoring/scoringEngine';
 
 const valid = (word: string): ValidationResult => ({
   isValid: true,
   normalizedWord: word,
   reason: null,
+  entry: null,
 });
 
 const invalid = (word: string, reason: ValidationResult['reason']): ValidationResult => ({
   isValid: false,
   normalizedWord: word,
   reason,
+  entry: null,
 });
 
 const newSession = (startingWord = 'apple'): GameSessionState =>
@@ -231,6 +234,47 @@ describe('round endings', () => {
         'technical_failure',
       ]),
     );
+  });
+});
+
+describe('round-end bonuses reach the score (WL-111)', () => {
+  const withBest = (previousBestChainLength: number | null): GameSessionState =>
+    createSession({
+      sessionId: 's1',
+      difficulty: 'medium',
+      startingWord: 'apple',
+      previousBestChainLength,
+    });
+
+  it('adds the win bonus to the round score', () => {
+    const state = applyComputerCannotMove(withBest(99), { playerRepliesRemaining: 40 });
+    expect(state.score).toBe(ROUND_WIN_BONUS);
+  });
+
+  it('adds the milestone bonus when the chain beats the previous best', () => {
+    // The opener alone is a chain of 1, which beats a best of 0.
+    const state = applyComputerCannotMove(withBest(0), { playerRepliesRemaining: 0 });
+    expect(state.score).toBe(PERSONAL_BEST_MILESTONE_BONUS);
+  });
+
+  it('leaves the score untouched when no personal best is known', () => {
+    const state = applyComputerCannotMove(withBest(null), { playerRepliesRemaining: 0 });
+    expect(state.score).toBe(0);
+  });
+
+  it('pays out nothing for an abandoned or failed round', () => {
+    expect(abandonSession(withBest(0)).score).toBe(0);
+    expect(failSession(withBest(0)).score).toBe(0);
+  });
+
+  it('adds the bonus on top of the per-word scores already banked', () => {
+    const played = applyValidation(beginValidation(setInput(withBest(99), 'eagle')), {
+      submittedWord: 'eagle',
+      result: valid('eagle'),
+      scoreAwarded: 14,
+    });
+    const state = applyComputerCannotMove(played, { playerRepliesRemaining: 40 });
+    expect(state.score).toBe(14 + ROUND_WIN_BONUS);
   });
 });
 
