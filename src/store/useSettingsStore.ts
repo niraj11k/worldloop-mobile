@@ -3,22 +3,19 @@ import { create } from 'zustand';
 /**
  * Settings store.
  * Spec: Wireframe doc section 16 (v1 settings list).
+ * No theme setting: dark mode is cut from v1 (Delivery Plan D-05, closed 2026-08-26).
  * Persistence to local storage (src/services/storage) is not yet wired up.
  */
 interface SettingsState {
   soundEnabled: boolean;
   hapticsEnabled: boolean;
-  theme: 'system' | 'light' | 'dark';
   toggleSound: () => void;
   toggleHaptics: () => void;
-  setTheme: (theme: SettingsState['theme']) => void;
 }
 
 export const useSettingsStore = create<SettingsState>(set => ({
   soundEnabled: true,
   hapticsEnabled: true,
-  theme: 'system',
   toggleSound: () => set(s => ({ soundEnabled: !s.soundEnabled })),
   toggleHaptics: () => set(s => ({ hapticsEnabled: !s.hapticsEnabled })),
-  setTheme: theme => set({ theme }),
 }));

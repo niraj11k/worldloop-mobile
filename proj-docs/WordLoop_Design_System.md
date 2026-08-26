@@ -47,9 +47,28 @@ High-contrast, saturated, deliberately unconventional pairings. No corporate blu
 
 ## 2. Typography
 
-**Display face:** An expressive, loud, high-personality display font for headlines, the game's wordmark, the required-letter callout, and score numbers. Think chunky rounded-slab or bold condensed display, something with real character, not a system font. Candidates to evaluate: a rounded-slab display face with heavy weight (e.g. in the family of Fredoka, Baloo 2, or Lilita One), or a chunkier variable display face if the team wants something less "kids app" and more "skate brand." **Decision needed:** pick one and license/bundle it before implementation; do not ship with a system font standing in for the display role.
+**Display face: `Baloo 2`** (Black/900 and Bold/700 cuts). **Decided — Delivery Plan D-06,
+closed 2026-08-26.** Chosen over Fredoka (reads warmer/softer, closer to the "kids app"
+register this doc's thesis warns against overshooting into) and Lilita One (single heavy
+weight only, more comic/sticker-like — closer to the "skate brand" alternative, but with no
+lighter cut available for the 40px wordmark role). Baloo 2 carries the most weight and
+confidence at the 64px required-letter size — the single largest, highest-stakes text
+element in the app — without losing the rounded-slab warmth the rest of the palette commits
+to. Google Fonts, **SIL Open Font License** — verified against the license text directly:
+bundling, embedding, and redistributing inside app software is explicitly permitted at no
+cost, provided the license text ships with the app. Covered by the Attributions screen
+(WL-407), alongside the ESDB, WordNet, and LDNOOBW notices.
 
-**Body face:** A highly readable **monospace** for body copy, instructions, word-chain history, and settings. Monospace reinforces the "word game / word puzzle" identity (every letter takes equal visual weight, which suits a letter-chain mechanic) while staying more legible than the display face at small sizes. Candidates: JetBrains Mono, IBM Plex Mono, Space Mono. **Decision needed:** confirm licensing for mobile bundling.
+**Body face: `JetBrains Mono`** (Regular/400 and Bold/700, plus Italic where needed) for
+body copy, instructions, word-chain history, and settings. Monospace reinforces the "word
+game / word puzzle" identity (every letter takes equal visual weight, which suits a
+letter-chain mechanic) while staying more legible than the display face at small sizes.
+**Decided — Delivery Plan D-06, closed 2026-08-26.** Chosen over IBM Plex Mono (very
+legible, but reads more geometric/corporate) and Space Mono (most characterful of the
+three, but its lower x-height hurts legibility at the 12px caption size where score labels
+and timestamps actually get read) — JetBrains Mono stays clearest at that size while
+keeping a calm, technical register next to Baloo 2's louder display voice. Same OFL
+licensing basis as above — mobile bundling is explicitly permitted.
 
 **Type scale:**
 
@@ -176,7 +195,14 @@ In this system, that means:
 
 ## 9. Open items
 
-1. Final display and monospace font selection and mobile licensing not yet confirmed (section 2).
+1. ~~Final display and monospace font selection...~~ **Resolved — Delivery Plan D-06,
+   closed 2026-08-26: `Baloo 2` (display) + `JetBrains Mono` (body/UI).** Both are Google
+   Fonts under SIL OFL, verified to permit mobile app bundling at no cost. See section 2.
 2. Exact palette hex values are a first pass — should be run through a contrast checker against every actual text/fill pairing used in final screens, not just the ones listed in section 1.
-3. No dark mode variant has been designed. The Wireframe doc lists "dark mode or system theme" as a v1 setting (section 16); this doc currently only specifies a light/paper-based palette. This needs a follow-up pass before Settings' dark mode toggle can be implemented against real tokens.
+3. ~~No dark mode variant has been designed...~~ **Resolved — Delivery Plan D-05, closed
+   2026-08-26: no dark mode in v1.** The Wireframe doc's §16 toggle is cut for v1 (updated
+   there to match). The v1 token layer (`WL-203`) only needs to produce light-mode values.
+   Designing a real dark palette — this maximalist warm-paper palette has no obvious dark
+   translation, and a rushed one would look worse than not offering the toggle — is a
+   post-v1 target, revisited when that release is scoped.
 4. Motion timing values (200ms, spring parameters, etc.) are first-pass suggestions, not tuned against an actual build.
