@@ -551,7 +551,10 @@ Avoid overly competitive language for a learning-oriented casual game.
   - If signed in: show linked provider (Apple / Google / Email) and Sign Out
 - Sound on/off.
 - Haptic feedback on/off.
-- Dark mode or system theme.
+- ~~Dark mode or system theme.~~ **Cut from v1 — Delivery Plan D-05, closed 2026-08-26.**
+  No dark palette exists (Design System §9), and designing one properly was judged not
+  worth the Phase 2 cost for a maximalist warm-paper palette with no obvious dark
+  translation. Target for a post-v1 release once a real dark palette is designed.
 - Text size or accessibility option.
 - Reset local statistics.
 - Privacy policy.
