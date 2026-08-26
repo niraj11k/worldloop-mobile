@@ -776,16 +776,68 @@ reaching the screen).
 > is not possible today — `baseWord` is unpopulated upstream, as `dictionaryService`
 > already notes — so it would need the same pipeline pass.
 
-**WL-113 · Headless round simulator** — M · 1.5d · WL-110, WL-111
+**WL-113 · Headless round simulator** — M · 1.5d · WL-110, WL-111 — **DONE 2026-08-26**
 A CLI harness that plays complete rounds. This is the tuning instrument for Architecture
 §6 and §7, and the fastest way to catch a broken Hard mode before it reaches a player.
 *Done when:* `npm run simulate -- --difficulty hard --rounds 500` reports win rate, mean
-chain length, mean score, and dead-letter frequency.
+chain length, mean score, and dead-letter frequency. ✅ — `src/features/game/roundSimulator.ts`
+(logic, typechecked and unit-tested) plus `scripts/simulate.js`/`scripts/simulateCli.ts` (CLI
+glue, plain JS/untyped like `audit-gate.mjs`, registered through the project's own
+`babel.config.js` via `@babel/register` rather than a second alias config). 12 tests; full
+suite 229 passing.
+
+Reuses the real engines throughout — `gameSession`, `ruleEngine`, `difficultyEngine`,
+`scoringEngine`, `startingWord` — rather than a parallel model of the rules, so it fails the
+same way the shipped app would. The simulated player (no PRD spec exists for one; this is a
+dev-tooling need the plan itself invented) is a deliberately weak baseline: uniform random
+pick from every word `validateMove` would accept for the required letter, run back through
+the real `validateMove` before being applied so any drift between this module's own
+filtering and the rule engine fails loudly rather than silently miscounting.
+
+**Two findings, both bigger than the task that found them:**
+
+1. **Natural rounds run for hundreds to thousands of turns, not "tens of words."** Seeded,
+   30 rounds per difficulty against the real dictionary: Easy averages ~6,250 chain length
+   (100% player win), Medium ~1,140 (3% player win), Hard ~910 (0% player win, seed- and
+   sample-dependent — a 500-round run at a different seed read 3.6%). The dictionary is
+   simply too large (~140k player-allowed words) for genuine, whole-pool exhaustion to be a
+   short-round event, which means the state machine's win/loss/draw conditions — the only
+   ending this simulator or the shipped app can reach — are very unlikely to be what ends a
+   *real* round. A real player almost certainly abandons long before any letter's pool
+   genuinely runs dry. Worth knowing before reading too much into PRD §9.4's targets: they
+   describe an ending condition the implementation can reach, but real play may rarely
+   produce.
+2. **Hard reads 0–4% player win rate against this player model — the exact "Hard sits at
+   0–5%" case the Phase 1 gate below was written to catch.** The extremes match
+   `option_reduction_score`'s own logic exactly: Easy (zero weight on it) resolves to the
+   *computer* running out first almost every time; Medium and Hard (0.5 and 1.0 weight)
+   invert that almost completely. Whether this means Hard is genuinely over-tuned or that a
+   uniform-random, no-strategy player is too weak a baseline to read Hard fairly (most
+   likely some of both) is exactly what WL-605 exists to determine — not adjudicated here.
+3. **A latent, real correctness gap, found rather than fixed.** `replyCountForLetter`'s
+   precomputed totals (WL-106) don't exclude words under `MIN_WORD_LENGTH` — the same gap
+   WL-108 found and fixed for the computer's own candidate generation, but never patched on
+   this side, since doing so means re-deriving the bundled asset. WL-106's own review of this
+   checked only the round-*start* case and found it never fires there; that check was
+   incomplete, not wrong — once a round runs long enough (per finding 1, routinely) for a
+   letter's longer words to be genuinely exhausted, what's left can be entirely sub-3-letter
+   entries the count still treats as available. Measured: fired on 29/30 Medium rounds and
+   30/30 Hard rounds in the same run. This module falls back to ending the round when it
+   happens (the objectively correct call — no real submission could satisfy the length rule
+   either), but **the shipped `GameScreen`/`gameSession` have no equivalent fallback** — they
+   would read the phantom nonzero count as "the player can still move" and simply wait,
+   leaving a genuinely, correctly stuck player in a round the app never recognizes as over.
+   Flagged for a fix against `scripts/generate-dictionary.py`'s `reply_counts_by_letter`
+   (WL-106), not addressed here.
 
 > **Phase 1 gate:** the simulator reports a plausible win-rate spread across the three
 > difficulties (Easy clearly player-favoured, Hard 20–40% per section 2). If Hard sits at
 > 0–5%, retune the §6 weights *now* — not after real players have abandoned it. This is the
-> PRD §9.4 risk, caught cheaply.
+> PRD §9.4 risk, caught cheaply. **Triggered on the first real run** — Hard measured 0–4%,
+> not 20–40%. Per finding 2 above, this is exactly the signal the gate exists to catch;
+> WL-605 (gated on this task) is where it gets acted on, informed by whichever of "Hard is
+> over-tuned" or "the simulated player needs to be less weak" (or both) further
+> investigation points to.
 
 ---
 
