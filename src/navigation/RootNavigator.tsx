@@ -13,6 +13,7 @@ import { HowToPlayScreen } from '@screens/HowToPlay/HowToPlayScreen';
 import { WordReviewScreen } from '@screens/WordReview/WordReviewScreen';
 import { SettingsScreen } from '@screens/Settings/SettingsScreen';
 import { AccountCreationScreen } from '@screens/AccountCreation/AccountCreationScreen';
+import { FontSpecimenScreen } from '@screens/FontSpecimen/FontSpecimenScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -55,6 +56,14 @@ export function RootNavigator(): React.JSX.Element {
             component={AccountCreationScreen}
             options={{ presentation: 'modal' }}
           />
+          {/*
+            WL-201 font specimen. Dev builds only — it is a verification
+            surface, not product, and must not be reachable in a release
+            build. WL-206's component gallery should absorb it.
+          */}
+          {__DEV__ && (
+            <Stack.Screen name="FontSpecimen" component={FontSpecimenScreen} />
+          )}
         </Stack.Navigator>
       </SafeAreaView>
     </NavigationContainer>

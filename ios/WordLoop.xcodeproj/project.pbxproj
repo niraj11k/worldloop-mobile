@@ -13,6 +13,10 @@
 		245EED5D7C1455494A6FBB35 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		44F779FC72654114A0A21F1C /* Baloo2-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A11ED0293E2D420E99782B44 /* Baloo2-Bold.ttf */; };
+		6986B87E2B3143A8907BA744 /* JetBrainsMono-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 88C3B998CA7C4AE0B730A797 /* JetBrainsMono-Bold.ttf */; };
+		AF0B8C41A0B64E658C3116FC /* JetBrainsMono-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 428029D873C549C180C059E2 /* JetBrainsMono-Regular.ttf */; };
+		7B4D75F6AFAB43E28B2E9A73 /* Baloo2-ExtraBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7DC9392FE32742F281AD64BE /* Baloo2-ExtraBold.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,6 +31,10 @@
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = WordLoop/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		AFA884F08810761EF3B1E3DA /* GoogleService-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "WordLoop/GoogleService-Info.plist"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		A11ED0293E2D420E99782B44 /* Baloo2-Bold.ttf */ = {isa = PBXFileReference; name = "Baloo2-Bold.ttf"; path = "../src/assets/fonts/Baloo2-Bold.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		88C3B998CA7C4AE0B730A797 /* JetBrainsMono-Bold.ttf */ = {isa = PBXFileReference; name = "JetBrainsMono-Bold.ttf"; path = "../src/assets/fonts/JetBrainsMono-Bold.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		428029D873C549C180C059E2 /* JetBrainsMono-Regular.ttf */ = {isa = PBXFileReference; name = "JetBrainsMono-Regular.ttf"; path = "../src/assets/fonts/JetBrainsMono-Regular.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		7DC9392FE32742F281AD64BE /* Baloo2-ExtraBold.ttf */ = {isa = PBXFileReference; name = "Baloo2-ExtraBold.ttf"; path = "../src/assets/fonts/Baloo2-ExtraBold.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -78,6 +86,7 @@
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
+				FFB34AE33B084EB389EEF4BB /* Resources */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -100,6 +109,18 @@
 			);
 			path = Pods;
 			sourceTree = "<group>";
+		};
+		FFB34AE33B084EB389EEF4BB /* Resources */ = {
+			isa = "PBXGroup";
+			children = (
+				A11ED0293E2D420E99782B44 /* Baloo2-Bold.ttf */,
+				88C3B998CA7C4AE0B730A797 /* JetBrainsMono-Bold.ttf */,
+				428029D873C549C180C059E2 /* JetBrainsMono-Regular.ttf */,
+				7DC9392FE32742F281AD64BE /* Baloo2-ExtraBold.ttf */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+			path = "";
 		};
 /* End PBXGroup section */
 
@@ -167,6 +188,10 @@
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				245EED5D7C1455494A6FBB35 /* PrivacyInfo.xcprivacy in Resources */,
 				16D65D054CB28D90847D19F8 /* GoogleService-Info.plist in Resources */,
+				44F779FC72654114A0A21F1C /* Baloo2-Bold.ttf in Resources */,
+				6986B87E2B3143A8907BA744 /* JetBrainsMono-Bold.ttf in Resources */,
+				AF0B8C41A0B64E658C3116FC /* JetBrainsMono-Regular.ttf in Resources */,
+				7B4D75F6AFAB43E28B2E9A73 /* Baloo2-ExtraBold.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

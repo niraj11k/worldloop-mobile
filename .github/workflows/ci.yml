@@ -41,6 +41,19 @@ jobs:
       - name: Test
         run: npm test
 
+      # WL-202: recomputes every WCAG AA pairing from src/theme/palette.ts.
+      # --check also fails if the committed matrix is stale, so a palette
+      # change cannot land without its verified matrix landing alongside it.
+      - name: Contrast gate
+        run: npm run contrast:verify -- --check
+
+      # WL-201: fonts resolve silently in RN — a misnamed family or an
+      # unlinked file renders the system face with no error at all. This
+      # checks the chain from the strings the app references down to the
+      # PostScript names inside the TTFs, plus both native projects' links.
+      - name: Font integrity gate
+        run: npm run fonts:verify
+
       # Fails on any advisory that is not a reviewed, unexpired exception in
       # audit-allowlist.json, and on exceptions that have gone stale. See the
       # "Dependency audit state" section of README.md.
