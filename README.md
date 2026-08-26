@@ -134,6 +134,20 @@ npm run audit:ci  # dependency audit gate (see below)
 All four run in CI on push and PR to `main`/`dev`, plus weekly — see
 `.github/workflows/ci.yml`.
 
+```bash
+npm run simulate -- --difficulty easy|medium|hard|all [--rounds N] [--seed N]
+```
+
+Headless round simulator (WL-113) — plays complete rounds with no UI against
+the real engines and dictionary, and reports win rate, mean chain length,
+mean score, and dead-letter (draw) frequency. Not part of CI: a real tuning
+pass (`--rounds 500`, matching the Delivery Plan's own example) takes several
+minutes, longest on Easy. See `src/features/game/roundSimulator.ts` for what
+each figure means and two findings building it turned up — natural rounds
+run to hundreds or thousands of turns rather than the "tens of words" the
+product docs assume, and Hard currently reads well outside PRD section 9.4's
+20-40% player-win-rate target.
+
 `ruleEngine.ts`, `scoringEngine.ts`, `difficultyEngine.ts`, and `promptPolicy.ts`
 all have unit tests. `dictionaryEngine`-dependent behavior (proper-noun and
 offensive-word rejection in `ruleEngine.ts`, candidate generation in

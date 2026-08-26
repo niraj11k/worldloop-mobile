@@ -297,23 +297,25 @@ export function maxReplyCount(): number {
 }
 
 /**
- * Every computer-playable entry starting with `letter`.
+ * Every entry starting with `letter` for which `predicate` holds.
  *
- * Per PRD section 8.7 the computer draws from the narrower tier while the
- * player may submit the wider accepted set. Records are sorted, so this is a
- * binary search for the letter boundary followed by a linear walk of that
- * letter's block — no scan of the other 25.
+ * Records are sorted, so this is a binary search for the letter boundary
+ * followed by a linear walk of that letter's block — no scan of the other
+ * 25. Shared by `computerPlayableEntriesStartingWith` (WL-106/108) and
+ * `allowedEntriesStartingWith` (WL-113) so the walk exists exactly once;
+ * only the filter differs between "what the computer may play" and "what
+ * the player may play".
  *
  * Returns decoded entries rather than bare words because the walk has to
- * decode each record anyway to test `isComputerPlayable`, and scoring needs
- * `frequencyScore` and `isObscure` — handing back strings would force the
- * caller into a second binary search per candidate (~10k of them for the
+ * decode each record anyway to test the predicate, and every caller so far
+ * also needs `frequencyScore` and/or `isObscure` — handing back strings
+ * would force a second binary search per candidate (~10k of them for the
  * worst letter).
- *
- * Full scored-candidate assembly is WL-108; this is the enumeration WL-106
- * needs to demonstrate its own scoring budget.
  */
-export function computerPlayableEntriesStartingWith(letter: string): DictionaryWord[] {
+function entriesStartingWithMatching(
+  letter: string,
+  predicate: (entry: DictionaryWord) => boolean,
+): DictionaryWord[] {
   if (index === null) {
     index = buildIndex();
   }
@@ -345,11 +347,38 @@ export function computerPlayableEntriesStartingWith(letter: string): DictionaryW
       break;
     }
     const entry = decodeAt(idx, j);
-    if (entry.isComputerPlayable) {
+    if (predicate(entry)) {
       entries.push(entry);
     }
   }
   return entries;
+}
+
+/**
+ * Every computer-playable entry starting with `letter`.
+ *
+ * Per PRD section 8.7 the computer draws from the narrower tier while the
+ * player may submit the wider accepted set.
+ *
+ * Full scored-candidate assembly is WL-108; this is the enumeration WL-106
+ * needs to demonstrate its own scoring budget.
+ */
+export function computerPlayableEntriesStartingWith(letter: string): DictionaryWord[] {
+  return entriesStartingWithMatching(letter, entry => entry.isComputerPlayable);
+}
+
+/**
+ * Every entry starting with `letter` that a *player* may submit (WL-113).
+ *
+ * Wider than `computerPlayableEntriesStartingWith`: `isAllowed` admits the
+ * obscure band the computer never draws from (PRD section 8.7). Built for
+ * the round simulator, which has to pick a plausible player move from the
+ * same set `validateMove` would accept — nothing in the shipped app needed
+ * this enumeration before WL-113, since a real player's next word comes from
+ * a human, not from walking the dictionary.
+ */
+export function allowedEntriesStartingWith(letter: string): DictionaryWord[] {
+  return entriesStartingWithMatching(letter, entry => entry.isAllowed);
 }
 
 export interface DefinitionResult {
