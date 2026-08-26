@@ -315,6 +315,15 @@ gap: `robert`/`nike`/`pepsi` come out accepted because ESDB left their `POS-CLAS
 instead of `person`/`trademark` — a source data-tagging gap, not a pipeline bug, excluded
 from the fixture list rather than chased here.
 
+> **2026-08-26, WL-112: this gap is wider than the three words above.** Enumerating the
+> whole computer-playable set turned up `xerxes`, `qaddafi`, `aachen`, `zappa`, `xemacs`,
+> `aaliyah`, `honda`, `toyota`, `amazon` and `oscar`, all `isAllowed` and
+> `isComputerPlayable` — so the computer can play them as ordinary moves, not just as
+> opening words. WL-112's starting-word pool sidesteps them as a side effect of its
+> frequency filter, which protects only the opening word; the gap itself is untouched and
+> needs a `scripts/generate-dictionary.py` pass plus a re-bundle, since capitalization
+> evidence does not survive into the packed asset. See WL-112 for the full note.
+
 **WL-104 · Offensive/excluded word list** — S · 1d · WL-102 — **DONE 2026-08-19**
 Per PRD §8.8 this must be configurable data, not code. Sourced list plus a manual review
 pass, applied at pipeline time and overridable at runtime.
@@ -700,11 +709,72 @@ lookup has already happened by then; repeating it per turn would be pure waste.
 > suggests. Worth measuring against real play before assuming the 0/+5/+10 spread is
 > doing any work.
 
-**WL-112 · Starting-word selection** — S · 0.5d · WL-108
+**WL-112 · Starting-word selection** — S · 0.5d · WL-108 — **DONE 2026-08-26**
 Pick starting words that don't hand the player an immediately dead letter, and vary them
 across rounds so replays don't feel identical.
 *Done when:* 100 generated starting words all leave ≥20 valid player replies, with no
-repeat inside any 10-round window.
+repeat inside any 10-round window. ✅ — `src/features/game/startingWord.ts`, 20 tests,
+both criteria asserted against the real bundled dictionary rather than a fixture.
+
+`GameScreen` no longer opens every round on the hardcoded `apple`. Selection draws a
+**first letter** before a word, rather than sampling across the whole dictionary: it
+enumerates one letter's records instead of 26 (WL-106 measured a single worst-case letter
+at ~10ms, so the alternative would put a visible stall on the round-start path), and it
+makes the opening letter itself vary. Measured at ~0.7ms per selection.
+
+**The ≥20-replies criterion never fires against real data, and that is worth recording
+rather than quietly passing.** The thinnest letter in the bundle (`x`) still offers 115
+player replies, so every candidate clears the bar by 5×. The guard is kept — a criterion
+verified to never fire is a different and better position than one never checked — but it
+should not be read as evidence that dead-letter openings were a live risk.
+
+**Two filters beyond the plan's wording are the implementation's own**, both stated as
+tunable constants and both fair game for WL-605:
+
+1. **Top frequency tier only** (`frequencyScore === 1`, ESDB tier 35), not the whole
+   common band. Primarily first-impression quality — this tier reads as `cabbage`,
+   `eagle`, `machine`, `zebra`.
+2. **A length band of 3–8**, since Wireframe §7 teaches the rule with
+   `apple → elephant → table` and a fourteen-letter opener sets a worse expectation. The
+   cap applies *only* to the opening word; the computer's ordinary moves are unchanged,
+   which is why a round can still run `clip → planet → thermodynamics`.
+
+**A second variety axis was needed, and the acceptance criterion does not capture it.**
+Distinct starting words are not the same thing as distinct openings: English inflection
+concentrates word endings so hard that **28.5% of the eligible pool ends in `s`**, and
+`s`/`d`/`g`/`e` together cover 64% of it (`-s`, `-ed`, `-ing` forms are all top-tier).
+Selecting on the word alone passed the stated criterion while producing
+`snmllsddeggdyssggsxs` over twenty rounds — every word different, `s` six times. Since
+Design System §6 makes the required letter the single largest element on the game screen,
+that is the part of an opening a player actually registers. Selection now also avoids the
+last **3** rounds' required letters (`RECENT_REQUIRED_LETTERS_WINDOW`), as a preference
+that yields rather than a rule, so a thin letter whose whole pool shares one ending still
+produces a word. Same 20 rounds afterwards: `deksgydetklsdglsroydrgepdlrgsh`.
+
+*Verified on an iPhone 17 Pro simulator*, four consecutive rounds opening `YARNS`/`CLIP`/
+`JUMPS`/`MATRIX` — required letters S, P, S, X — and a full round played through
+(`clip → planet → thermodynamics`, scoring 16 for `planet`, which is WL-111's formula
+reaching the screen).
+
+> **Finding for WL-103, surfaced here rather than fixed here: the proper-noun tagging gap
+> is materially wider than that task recorded.** WL-103 named `robert`/`nike`/`pepsi` as
+> words ESDB left with a blank `POS-CLASS`. Enumerating the computer-playable set for this
+> task turned up many more — `xerxes`, `qaddafi`, `aachen`, `zappa`, `xemacs`, `aaliyah`,
+> `honda`, `toyota`, `amazon`, `oscar` — all currently `isAllowed` **and**
+> `isComputerPlayable`, meaning the computer can play them as ordinary moves today, not
+> only as openings. WL-112's tier-35 filter happens to exclude every one of them (they all
+> sit at tier 50 or 60), but that is a **side effect protecting the single most visible
+> word in the round, not a repair**. The gap itself is upstream, in the pipeline, and
+> unaddressed. Note that the words which *survive* the tier-35 filter — `victor`, `olive`,
+> `ruby`, `daisy`, `martin` — are all genuine common words that PRD §8.5 says must stay
+> playable, so they are correct, not leaks. Capitalization evidence is not recoverable at
+> runtime: the packed asset carries only three flag bits (tier, proper-noun, offensive),
+> so any real fix has to happen in `scripts/generate-dictionary.py` and be re-bundled.
+>
+> **Also for WL-605:** inflected forms make perfectly ordinary but slightly awkward
+> openers (`quirking`, `ebbing`, `loping`, `goatees` all appear). Filtering to base forms
+> is not possible today — `baseWord` is unpopulated upstream, as `dictionaryService`
+> already notes — so it would need the same pipeline pass.
 
 **WL-113 · Headless round simulator** — M · 1.5d · WL-110, WL-111
 A CLI harness that plays complete rounds. This is the tuning instrument for Architecture
@@ -786,8 +856,10 @@ matching component border weight.
 >
 > This is wiring only, not this phase's work. The layout, the seven Wireframe §9 states,
 > the chain display, the hint sheet and the game-over screen are still WL-301 through
-> WL-308 and still gated on the design system. Per-word scoring still reads 0 until
-> WL-111, and the starting word is still fixed until WL-112.
+> WL-308 and still gated on the design system. ~~Per-word scoring still reads 0 until
+> WL-111, and the starting word is still fixed until WL-112.~~ **Both closed:** scoring
+> reaches the screen as of WL-111, and rounds no longer open on the hardcoded `apple` as
+> of WL-112.
 
 Goal: the thing the whole product rests on. Wireframe §21 says design the game screen
 first; the same applies to building it.

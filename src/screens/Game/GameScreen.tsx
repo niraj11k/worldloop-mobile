@@ -14,6 +14,7 @@ import {
   isRoundOver,
   usedWords,
 } from '@features/game/gameSession';
+import { nextStartingWord } from '@features/game/startingWord';
 import { generateCandidates, selectComputerWord } from '@features/difficulty/difficultyEngine';
 import { rarityForEntry, scoreWord } from '@features/scoring/scoringEngine';
 import { replyCountForLetter } from '@features/dictionary/dictionaryService';
@@ -32,6 +33,9 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
  * turn observable.
  */
 const COMPUTER_THINK_MS = 350;
+
+/** Only reachable if the bundled dictionary is missing or corrupt (WL-112). */
+const FALLBACK_STARTING_WORD = 'apple';
 
 const ROUND_OVER_MESSAGES: Record<Exclude<GameStatus, 'active'>, string> = {
   player_win: 'You win — WordLoop ran out of words!',
@@ -67,9 +71,13 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
     createSession({
       sessionId: `local-${Date.now()}`,
       difficulty,
-      // TODO(WL-112): pick a starting word that leaves the player a healthy
-      // set of replies and varies between rounds.
-      startingWord: 'apple',
+      // `null` means no letter in the dictionary could offer a usable
+      // opening word, which with the bundled asset means the asset itself is
+      // missing or corrupt. Falling back keeps the round playable rather
+      // than dead; surfacing it as the Wireframe section 17 "dictionary
+      // unavailable" state is WL-506's, and the game-over treatment
+      // WL-308's. `apple` is Wireframe section 7's own teaching word.
+      startingWord: nextStartingWord() ?? FALLBACK_STARTING_WORD,
     }),
   );
   const [input, setInput] = useState('');
