@@ -53,6 +53,25 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
       <Pressable onPress={() => navigation.navigate('HowToPlay')}>
         <Text>How to Play</Text>
       </Pressable>
+
+      {/*
+        WL-206: the only entry point to the component gallery, and the reason
+        it is here rather than behind a gesture — a dev screen nobody can find
+        is a dev screen nobody uses, which is the failure mode the previous
+        specimen screens had (registered, but reachable only by editing
+        `initialRouteName`).
+
+        `__DEV__` keeps it out of release builds entirely: the route itself is
+        not registered there either (see RootNavigator), so this cannot become
+        a dead link in production. It is deliberately last and unstyled so it
+        never reads as product — Wireframe §5 fixes what belongs on Home, and
+        this is not one of those things.
+      */}
+      {__DEV__ && (
+        <Pressable onPress={() => navigation.navigate('Gallery')}>
+          <Text>Component gallery (dev)</Text>
+        </Pressable>
+      )}
     </View>
   );
 }

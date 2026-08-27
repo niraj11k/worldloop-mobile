@@ -102,12 +102,17 @@ module.exports = [
     },
   },
 
-  // The font specimen is a measurement instrument, not product UI (WL-201). It
-  // has to render probe strings at arbitrary sizes and, crucially, to render
-  // text with *no* fontFamily at all to get the platform default to compare
-  // against. Token-only styling would defeat the thing it exists to detect.
+  // The typography section is a measurement instrument, not product UI
+  // (WL-201, now living in the WL-206 gallery). It has to render probe strings
+  // at arbitrary sizes and, crucially, to render text with *no* fontFamily at
+  // all to get the platform default to compare against. Token-only styling
+  // would defeat the thing it exists to detect.
+  //
+  // Scoped to this one file rather than the whole gallery: every other section
+  // is styled from the tokens, which is what lets the gallery break when the
+  // token layer does.
   {
-    files: ['src/screens/FontSpecimen/**/*.{ts,tsx}'],
+    files: ['src/screens/Gallery/sections/TypographySection.tsx'],
     rules: { 'no-restricted-syntax': 'off' },
   },
 ];

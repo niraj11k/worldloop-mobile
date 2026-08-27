@@ -1,8 +1,14 @@
 import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { palette } from '@theme/palette';
-import { fontFamily, typeScale } from '@theme/typography';
+import {
+  palette,
+  fontFamily,
+  typeScale,
+  spacing,
+  radius,
+  borderWidth,
+} from '@theme/theme';
 
 /**
  * Dev-only font specimen — WL-201's on-device verification surface.
@@ -61,7 +67,7 @@ const PROBES = ['Handgloves 0123', 'WWWMMM@#%', 'quick brown fox jumps'];
 const NARROW = 'illlliiii';
 const WIDE = 'MMMMWWWWW';
 
-export function FontSpecimenScreen(): React.JSX.Element {
+export function TypographySection(): React.JSX.Element {
   const [widths, setWidths] = useState<Widths>({});
 
   const measure = useCallback(
@@ -92,7 +98,7 @@ export function FontSpecimenScreen(): React.JSX.Element {
   const allPass = results.every(r => r === true) && monoIsMono() === true;
 
   return (
-    <ScrollView style={styles.page} contentContainerStyle={styles.content}>
+    <View>
       <View
         style={[
           styles.banner,
@@ -213,27 +219,23 @@ export function FontSpecimenScreen(): React.JSX.Element {
           <Text style={typeScale.caption as object}>abcdefghijklmnop 0123456789</Text>
         </View>
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
+// Chrome uses tokens; only the *probe* type stays raw, because measuring
+// against arbitrary sizes and the platform default face is the entire job of
+// this section (hence its narrow lint exemption in eslint.config.js).
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: palette.paper },
-  content: { padding: 16, paddingBottom: 48 },
   banner: {
-    borderWidth: 3,
+    borderWidth: borderWidth.base,
     borderColor: palette.ink,
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 16,
+    borderRadius: radius.control,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
   },
-  bannerText: {
-    fontFamily: fontFamily.monoBold,
-    fontSize: 15,
-    color: palette.ink,
-    textAlign: 'center',
-  },
-  probes: { gap: 12, marginBottom: 8 },
+  bannerText: { ...typeScale.buttonLabel, color: palette.ink, textAlign: 'center' },
+  probes: { gap: spacing.md, marginBottom: spacing.sm },
   probeRow: { gap: 2 },
   probeName: { fontFamily: fontFamily.monoBold, fontSize: 11, color: palette.ink },
   probeStrings: { gap: 2 },
@@ -243,18 +245,12 @@ const styles = StyleSheet.create({
   probeLine: { flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' },
   probe: { fontSize: 18, color: palette.ink, alignSelf: 'flex-start' },
   probeWidth: { fontFamily: fontFamily.monoRegular, fontSize: 10, color: palette.ink },
-  h2: {
-    fontFamily: fontFamily.displayBold,
-    fontSize: 28,
-    color: palette.ink,
-    marginTop: 24,
-    marginBottom: 8,
-  },
+  h2: { ...typeScale.screenTitle, color: palette.ink, marginTop: spacing.xl, marginBottom: spacing.sm },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 4,
-    gap: 8,
+    paddingVertical: spacing.xs,
+    gap: spacing.sm,
   },
   rowLabel: { fontFamily: fontFamily.monoRegular, fontSize: 12, color: palette.ink, flexShrink: 1 },
   rowValue: { fontFamily: fontFamily.monoBold, fontSize: 12, color: palette.ink },
