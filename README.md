@@ -146,6 +146,33 @@ reads cannot drift from the colours it was derived from. CI runs the `--check`
 form, which additionally fails when the committed matrix is stale, so a
 palette change can't land without its verified matrix.
 
+## Design tokens (WL-203)
+
+`src/theme/theme.ts` is the only place a screen or component styles from. It
+composes `palette.ts` (colour, WL-202) and `typography.ts` (type, WL-201) and
+adds spacing, radii, border weights, shadows, and rotation.
+
+**No screen or component may contain a raw hex, colour keyword, font size, font
+family, or shadow value.** That is enforced by `no-restricted-syntax` selectors
+in `eslint.config.js`, scoped to `src/screens/**` and `src/components/**`. If a
+value is missing, add it to the theme — do not inline it at the call site.
+
+Two things worth knowing before styling anything:
+
+- **Shadows must use `boxShadow: shadow.*`, never `elevation` or `shadowOffset`.**
+  Design System §4 requires a hard offset shadow with no blur. The legacy props
+  cannot express that on Android — `elevation` draws a blurred Material shadow
+  with uncontrollable offset — so `boxShadow` with `blurRadius: 0` is the only
+  route. **This means the design depends on New Architecture being enabled**;
+  disabling it would silently drop every shadow rather than failing loudly.
+- **Disabled controls use `disabledFill.*`, never `opacity` on the container.**
+  A container opacity fades the `ink` border §4 requires them to keep, and the
+  label along with it, landing far below the contrast WL-202 verified.
+
+A dev-only `TokenSpecimen` screen (behind `__DEV__`) renders every token
+on-device, including each hard shadow beside a deliberately blurred control so
+a regression to blurred shadows is visible rather than plausible.
+
 ## Fonts (WL-201)
 
 Four static cuts in `src/assets/fonts/` (1.21MB total), referenced through

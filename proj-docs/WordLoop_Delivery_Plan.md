@@ -988,12 +988,73 @@ without its verified matrix landing with it. All three guards were negative-test
 > undefined, so it could not be verified. WL-203 must either define it as a concrete token
 > (and add it to the matrix) or drop the phrase.
 
-**WL-203 · Token layer** — M · 1.5d · WL-201, WL-202, D-05
+**WL-203 · Token layer** — M · 1.5d · WL-201, WL-202, D-05 — **DONE 2026-08-27**
 Replace the placeholder `theme.ts` with real tokens: colours, type scale, 4px spacing
 scale, radii (20 / 16 / 999), border weights (2–4px), offset-shadow specs, rotation
 range. **D-05 closed 2026-08-26 — light-mode tokens only, no dark variant.**
 *Done when:* no screen or component references a raw hex, px font size, or shadow value —
-a lint rule enforces this.
+a lint rule enforces this. ✅ — `src/theme/theme.ts` composes `palette.ts` (WL-202) and
+`typography.ts` (WL-201) rather than restating them, and adds spacing, radii, border
+weights, shadows and rotation. Verified on an iPhone 17 Pro simulator and a
+`Medium_Phone_API_36.1` emulator via a new dev-only `TokenSpecimen` screen.
+
+**The lint rule is six `no-restricted-syntax` selectors**, scoped to `src/screens/**` and
+`src/components/**` (the theme directory is where these literals belong): raw hex, raw
+colour keywords (`'white'` — with `transparent` exempted, since it is the absence of a
+colour), raw `fontSize`, raw `fontFamily`, the legacy `shadow*`/`elevation` props, and
+inline `boxShadow` arrays. Selectors rather than a custom plugin, which would mean a new
+package and its own tests to express six AST patterns. **Negative-tested** — a probe file
+with one violation of each produced exactly six errors and let `transparent` through.
+Migration was small because no raw hex existed anywhere; only `GameScreen` and `HintSheet`
+carried raw font sizes.
+
+**Two values the doc left undefined, both resolved and both flagged rather than silently
+filled in:**
+
+1. **`shadow-ink` "at fixed opacity" → 1.0, fully opaque.** The palette's own rules decide
+   it: `ink` at any lower opacity composites over `paper` to a **grey** (0.85 lands on
+   `#39352F`), and §1 states "Grays are excluded from this palette entirely" — so any
+   translucency manufactures the one colour family the palette bans. It also softens the
+   shadow edge, the same failure §8 rejects blur for.
+2. **Cards' "light tint fill" → removed.** No tint was ever specified, so nothing could be
+   contrast-checked, and WL-202 flagged it as the one fill its matrix could not cover. It
+   was also *narrower and vaguer* than §4's own construction block, which already permits
+   "one saturated color from section 1, or `paper`" for every component. Cards now follow
+   that rule, so every legal card fill is already verified with its mandatory text colour.
+
+> **The design system depends on New Architecture, and this is where that becomes load-bearing.**
+> §4 mandates "hard offset shadow, no blur" and §8 rejects blurred shadows outright. The
+> legacy RN shadow props cannot express that on Android at all: `shadowColor`/`shadowOffset`/
+> `shadowRadius` are iOS-only, and `elevation` draws a Material *blurred* shadow whose offset
+> and colour are not controllable. `boxShadow` (RN 0.86, Fabric — `OutsetBoxShadowDrawable` on
+> Android, `RCTBoxShadow` on iOS) is the only route, and it takes an explicit `blurRadius: 0`.
+> **Turning off `newArchEnabled` would silently drop every shadow in the app rather than
+> failing loudly.** The specimen screen renders each hard shadow beside a deliberately blurred
+> control precisely so this cannot regress unnoticed — verified visually distinct on both
+> platforms.
+
+> **A real bug the specimen caught, and the process failure underneath it.** The disabled
+> button was first implemented with `opacity: 0.4` on the container — which fades the `ink`
+> border §4 says a disabled control must *keep*, and fades the label too, landing nowhere near
+> the 9.30:1 WL-202 measured. It still looked like a plausible disabled button. The root cause
+> was not the CSS: **WL-202's matrix had verified a colour the app could not produce**, because
+> `verify-contrast.js` composited its own private copy of the disabled fill and exported
+> nothing. `palette.ts` now exports `composite()` and `disabledFill`, and the verifier measures
+> *those* values — so "verified" and "shipped" are the same bytes. The regenerated matrix is
+> byte-identical, confirming the refactor changed the source of the numbers, not the numbers.
+
+**Tests:** `__tests__/theme.test.ts` (14) asserts the §3/§4 rules that are cheap to state and
+expensive to notice breaking — every shadow has `blurRadius: 0`, shadows use `shadow-ink` and
+escalate badge → control → primary → card → modal, spacing is all multiples of 4, radii are
+exactly the three named values, border weights stay within 2–4px with a 4px floor for modals,
+and `disabledFill` is a composite rather than the raw accent. The no-blur assertion was
+negative-tested. Suite: 248 passing.
+
+> **Scope held deliberately:** `GameScreen` has only its required-letter callout tokenised —
+> the one element §6 and Wireframe §8 both constrain. The rest of that screen stays unstyled
+> skeleton, because **WL-301 owns the game screen layout** and restyling it here would be
+> inventing that design a phase early. Same for `HintSheet`, which gets tokens but not its
+> real hint levels (WL-307) or the Button component it should be built from (WL-204).
 
 **WL-204 · Core component set** — L · 3d · WL-203
 Per Design System §4, every component carrying **both** halves of the hybrid — thick `ink`

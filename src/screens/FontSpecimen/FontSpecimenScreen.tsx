@@ -19,10 +19,10 @@ import { fontFamily, typeScale } from '@theme/typography';
  * no red box. A screenshot of correctly-sized text therefore proves nothing on
  * its own — it looks entirely plausible while being 100% system font.
  *
- * So each face is rendered twice at the same size: once in the target family,
- * once with no `fontFamily` at all. If the widths come back identical, the
- * custom face did not load and the system font is standing in. The banner at
- * the top reports that as a hard PASS/FAIL rather than leaving it to the eye.
+ * So each face is rendered against three different probe strings (see the
+ * `PROBES` docblock for why one string was not enough) and compared to the
+ * platform default. The banner at the top reports that as a hard PASS/FAIL
+ * rather than leaving it to the eye.
  *
  * `JetBrainsMono` gets a second, independent check: it is monospace, so a
  * narrow string and a wide one of equal character count must measure equal.
@@ -31,7 +31,10 @@ import { fontFamily, typeScale } from '@theme/typography';
  * happening to differ.
  *
  * WL-206 (component gallery) should absorb this screen rather than duplicating
- * it.
+ * it. WL-203 also appended a shadow/radius/rotation specimen block below the
+ * type scale, for the same reason: `boxShadow` support is new enough in this
+ * RN version that a build succeeding proves nothing about it actually
+ * painting per-platform.
  */
 
 type Widths = Record<string, number>;

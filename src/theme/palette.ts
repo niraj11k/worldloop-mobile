@@ -43,18 +43,58 @@ export type PaletteToken = keyof typeof palette;
 /**
  * Offset drop shadows only — never a fill, never behind text. Excluded from
  * contrast verification for that reason: nothing is ever read against it.
- * The exact opacity is a WL-203 decision; Design System section 4 fixes only
- * the offset distances (4-8px components, 10-12px modals) and "no blur".
+ *
+ * Fully opaque (Design System section 1, resolved by WL-203): `ink` at any
+ * lower opacity composites over `paper` to a grey, and section 1 excludes greys
+ * from the palette entirely. Kept as its own token so shadow colour can be
+ * retuned without touching every border in the app.
  */
 export const SHADOW_INK = palette.ink;
 
 /**
  * Disabled controls drop to 40% fill opacity and lose their offset shadow
- * (Design System section 4, Buttons). The fill composites over `paper`, which
- * is what makes the disabled label a distinct contrast case from the enabled
- * one — see the matrix, and `TEXT_ON.disabled`.
+ * (Design System section 4, Buttons).
  */
 export const DISABLED_FILL_OPACITY = 0.4;
+
+/**
+ * Composite `fg` at `alpha` over an opaque `bg`, in sRGB — how a partially
+ * transparent fill actually renders against the page.
+ */
+export const composite = (fg: string, bg: string, alpha: number): string => {
+  const rgb = (hex: string) => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+  const [fr, fg_, fb] = rgb(fg) as [number, number, number];
+  const [br, bg_, bb] = rgb(bg) as [number, number, number];
+  const mix = (a: number, b: number) => Math.round(a * alpha + b * (1 - alpha));
+  return (
+    '#' +
+    [mix(fr, br), mix(fg_, bg_), mix(fb, bb)]
+      .map(c => c.toString(16).padStart(2, '0').toUpperCase())
+      .join('')
+  );
+};
+
+/**
+ * Pre-composited disabled fills.
+ *
+ * **Use these instead of putting `opacity` on the control.** A container
+ * `opacity` fades everything inside it — the `ink` border section 4 says a
+ * disabled button must *keep*, and the label along with it. WL-202 measured the
+ * disabled label at 9.30:1 assuming a full-strength `ink` label over a
+ * composited fill; fading the label too lands nowhere near that, and nothing
+ * would have caught it, because a washed-out button still looks like a
+ * plausible disabled button.
+ *
+ * That is exactly what happened while WL-203 was being built: the token layer
+ * reached for `opacity` because no composited fill existed to reach for, so the
+ * contrast matrix had verified a colour the app could not actually produce.
+ * These exports close that loop — `scripts/verify-contrast.js` measures *these*
+ * values rather than recomputing its own copy.
+ */
+export const disabledFill = {
+  grape: composite(palette.grape, palette.paper, DISABLED_FILL_OPACITY),
+  tangerine: composite(palette.tangerine, palette.paper, DISABLED_FILL_OPACITY),
+} as const;
 
 /**
  * Text colours are never grey and never an accent — only `ink` or `paper`
