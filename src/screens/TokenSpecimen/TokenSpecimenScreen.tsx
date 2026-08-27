@@ -6,6 +6,12 @@ import { BottomSheet } from '@components/common/BottomSheet';
 import { Button } from '@components/common/Button';
 import { Card } from '@components/common/Card';
 import { Input } from '@components/common/Input';
+import { ColorFlash } from '@components/common/motion/ColorFlash';
+import { ScalePunch } from '@components/common/motion/ScalePunch';
+import { Shake } from '@components/common/motion/Shake';
+import { SpringIn } from '@components/common/motion/SpringIn';
+import { ThinkingDots } from '@components/common/motion/ThinkingDots';
+import { useReducedMotion } from '@hooks/useReducedMotion';
 
 import {
   palette,
@@ -54,12 +60,39 @@ export function TokenSpecimenScreen(): React.JSX.Element {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [text, setText] = useState('');
 
+  // WL-205 motion triggers. Each is a counter so that repeating the same
+  // action still changes the value and re-fires the effect.
+  const reducedMotion = useReducedMotion();
+  const [streak, setStreak] = useState(4);
+  const [validCount, setValidCount] = useState(0);
+  const [invalidCount, setInvalidCount] = useState(0);
+  const [stampKey, setStampKey] = useState(0);
+
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.content}>
       <Text style={styles.h1}>Design tokens</Text>
       <Text style={styles.caption}>
         Every value on this screen comes from @theme/theme. Nothing is inline.
       </Text>
+
+      {/*
+        Pinned to the top rather than sitting with the Motion section further
+        down: this is the state every effect below depends on, and an
+        instrument whose reading you have to go looking for is one people stop
+        checking. Any screenshot of this screen now records which mode it was
+        taken in.
+      */}
+      <View
+        style={[
+          styles.motionBanner,
+          { backgroundColor: reducedMotion ? palette.sunbeam : palette.limeade },
+        ]}>
+        <Text style={styles.motionBannerText}>
+          {reducedMotion
+            ? 'REDUCED MOTION IS ON — fallbacks active'
+            : 'REDUCED MOTION IS OFF — full animation'}
+        </Text>
+      </View>
 
       <Text style={styles.h2}>Hard vs blurred</Text>
       <Text style={styles.caption}>
@@ -283,6 +316,94 @@ export function TokenSpecimenScreen(): React.JSX.Element {
         <Button label="Open sheet" onPress={() => setSheetOpen(true)} />
       </View>
 
+      {/* ---- WL-205: motion primitives and their reduced-motion fallbacks ---- */}
+
+      <Text style={styles.h1}>Motion</Text>
+      <Text style={styles.caption}>
+        Live from the OS setting (iOS: Accessibility → Motion → Reduce Motion;
+        Android: Accessibility → Remove animations). Toggle it while this screen
+        is open — the banner and every effect below switch immediately, without
+        a relaunch.
+      </Text>
+
+      <Text style={styles.h2}>Scale-punch</Text>
+      <Text style={styles.caption}>
+        §5: 1.0 → 1.15 → 1.0 over ~200ms. Reduced: no scale, a 100ms opacity
+        flash, and the number still updates.
+      </Text>
+      <View style={styles.motionRow}>
+        <ScalePunch trigger={streak}>
+          <Badge label={`STREAK ${streak}`} rotation={0} />
+        </ScalePunch>
+        <ScalePunch trigger={streak} milestone>
+          <Badge label={`MILESTONE ${streak}`} fill="bubblegum" rotation={0} />
+        </ScalePunch>
+      </View>
+      <Button label="Increment streak" onPress={() => setStreak(s => s + 1)} />
+
+      <Text style={styles.h2}>Colour flash</Text>
+      <Text style={styles.caption}>
+        §5: the valid-move fill flashes limeade, ink border retained. Reduced:
+        still flashes — colour is the signal here, not decoration — but switches
+        instantly instead of easing.
+      </Text>
+      <ColorFlash
+        trigger={validCount}
+        from={palette.paper}
+        to={palette.limeade}
+        style={styles.flashBox}>
+        <Text style={styles.rowLabel}>PLANET</Text>
+      </ColorFlash>
+      <Button label="Submit valid word" onPress={() => setValidCount(c => c + 1)} />
+
+      <Text style={styles.h2}>Horizontal shake</Text>
+      <Text style={styles.caption}>
+        §5: short shake on an invalid word. Reduced: no shake at all — the
+        border, marker, message and live-region announcement already carry it,
+        which is why this is the one effect with no substitute.
+      </Text>
+      <Shake trigger={invalidCount}>
+        <Input
+          accessibilityLabel="Shake demonstration"
+          value="zzz"
+          error="That word isn't in our dictionary."
+        />
+      </Shake>
+      <Button
+        label="Submit invalid word"
+        tone="tangerine"
+        onPress={() => setInvalidCount(c => c + 1)}
+      />
+
+      <Text style={styles.h2}>Spring scale-in</Text>
+      <Text style={styles.caption}>
+        §5: the modal entry and the chain stamp are the same primitive. Reduced:
+        instant appearance. Only the new entry animates — the others must not
+        reflow.
+      </Text>
+      <View style={styles.motionCol}>
+        <SpringIn key={stampKey}>
+          <Card rotation={0}>
+            <Text style={styles.rowLabel}>Newest word stamps in</Text>
+          </Card>
+        </SpringIn>
+        <Card rotation={0}>
+          <Text style={styles.rowLabel}>Older entry — must not move</Text>
+        </Card>
+      </View>
+      <Button label="Stamp a word" onPress={() => setStampKey(k => k + 1)} />
+
+      <Text style={styles.h2}>Thinking indicator</Text>
+      <Text style={styles.caption}>
+        §5: a 3-dot pulse in the monospace face, never a spinner. Reduced: dots
+        hold static — the accompanying text is what carries the state, which is
+        why this primitive requires one.
+      </Text>
+      <View style={styles.thinkingRow}>
+        <Text style={styles.rowLabel}>WordLoop is thinking</Text>
+        <ThinkingDots />
+      </View>
+
       <BottomSheet
         visible={sheetOpen}
         onRequestClose={() => setSheetOpen(false)}
@@ -414,6 +535,37 @@ const styles = StyleSheet.create({
   spacingBar: { height: 12, backgroundColor: palette.grape },
 
   componentCol: { gap: spacing.md, marginTop: spacing.md, alignItems: 'flex-start' },
+  motionBanner: {
+    borderWidth: borderWidth.base,
+    borderColor: palette.ink,
+    borderRadius: radius.control,
+    padding: spacing.md,
+    marginTop: spacing.md,
+    boxShadow: shadow.control,
+  },
+  motionBannerText: { ...typeScale.buttonLabel, color: palette.ink, textAlign: 'center' },
+  motionRow: {
+    flexDirection: 'row',
+    gap: spacing.lg,
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginVertical: spacing.md,
+  },
+  motionCol: { gap: spacing.md, marginVertical: spacing.md },
+  flashBox: {
+    borderWidth: borderWidth.base,
+    borderColor: palette.ink,
+    borderRadius: radius.control,
+    padding: spacing.lg,
+    marginVertical: spacing.md,
+    alignSelf: 'flex-start',
+  },
+  thinkingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginVertical: spacing.md,
+  },
   badgeWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',

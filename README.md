@@ -193,6 +193,32 @@ into the full gallery, which is also where a component-rendering test library
 belongs if one is ever added — the suite currently tests logic, not rendered
 trees, by design.
 
+## Motion (WL-205)
+
+`src/components/common/motion/` — `ScalePunch`, `ColorFlash`, `Shake`,
+`SpringIn`, `ThinkingDots`. Built on RN's own `Animated`; timings live in
+`src/theme/motion.ts`.
+
+Every one has a reduced-motion fallback driven by `useReducedMotion()`, which
+subscribes to the OS setting rather than reading it once — toggling **iOS
+Accessibility → Motion → Reduce Motion** or **Android Accessibility → Remove
+animations** takes effect immediately, without a relaunch. `TokenSpecimen`
+shows the live state in a banner at the top of the screen.
+
+Two fallbacks are not simply "off", and both are deliberate:
+
+- **`ColorFlash` still flashes** — the colour is the signal, not decoration, so
+  suppressing it would remove information. Only the eased transition is
+  dropped.
+- **`Shake` does nothing at all** — §5 says the shake must never be the only
+  signal, and `Input` already carries four permanent ones (border, marker,
+  message, live-region announcement). Do not wrap something whose error signal
+  isn't independently carried.
+
+Timings other than the ones §5 states outright are **untuned** (Design System
+§9 open item 4) and intentionally not pinned by tests, so a real tuning pass
+doesn't read as a regression.
+
 ## Fonts (WL-201)
 
 Four static cuts in `src/assets/fonts/` (1.21MB total), referenced through

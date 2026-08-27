@@ -1139,13 +1139,90 @@ styles — the first real consumer, which is what proved the API.
 > pure invariant that makes the component API safe: `__tests__/theme.test.ts` now covers
 > `textOn` across every fill (21 tests in that file; suite 255).
 
-**WL-205 · Motion primitives with reduced-motion fallbacks** — M · 1.5d · WL-204
+**WL-205 · Motion primitives with reduced-motion fallbacks** — M · 1.5d · WL-204 — **DONE 2026-08-27**
 Per Design System §5: scale-punch, colour flash, spring modal entry, horizontal shake,
 3-dot typographic thinking indicator. **Every one needs a non-animated equivalent that
 still communicates the state change.** No particle effects or confetti — explicitly
 rejected in §5.
 *Done when:* with OS reduced-motion enabled, every state change is still legible, verified
-by a checklist walkthrough.
+by a checklist walkthrough. ✅ — see the walkthrough below.
+
+All five in `src/components/common/motion/`, driven by `useReducedMotion()`
+(`src/hooks/`) with timings in `src/theme/motion.ts`. Built on React Native's own
+`Animated` — **no animation library added**; §5's effects are a scale, an opacity, a
+translate and a colour, and Reanimated would be a native dependency and a second build
+surface to serve that.
+
+### The reduced-motion checklist walkthrough
+
+Run on an iPhone 17 Pro simulator and a `Medium_Phone_API_36.1` emulator, toggling the OS
+setting **while the app stayed open** in both directions. `TokenSpecimen` shows the live
+state in a banner pinned to the top of the screen, so every screenshot records which mode
+it was taken in.
+
+| Effect | Full motion | Reduced motion | Still legible? |
+|---|---|---|---|
+| Scale-punch (streak) | 1.0 → 1.15 → 1.0, 200ms | No scale; 100ms opacity dip to 0.6 | ✅ the number itself updates either way |
+| Colour flash (valid move) | Eased fill flash to `limeade` | **Still flashes**, but switches instantly | ✅ colour *is* the signal here, so it is kept |
+| Spring scale-in (modal, chain stamp) | Spring from 0.9 | Instant appearance | ✅ the element appearing is the state change |
+| Horizontal shake (invalid word) | 3 cycles, ±6pt | **Nothing** | ✅ border, marker, message and live-region announcement all persist |
+| Thinking dots | Staggered 3-dot pulse | Dots hold static at full opacity | ✅ carried by the required accompanying text |
+
+**The live toggle is the part worth having checked.** A one-shot read at mount would leave
+the app animating until the next cold start — which is exactly the wrong behaviour for
+someone who reaches for that setting *because* motion has started making them unwell
+mid-round. Verified in both directions on both platforms: iOS via the
+`reduceMotionChanged` subscription, Android via RN's `ContentObserver` on
+`TRANSITION_ANIMATION_SCALE` (which is what `isReduceMotionEnabled` actually reads there —
+Android has no separate "reduce motion" flag, it is the "Remove animations" setting).
+
+**Two fallbacks that are not "turn it off", and are the interesting ones:**
+
+1. **The colour flash still flashes under reduced motion.** Unlike the punch and the shake,
+   the *colour* is the signal rather than decoration on top of one — suppressing it would
+   remove information from the very users the rule exists to protect. What is removed is
+   the animated transition: it switches instantly, holds, and switches back. Reduced motion
+   targets movement and vestibular triggers, not colour; WCAG 2.3.1's flashing threshold is
+   three or more flashes per second, and this is a single brief change well under it that
+   is never the sole carrier of the state.
+2. **The shake's fallback is genuinely nothing, and that is complete rather than lazy.** §5
+   says "no shake, border flash only" *and* gives the reason: "the shake must never be the
+   only signal, since the error text already carries the meaning". WL-204's `Input` carries
+   four independent signals permanently — `red-alert` border, marker, message, assertive
+   live region — so there is nothing left to substitute. Wrapping something whose error
+   signal is *not* independently carried would be a misuse of that primitive, and its
+   docblock says so.
+
+**Smaller decisions worth knowing:**
+
+- **`ThinkingDots` requires accompanying text**, unlike the other primitives. Static dots
+  alone are ambiguous — they read equally as a truncation — so the component is one
+  accessibility node with `accessibilityRole="progressbar"` and a label, which is the one
+  thing a static row of full stops cannot say on its own.
+- **Effects fire on a `trigger` value changing, not through an imperative ref.** The
+  animation is then a consequence of state and cannot drift out of sync with what is
+  rendered. Every primitive skips its first render — mounting is not an increment, and
+  badges jumping on a freshly-opened screen would read as a fault.
+- **Badge tilt, `SpringIn`'s starting scale, and every loop are stopped on unmount.** An
+  `Animated.loop` that outlives its component runs forever; the thinking indicator unmounts
+  the instant the computer's turn ends.
+- **`ColorFlash` cannot use the native driver**, because `backgroundColor` is neither a
+  transform nor an opacity. Acceptable for a short flash that never runs alongside a
+  gesture; anything longer-running should prefer opacity or transform.
+- **`BottomSheet`'s spring entry — the debt WL-204 deliberately left — is paid.** `Modal`'s
+  own `animationType` stays `"none"` so the platform slide and the spring do not compound
+  into two separate entrances, and the scrim sits outside the spring so dimming arrives
+  with the sheet rather than scaling with it.
+
+> **Timings remain untuned, and the token file says so.** Design System §9 open item 4
+> records that "motion timing values (200ms, spring parameters, etc.) are first-pass
+> suggestions, not tuned against an actual build". Only the figures §5 states outright —
+> the 1.15 punch, ~200ms, the 100ms reduced flash — come from the doc and are asserted in
+> `__tests__/motion.test.ts` (9 tests). The rest are flagged in `motion.ts` as this
+> implementation's, and are deliberately **not** pinned by tests, so that a real tuning pass
+> does not read as a regression. **§9 item 4 stays open** — tuning wants someone watching
+> the app on a device, which is a design review or WL-605, not a guess made while writing
+> the primitives.
 
 **WL-206 · Component gallery screen** — S · 1d · WL-204, WL-205
 A dev-only screen rendering every component in every state. Cheap, and it's how design
