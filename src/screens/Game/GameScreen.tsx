@@ -19,6 +19,7 @@ import { generateCandidates, selectComputerWord } from '@features/difficulty/dif
 import { rarityForEntry, scoreWord } from '@features/scoring/scoringEngine';
 import { replyCountForLetter } from '@features/dictionary/dictionaryService';
 import { INVALID_WORD_MESSAGES } from '@constants/gameConstants';
+import { Icon } from '@components/common/icons/Icon';
 import { palette, typeScale } from '@theme/theme';
 import type { GameStatus, InvalidReason } from '@app-types/game';
 
@@ -171,11 +172,19 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   return (
     <View style={{ flex: 1 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Pressable onPress={() => navigation.goBack()}>
-          <Text>←</Text>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Back">
+          <Icon name="back" />
         </Pressable>
         <Text>{difficulty}</Text>
-        <Text>⏸</Text>
+        {/*
+          Not yet a control — WL-404 builds the Pause screen and wires this up.
+          Rendered without a Pressable on purpose, so it does not advertise a
+          tap target that does nothing.
+        */}
+        <Icon name="pause" />
       </View>
 
       <Text>

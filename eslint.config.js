@@ -98,6 +98,22 @@ module.exports = [
             'Inline shadow value. Use a `shadow.*` token from @theme/theme — Design System §4 ' +
             'fixes the offset per component type.',
         },
+        // WL-207: an emoji standing in for an icon. The listed characters are
+        // pictographic and have no legitimate prose use, unlike arrows (→),
+        // which appear in real copy and are deliberately not listed.
+        {
+          selector: 'JSXText[value=/[\\u2699\\u23F8\\u23F9\\u25B6\\u2716\\u274C\\u2190\\uD83D\\uDD0A\\uD83D\\uDCF3\\uD83D\\uDCA1\\uD83C\\uDFA8]/]',
+          message:
+            'Emoji used as an icon. Use <Icon name=… /> from @components/common/icons — ' +
+            'Design System §7 requires the custom set, and emoji render as tofu boxes ' +
+            'wherever the platform lacks the glyph.',
+        },
+        {
+          selector: 'Literal[value=/[\\u2699\\u23F8\\u23F9\\u25B6\\u2716\\u274C\\uD83D\\uDD0A\\uD83D\\uDCF3\\uD83D\\uDCA1\\uD83C\\uDFA8]/]',
+          message:
+            'Emoji used as an icon. Use <Icon name=… /> from @components/common/icons — ' +
+            'Design System §7 requires the custom set.',
+        },
       ],
     },
   },

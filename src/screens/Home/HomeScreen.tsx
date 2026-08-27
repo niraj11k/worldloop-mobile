@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
+import { Icon } from '@components/common/icons/Icon';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -21,8 +22,16 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
     <View style={{ flex: 1 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
         <Text>WordLoop</Text>
-        <Pressable onPress={() => navigation.navigate('Settings')}>
-          <Text>⚙</Text>
+        {/*
+          Icon-only control, so the label lives on the Pressable — the glyph is
+          decorative and hidden from assistive tech (WL-207). A gear is only
+          "Settings" in context.
+        */}
+        <Pressable
+          onPress={() => navigation.navigate('Settings')}
+          accessibilityRole="button"
+          accessibilityLabel="Settings">
+          <Icon name="settings" />
         </Pressable>
       </View>
 

@@ -7,6 +7,7 @@ import { BottomSheet } from '@components/common/BottomSheet';
 import { Button } from '@components/common/Button';
 import { Card } from '@components/common/Card';
 import { Input } from '@components/common/Input';
+import { Icon, ICON_NAMES } from '@components/common/icons/Icon';
 import { spacing } from '@theme/theme';
 
 /**
@@ -98,6 +99,35 @@ export function ComponentsSection(): React.JSX.Element {
         streak badge must not jump to a new angle every time the number ticks up.
       </Text>
 
+      <Text style={gallery.h2}>Icons</Text>
+      <Text style={gallery.caption}>
+        The whole WL-207 set, drawn from Views using the same borderWidth and
+        palette tokens as the components — which is what §7 means by strokes
+        &ldquo;matching the border weight used on components&rdquo;. Iterated
+        from ICON_NAMES, so a new glyph appears here automatically rather than
+        needing to be remembered.
+      </Text>
+      <View style={styles.iconWrap}>
+        {ICON_NAMES.map(name => (
+          <View key={name} style={styles.iconCell}>
+            <Icon name={name} size={32} />
+            <Text style={gallery.caption}>{name}</Text>
+          </View>
+        ))}
+      </View>
+      <Text style={gallery.caption}>
+        Stroke weight scales with the box, so all three sizes below stay chunky
+        rather than the largest reading as a hairline.
+      </Text>
+      <View style={styles.iconWrap}>
+        {[16, 24, 48].map(size => (
+          <View key={size} style={styles.iconCell}>
+            <Icon name="settings" size={size} />
+            <Text style={gallery.caption}>{size}pt</Text>
+          </View>
+        ))}
+      </View>
+
       <Text style={gallery.h2}>BottomSheet</Text>
       <View style={gallery.col}>
         <Button label="Open sheet" onPress={() => setSheetOpen(true)} />
@@ -124,6 +154,13 @@ export function ComponentsSection(): React.JSX.Element {
 const styles = StyleSheet.create({
   // Inputs stretch rather than hugging their content, unlike the buttons above.
   inputCol: { gap: spacing.sm, marginBottom: spacing.md },
+  iconWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xl,
+    marginBottom: spacing.md,
+  },
+  iconCell: { alignItems: 'center', gap: spacing.xs },
   badgeWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
