@@ -1056,14 +1056,88 @@ negative-tested. Suite: 248 passing.
 > inventing that design a phase early. Same for `HintSheet`, which gets tokens but not its
 > real hint levels (WL-307) or the Button component it should be built from (WL-204).
 
-**WL-204 · Core component set** — L · 3d · WL-203
+**WL-204 · Core component set** — L · 3d · WL-203 — **DONE 2026-08-27**
 Per Design System §4, every component carrying **both** halves of the hybrid — thick `ink`
 border and hard offset shadow **and** rounded puffy geometry: Button (primary / secondary
 / disabled, with the press-into-shadow state from §4), Card (with permitted rotation),
 Input (focus → `grape` border, error → `red-alert` border **plus** icon and text), Badge/
 sticker (pill, rotated 3–6°), BottomSheet/Modal (10–12px offset shadow).
 *Done when:* each component renders every specified state, disabled buttons drop the
-shadow entirely, and no component uses a blurred shadow.
+shadow entirely, and no component uses a blurred shadow. ✅ — all five in
+`src/components/common/`, every state rendered and checked on an iPhone 17 Pro simulator
+and a `Medium_Phone_API_36.1` emulator via the `TokenSpecimen` screen.
+
+**The design goal was to make the rules unrepresentable rather than documented.** Three
+things a caller now cannot express:
+
+1. **A failing colour pairing.** Components take a *fill*, never a text colour, and derive
+   the label through the new `textOn()` helper, which reads the WL-202 contrast matrix.
+   There is no prop that can put `paper` on `tangerine` (2.66:1). The single rule anyone
+   needs — *grape is the only fill dark enough for paper text* — is now enforced rather
+   than remembered.
+2. **A borderless variant.** WL-202 found the `ink` outline is load-bearing for WCAG
+   1.4.11, so it is not configurable on any component.
+3. **A blurred shadow.** Shadows come only from `shadow.*` tokens, all asserted
+   `blurRadius: 0`.
+
+**`TEXT_ON` order is now significant and gated.** `textOn()` renders the head of each list,
+so the order *is* what ships. `verify-contrast.js` now derives those lists ranked by
+descending contrast and compares them **in order** rather than as sets — reshuffling the
+preference would otherwise change every component's text colour without changing a single
+ratio. Only `grape`'s large-text entry reordered (`paper` 5.32:1 ahead of `ink` 3.25:1).
+
+**One new palette token, contrast-verified: `ink-muted`** (`#736E67`, `ink` at 60% over
+`paper`, 4.72:1). §1 defined no placeholder colour and the conventional answer looked
+banned — "Grays are excluded from this palette entirely". Resolved rather than assumed:
+§1's objection is to cool grey neutrals *as a base*, and this is not a new hue but `ink`
+composited over `paper`, so it inherits the palette's warmth and moves if either parent is
+retuned. The alternative is worse for accessibility — a full-`ink` placeholder is
+indistinguishable from a real value. 60% is the lowest alpha still clearing 4.5:1.
+
+> **Also added, and flagged as this implementation's choice rather than the doc's: a modal
+> scrim** (`ink` at 45%). §4 specifies a heavier shadow to make a sheet read as elevated but
+> says nothing about the surface behind it, and a sheet over an undimmed page leaves the
+> screen beneath looking live and tappable. Excluded from the contrast matrix because
+> nothing is read against it — the sheet sits on opaque `paper`. **The exact alpha wants a
+> design opinion.**
+
+**Details worth knowing, each a decision rather than a default:**
+
+- **Disabled *secondary* has no distinct fill, and that is §4's own answer.** `paper` at 40%
+  over a `paper` page is still `paper`. §4 makes the dropped shadow the signal — "reads as
+  flat, reinforcing non-interactivity without relying on color alone" — and
+  `accessibilityState` carries it to assistive tech regardless.
+- **Badge tilt is derived from the label, not random.** §0 wants intentional imperfection,
+  but `Math.random()` at render time would re-roll the angle on every state change, so a
+  streak badge would visibly jump each time the number ticked up — a glitch, not character.
+  A hash of the label gives stable-per-badge, varied-across-badges.
+- **Card rotation is opt-in and clamped** to §3's −2..3, so a plausible-looking
+  `rotation={15}` cannot ship. §4's rule that cards holding inputs or primary controls must
+  never rotate cannot be enforced by a component that cannot inspect its children — that
+  judgement stays with the caller, where the information is.
+- **Input carries three error signals, not one** — `red-alert` border, a marker, and the
+  message — per the no-colour-only-meaning rule. The message is announced via
+  `role="alert"` and an assertive live region, which is Wireframe §18's "accessible error
+  announcements": without it a screen-reader user submits a word, hears nothing, and cannot
+  tell why the round did not advance. The marker is typographic, not from an icon library —
+  §7 rejects stock icon sets and WL-207 owns the custom set.
+- **`MIN_TAP_TARGET` is 48**, satisfying both iOS HIG (44) and Android Material (48) with
+  one number.
+- **`BottomSheet` has no entry animation, deliberately.** §4 calls for a spring, but §5 owns
+  motion and that is **WL-205**, which must also supply the reduced-motion equivalent.
+  `animationType="none"` is set explicitly so the absence reads as a decision.
+
+**`HintSheet` was rebuilt on `BottomSheet` + `Button`** rather than left restating those
+styles — the first real consumer, which is what proved the API.
+
+> **No component-rendering test library was added, and that is a deliberate non-decision to
+> flag.** The project has no precedent for rendered-tree tests — the README states the
+> feature-based structure exists specifically to keep logic "unit-testable without a
+> rendered component tree" — and **WL-206 is the project's own chosen mechanism** for
+> catching component regressions. Adding `@testing-library/react-native` is a real
+> dependency call that belongs with WL-206, not smuggled in here. What *is* tested is the
+> pure invariant that makes the component API safe: `__tests__/theme.test.ts` now covers
+> `textOn` across every fill (21 tests in that file; suite 255).
 
 **WL-205 · Motion primitives with reduced-motion fallbacks** — M · 1.5d · WL-204
 Per Design System §5: scale-punch, colour flash, spring modal entry, horizontal shake,

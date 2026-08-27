@@ -35,7 +35,12 @@ require('@babel/register')({
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { palette, TEXT_ON, disabledFill } = require('../src/theme/palette.ts');
+const {
+  palette,
+  TEXT_ON,
+  disabledFill,
+  inkMuted,
+} = require('../src/theme/palette.ts');
 
 const ROOT = path.resolve(__dirname, '..');
 const MATRIX_PATH = path.join(ROOT, 'proj-docs', 'WordLoop_Contrast_Matrix.md');
@@ -117,6 +122,12 @@ const FILLS = {
   disabledTangerine: disabledFill.tangerine,
 };
 
+// Text colours are `ink` and `paper` plus one derived tone: `inkMuted`, the
+// placeholder colour (WL-204). It is deliberately NOT in `FILLS` — nothing is
+// ever filled with it, and it is not a candidate in the TEXT_ON derivation
+// below, which stays a two-way choice between ink and paper.
+const TEXTS = { ...palette, inkMuted };
+
 // `probe: true` marks a combination the design system does NOT prescribe, tested
 // to establish which of `ink`/`paper` is *mandatory* on that fill. Section 1
 // says text is only ever ink or paper but never says which, per fill — so a
@@ -125,6 +136,7 @@ const FILLS = {
 const TEXT_PAIRINGS = [
   ['paper', 'ink', 'body', 'Base screen copy, instructions (§1)'],
   ['paper', 'ink', 'caption', 'Score labels, timestamps (§2)'],
+  ['paper', 'inkMuted', 'body', 'Input placeholder text (§4 Input fields)'],
   ['paper', 'ink', 'button', 'Secondary button label (§4)'],
   ['paper', 'ink', 'chainWord', 'Word chain history (§4 Cards)'],
   ['paper', 'ink', 'screenTitle', 'Screen titles (§2)'],
@@ -186,7 +198,7 @@ const failures = [];
 const warnings = [];
 
 const textRows = TEXT_PAIRINGS.map(([fill, text, role, where, probe = false]) => {
-  const ratio = contrast(FILLS[fill], palette[text]);
+  const ratio = contrast(FILLS[fill], TEXTS[text]);
   const { px, label } = ROLES[role];
   const min = threshold(px);
   const pass = ratio >= min;
@@ -216,12 +228,19 @@ const nonTextRows = NONTEXT_PAIRINGS.map(([a, b, where]) => {
 });
 
 // Derive TEXT_ON from measurement and compare against what palette.ts declares.
+// Ordered highest-contrast first, because `textOn()` in palette.ts renders the
+// head of each list — so the order is not cosmetic, it is what ships. Compared
+// in order below rather than as a set: reshuffling the preference would change
+// every component's text colour without changing a single ratio.
 const derived = {};
 for (const fill of Object.keys(FILLS)) {
   derived[fill] = { normal: [], large: [] };
-  for (const text of ['ink', 'paper']) {
-    const ratio = contrast(FILLS[fill], palette[text]);
-    if (fill === text) continue;
+  const ranked = ['ink', 'paper']
+    .filter(text => text !== fill)
+    .map(text => ({ text, ratio: contrast(FILLS[fill], palette[text]) }))
+    .sort((a, b) => b.ratio - a.ratio);
+
+  for (const { text, ratio } of ranked) {
     if (ratio >= 4.5) derived[fill].normal.push(text);
     if (ratio >= 3) derived[fill].large.push(text);
   }
@@ -230,8 +249,9 @@ for (const fill of Object.keys(FILLS)) {
 const tableMismatches = [];
 for (const fill of Object.keys(derived)) {
   for (const size of ['normal', 'large']) {
-    const want = [...derived[fill][size]].sort().join(',');
-    const got = [...(TEXT_ON[fill]?.[size] ?? [])].sort().join(',');
+    // Order-sensitive on purpose — see the `derived` comment above.
+    const want = derived[fill][size].join(',');
+    const got = (TEXT_ON[fill]?.[size] ?? []).join(',');
     if (want !== got) {
       tableMismatches.push({ fill, size, want: want || '(none)', got: got || '(none)' });
     }

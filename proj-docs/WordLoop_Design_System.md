@@ -34,6 +34,19 @@ High-contrast, saturated, deliberately unconventional pairings. No corporate blu
 | `red-alert` | `#FF3131` | Error / invalid move — reserved, don't overuse |
 | `sunbeam` | `#FFD400` | Highlight / badge fills, level-up moments |
 | `shadow-ink` | `#161311`, **fully opaque** | Used only for offset drop shadows, never as a fill |
+| `ink-muted` | `#736E67` (`ink` at 60% over `paper`) | **Placeholder text only.** Never a fill, never a border, never real content |
+
+> **WL-204 (2026-08-27): `ink-muted` added for placeholder text.** This section defined no
+> placeholder colour, and the conventional answer looked banned — "Grays are excluded from
+> this palette entirely." Two things reconcile it. First, the stated objection is to "cool
+> gray-scale neutrals **as a base**", i.e. a hue introduced into the palette; this is not a
+> new hue but `ink` composited over `paper`, so it inherits the palette's warmth (it comes
+> out brown-leaning, not a cool grey) and moves automatically if either parent is retuned.
+> Second, the alternative is *worse* for accessibility: a placeholder in full `ink` is
+> indistinguishable from a real value, so nobody can tell whether a field has been filled
+> in. 60% is the lowest alpha that still clears 4.5:1 against `paper` — it measures 4.72:1,
+> and is in the contrast matrix like every other pairing. **It is not a general-purpose
+> "muted text" colour**; anything the user must actually read is `ink`.
 
 > **WL-203 (2026-08-27): "at fixed opacity" resolved to 1.0 — fully opaque.** The value was
 > never named, and the palette's own rules decide it: `ink` at any opacity below 1.0

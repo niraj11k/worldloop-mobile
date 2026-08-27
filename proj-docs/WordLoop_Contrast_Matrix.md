@@ -26,6 +26,7 @@ earning its teeth, not a defect.
 |---|---|---|---|---|---|---|
 | PASS | 17.27:1 | 4.5:1 | `ink` | `paper` | Body / instructions (15px mono) | Base screen copy, instructions (§1) |
 | PASS | 17.27:1 | 4.5:1 | `ink` | `paper` | Caption / metadata (12px mono) | Score labels, timestamps (§2) |
+| PASS | 4.72:1 | 4.5:1 | `inkMuted` | `paper` | Body / instructions (15px mono) | Input placeholder text (§4 Input fields) |
 | PASS | 17.27:1 | 4.5:1 | `ink` | `paper` | Button label (15px mono bold) | Secondary button label (§4) |
 | PASS | 17.27:1 | 3:1 | `ink` | `paper` | Computer/player word (26px display) | Word chain history (§4 Cards) |
 | PASS | 17.27:1 | 3:1 | `ink` | `paper` | Screen title (28px display) | Screen titles (§2) |
@@ -84,7 +85,7 @@ script fails.
 |---|---|---|
 | `paper` | `ink` | `ink` |
 | `ink` | `paper` | `paper` |
-| `grape` | `paper` | `ink`, `paper` |
+| `grape` | `paper` | `paper`, `ink` |
 | `tangerine` | `ink` | `ink` |
 | `bubblegum` | `ink` | `ink`, `paper` |
 | `limeade` | `ink` | `ink` |

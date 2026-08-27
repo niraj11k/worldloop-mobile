@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { Badge } from '@components/common/Badge';
+import { BottomSheet } from '@components/common/BottomSheet';
+import { Button } from '@components/common/Button';
+import { Card } from '@components/common/Card';
+import { Input } from '@components/common/Input';
+
 import {
   palette,
   spacing,
@@ -45,6 +51,8 @@ import {
  */
 export function TokenSpecimenScreen(): React.JSX.Element {
   const [pressed, setPressed] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [text, setText] = useState('');
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.content}>
@@ -193,6 +201,102 @@ export function TokenSpecimenScreen(): React.JSX.Element {
           </View>
         ))}
       </View>
+
+      {/* ---- WL-204: the shared components, in every state §4 specifies ---- */}
+
+      <Text style={styles.h1}>Components</Text>
+      <Text style={styles.caption}>
+        The real components from @components/common, not a restatement. Label
+        colours are derived from each fill through the contrast matrix, so no
+        combination here can be a failing one.
+      </Text>
+
+      <Text style={styles.h2}>Button</Text>
+      <View style={styles.componentCol}>
+        <Button label="Primary grape" onPress={() => {}} />
+        <Button label="Primary tangerine" tone="tangerine" onPress={() => {}} />
+        <Button label="Secondary" variant="secondary" onPress={() => {}} />
+        <Button label="Disabled grape" disabled onPress={() => {}} />
+        <Button label="Disabled tangerine" tone="tangerine" disabled onPress={() => {}} />
+        <Button
+          label="Disabled secondary"
+          variant="secondary"
+          disabled
+          onPress={() => {}}
+        />
+      </View>
+      <Text style={styles.caption}>
+        Press any enabled button to see it translate into its own shadow.
+        Disabled secondary keeps its paper fill — §4 makes the dropped shadow
+        the signal there, since paper at 40% over paper is still paper.
+      </Text>
+
+      <Text style={styles.h2}>Card</Text>
+      <View style={styles.componentCol}>
+        <Card>
+          <Text style={styles.rowLabel}>Default paper card, no rotation</Text>
+        </Card>
+        <Card rotation={-2}>
+          <Text style={styles.rowLabel}>Tilted -2°, the §3 minimum</Text>
+        </Card>
+        <Card fill="sunbeam" rotation={99}>
+          <Text style={styles.rowLabel}>
+            Asked for 99° — clamped to the §3 maximum of 3°
+          </Text>
+        </Card>
+      </View>
+
+      <Text style={styles.h2}>Input</Text>
+      <View style={styles.componentCol}>
+        <Input
+          accessibilityLabel="Example word entry"
+          placeholder="Enter a word beginning with E"
+          value={text}
+          onChangeText={setText}
+        />
+        <Text style={styles.caption}>
+          Focus it: the border turns grape and a separate ring appears — §4
+          requires both, and a border change alone would be a colour-only signal.
+        </Text>
+        <Input
+          accessibilityLabel="Example word entry with an error"
+          placeholder="Enter a word"
+          value="zzz"
+          error="That word isn't in our dictionary."
+        />
+      </View>
+
+      <Text style={styles.h2}>Badge</Text>
+      <View style={styles.badgeWrap}>
+        <Badge label="STREAK 6" />
+        <Badge label="HARD" fill="bubblegum" />
+        <Badge label="NEW WORD" />
+        <Badge label="No tilt" rotation={0} />
+      </View>
+      <Text style={styles.caption}>
+        Tilt is derived from the label, so it is stable across re-renders — a
+        streak badge must not jump to a new angle every time the number ticks up.
+      </Text>
+
+      <Text style={styles.h2}>BottomSheet</Text>
+      <View style={styles.componentCol}>
+        <Button label="Open sheet" onPress={() => setSheetOpen(true)} />
+      </View>
+
+      <BottomSheet
+        visible={sheetOpen}
+        onRequestClose={() => setSheetOpen(false)}
+        title="Bottom sheet">
+        <Text style={styles.rowLabel}>
+          4px ink border, heaviest shadow, top corners rounded. Tap the scrim or
+          use the back gesture to dismiss.
+        </Text>
+        <Text style={styles.caption}>
+          No entry animation on purpose — motion is WL-205, which also owns the
+          reduced-motion fallback.
+        </Text>
+        <Button label="Close" onPress={() => setSheetOpen(false)} />
+      </BottomSheet>
     </ScrollView>
   );
 }
@@ -309,6 +413,14 @@ const styles = StyleSheet.create({
   spacingName: { ...typeScale.caption, color: palette.ink, width: 40 },
   spacingBar: { height: 12, backgroundColor: palette.grape },
 
+  componentCol: { gap: spacing.md, marginTop: spacing.md, alignItems: 'flex-start' },
+  badgeWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    marginTop: spacing.md,
+    alignItems: 'center',
+  },
   fillsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.md },
   fill: {
     paddingVertical: spacing.sm,
