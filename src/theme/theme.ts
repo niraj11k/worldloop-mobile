@@ -18,10 +18,31 @@
  * `eslint.config.js`, not by review. If a value is missing here, add it here —
  * do not inline it at the call site.
  */
-import { palette, SHADOW_INK, disabledFill, composite, TEXT_ON } from './palette';
+import {
+  palette,
+  SHADOW_INK,
+  disabledFill,
+  inkMuted,
+  scrim,
+  composite,
+  textOn,
+  TEXT_ON,
+} from './palette';
 import { fontFamily, typeScale } from './typography';
+import type { FillToken } from './palette';
 
-export { palette, TEXT_ON, fontFamily, typeScale, disabledFill, composite };
+export {
+  palette,
+  TEXT_ON,
+  fontFamily,
+  typeScale,
+  disabledFill,
+  inkMuted,
+  scrim,
+  composite,
+  textOn,
+};
+export type { FillToken };
 
 /**
  * Spacing — Design System section 3: base unit 4px, used in multiples.
@@ -155,6 +176,16 @@ export const shadow = {
  * Paired with `shadow.none` so the control lands exactly where its shadow was.
  */
 export const pressTranslate = 4;
+
+/**
+ * Minimum tap target — Wireframe section 18, "large tap targets".
+ *
+ * 48 rather than 44: iOS HIG asks for 44pt and WCAG 2.5.5 for 44×44, but
+ * Android's Material guidance asks for 48dp, and one number that satisfies
+ * both platforms is worth more than two that each satisfy one. The chunky,
+ * puffy geometry this design system calls for absorbs the extra 4pt easily.
+ */
+export const MIN_TAP_TARGET = 48;
 
 export const theme = {
   colors: palette,

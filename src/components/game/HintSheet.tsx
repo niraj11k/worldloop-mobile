@@ -1,7 +1,9 @@
 import React from 'react';
-import { View, Text, Pressable, Modal, StyleSheet } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { palette, spacing, radius, borderWidth, shadow, typeScale } from '@theme/theme';
+import { BottomSheet } from '@components/common/BottomSheet';
+import { Button } from '@components/common/Button';
+import { palette, spacing, typeScale } from '@theme/theme';
 
 interface HintSheetProps {
   visible: boolean;
@@ -20,6 +22,10 @@ interface HintSheetProps {
  * 1. Required letter, 2. word count available, 3. example word,
  * 4. definition-based clue. Only level 1 + 3 are stubbed here.
  * Never auto-reveal a word without explicit user choice.
+ *
+ * Rebuilt on `BottomSheet` and `Button` under WL-204, so the sheet's border,
+ * shadow, and scrim come from the shared component rather than being restated
+ * here. The remaining hint-level work is WL-307.
  */
 export function HintSheet({
   visible,
@@ -29,48 +35,33 @@ export function HintSheet({
   onCancel,
 }: HintSheetProps): React.JSX.Element {
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.sheet}>
-        <Text style={styles.title}>Hint</Text>
-        <Text style={styles.body}>Your word must begin with:</Text>
-        <Text style={styles.letter}>{requiredLetter.toUpperCase()}</Text>
-        <Text style={styles.body}>Example: {exampleWord.toUpperCase()}</Text>
-        <Text style={styles.body}>
-          This hint will reduce your available hints by one.
-        </Text>
-        <View style={styles.actions}>
-          <Pressable onPress={onUseHint}>
-            <Text style={styles.action}>Use Hint</Text>
-          </Pressable>
-          <Pressable onPress={onCancel}>
-            <Text style={styles.action}>Cancel</Text>
-          </Pressable>
-        </View>
+    <BottomSheet visible={visible} onRequestClose={onCancel} title="Hint">
+      <Text style={styles.body}>Your word must begin with:</Text>
+      <Text style={styles.letter}>{requiredLetter.toUpperCase()}</Text>
+      <Text style={styles.body}>Example: {exampleWord.toUpperCase()}</Text>
+      <Text style={styles.body}>
+        This hint will reduce your available hints by one.
+      </Text>
+
+      <View style={styles.actions}>
+        <Button
+          label="Use Hint"
+          onPress={onUseHint}
+          accessibilityHint="Reveals the hint and reduces your remaining hints by one"
+        />
+        <Button label="Cancel" variant="secondary" onPress={onCancel} />
       </View>
-    </Modal>
+    </BottomSheet>
   );
 }
 
-// Token-only styling (WL-203). This is the skeleton wearing real tokens, not
-// the finished sheet — WL-307 builds the actual hint levels and WL-204 supplies
-// the Button component these two Pressables should become.
 const styles = StyleSheet.create({
-  sheet: {
-    marginTop: 'auto',
-    backgroundColor: palette.paper,
-    padding: spacing.lg,
-    // Design System §4: modals carry the heaviest shadow and a 4px floor on
-    // the border, to read as elevated above the base screen.
-    borderWidth: borderWidth.thick,
-    borderColor: palette.ink,
-    borderTopLeftRadius: radius.card,
-    borderTopRightRadius: radius.card,
-    boxShadow: shadow.modal,
-    gap: spacing.sm,
-  },
-  title: { ...typeScale.screenTitle, color: palette.ink },
   body: { ...typeScale.body, color: palette.ink },
   letter: { ...typeScale.requiredLetter, color: palette.ink },
-  actions: { flexDirection: 'row', justifyContent: 'space-between' },
-  action: { ...typeScale.buttonLabel, color: palette.ink },
+  actions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.sm,
+    flexWrap: 'wrap',
+  },
 });

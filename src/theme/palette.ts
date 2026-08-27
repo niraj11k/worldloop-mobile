@@ -97,6 +97,52 @@ export const disabledFill = {
 } as const;
 
 /**
+ * Placeholder text — `ink` muted toward `paper`.
+ *
+ * Added by WL-204, because section 1 defines no placeholder colour and the
+ * conventional answer (grey) reads as banned: "Grays are excluded from this
+ * palette entirely."
+ *
+ * Two things reconcile that. First, section 1's stated objection is to "cool
+ * gray-scale neutrals **as a base**" — a hue introduced into the palette.
+ * This is not a new hue: it is `ink` composited over `paper`, so it inherits
+ * the palette's own warmth (`#736E67`, brown-leaning, not a cool grey) and
+ * moves automatically if either parent colour is ever retuned.
+ *
+ * Second, the alternative is worse for accessibility, not better. Rendering
+ * placeholders in full `ink` makes them indistinguishable from a real value,
+ * so nobody can tell at a glance whether a field has been filled in.
+ *
+ * 0.6 is the lowest alpha that still clears 4.5:1 against `paper` (it measures
+ * 4.72:1, verified in the contrast matrix) — i.e. the most visual separation
+ * from entered text that is still legible as text.
+ */
+export const INK_MUTED_ALPHA = 0.6;
+export const inkMuted = composite(palette.ink, palette.paper, INK_MUTED_ALPHA);
+
+/** `hex` as an `rgba()` string — for the few places real transparency is needed. */
+const rgba = (hex: string, alpha: number): string => {
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+/**
+ * Modal scrim — `ink` at 45%.
+ *
+ * Added by WL-204. Section 4 specifies a heavier shadow to make a sheet read as
+ * elevated but says nothing about the surface behind it, and a modal with no
+ * scrim at all leaves the page beneath looking live and tappable. This is one
+ * of the few places genuine transparency is required rather than a composite:
+ * the point is to see the dimmed screen through it.
+ *
+ * **Flagged for design review** — the exact alpha is this implementation's
+ * choice, not the doc's. It is excluded from the contrast matrix because
+ * nothing is read against it; the sheet sits on opaque `paper`.
+ */
+export const SCRIM_ALPHA = 0.45;
+export const scrim = rgba(palette.ink, SCRIM_ALPHA);
+
+/**
  * Text colours are never grey and never an accent — only `ink` or `paper`
  * (Design System section 1, pairing rules). Which of the two is legal depends
  * on the fill, and on the size of the text.
@@ -112,6 +158,12 @@ export const disabledFill = {
  * Every entry here is *derived from measurement*, not asserted — the
  * verifier recomputes each list from the hexes above and fails if this table
  * disagrees with it, so the table cannot quietly rot.
+ *
+ * **Order is significant: highest contrast first.** `textOn()` below takes the
+ * head of the list, so the first entry is what components actually render.
+ * The verifier compares these lists *in order*, not as sets, so the preference
+ * cannot be silently reshuffled — that would change what ships without
+ * changing any ratio.
  */
 export const TEXT_ON: Record<
   PaletteToken | 'disabledGrape' | 'disabledTangerine',
@@ -130,3 +182,26 @@ export const TEXT_ON: Record<
   disabledGrape: { normal: ['ink'], large: ['ink'] },
   disabledTangerine: { normal: ['ink'], large: ['ink'] },
 } as const;
+
+/** Any surface a component can put text on, including the disabled fills. */
+export type FillToken = keyof typeof TEXT_ON;
+
+/**
+ * The text colour to use on a given fill — the highest-contrast legal option.
+ *
+ * Components take a *fill* and call this rather than accepting a text colour,
+ * so the WL-202 contrast matrix is enforced by construction instead of by
+ * anyone remembering that `grape` is the only fill dark enough for `paper`
+ * text. There is no component API that can express a failing pairing.
+ *
+ * `size` follows the matrix's own split: `normal` for the monospace scale
+ * (body, button labels, captions), `large` for display roles at 24px+.
+ */
+export const textOn = (fill: FillToken, size: 'normal' | 'large' = 'normal'): string => {
+  const legal = TEXT_ON[fill][size];
+  const token = legal[0];
+  // Unreachable against the current table — every fill has at least one legal
+  // text colour, and the verifier fails if that stops being true. Falling back
+  // to `ink` rather than throwing keeps a rendering bug from becoming a crash.
+  return token ? palette[token] : palette.ink;
+};

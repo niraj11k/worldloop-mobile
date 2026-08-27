@@ -173,6 +173,26 @@ A dev-only `TokenSpecimen` screen (behind `__DEV__`) renders every token
 on-device, including each hard shadow beside a deliberately blurred control so
 a regression to blurred shadows is visible rather than plausible.
 
+## Shared components (WL-204)
+
+`src/components/common/` — `Button`, `Card`, `Input`, `Badge`, `BottomSheet`.
+Build screens from these rather than restyling views; `HintSheet` is the
+worked example.
+
+**Pass a `fill`, never a text colour.** Components derive their label colour
+through `textOn()`, which reads the verified contrast matrix, so a failing
+pairing cannot be expressed through the API. The one rule worth carrying in
+your head: *`grape` is the only fill dark enough for `paper` text; every other
+accent takes `ink`.*
+
+Borders are not configurable — WL-202 found the `ink` outline is load-bearing
+for WCAG 1.4.11, not decoration. Neither is shadow blur.
+
+`TokenSpecimen` renders every component in every state. WL-206 will expand it
+into the full gallery, which is also where a component-rendering test library
+belongs if one is ever added — the suite currently tests logic, not rendered
+trees, by design.
+
 ## Fonts (WL-201)
 
 Four static cuts in `src/assets/fonts/` (1.21MB total), referenced through

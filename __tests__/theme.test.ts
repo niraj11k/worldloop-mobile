@@ -16,7 +16,11 @@ import {
   rotate,
   palette,
   disabledFill,
+  inkMuted,
   composite,
+  textOn,
+  TEXT_ON,
+  MIN_TAP_TARGET,
 } from '@theme/theme';
 
 describe('shadows (§4)', () => {
@@ -132,5 +136,61 @@ describe('disabled fills (§4, WL-202)', () => {
 
   it('composite toward paper, landing lighter than the accent', () => {
     expect(disabledFill.grape).toBe(composite(palette.grape, palette.paper, 0.4));
+  });
+});
+
+/**
+ * WL-204. `textOn` is what makes a failing colour pairing unrepresentable in
+ * the component API — callers pass a *fill* and never a text colour. These
+ * assert the derivation rather than the ratios; the ratios themselves are
+ * gated by `npm run contrast:verify`, which measures the same table.
+ */
+describe('textOn (WL-204)', () => {
+  const fills = Object.keys(TEXT_ON) as (keyof typeof TEXT_ON)[];
+
+  it('returns only ink or paper — never an accent, never a grey', () => {
+    for (const fill of fills) {
+      expect([palette.ink, palette.paper]).toContain(textOn(fill));
+    }
+  });
+
+  it('returns the highest-contrast option, i.e. the head of the verified list', () => {
+    for (const fill of fills) {
+      const expected = TEXT_ON[fill].normal[0];
+      if (expected) expect(textOn(fill)).toBe(palette[expected]);
+    }
+  });
+
+  it('puts paper on grape and ink on every other accent', () => {
+    // The single rule worth memorising, from the WL-202 matrix. If this ever
+    // flips, a palette hex moved and the whole system needs re-reading.
+    expect(textOn('grape')).toBe(palette.paper);
+    for (const fill of ['tangerine', 'bubblegum', 'limeade', 'sunbeam', 'redAlert'] as const) {
+      expect(textOn(fill)).toBe(palette.ink);
+    }
+  });
+
+  it('keeps an ink label on disabled fills', () => {
+    // WL-202: a paper label on a 40% grape fill measures 1.86:1.
+    expect(textOn('disabledGrape')).toBe(palette.ink);
+    expect(textOn('disabledTangerine')).toBe(palette.ink);
+  });
+
+  it('distinguishes large-text allowances from normal text', () => {
+    // ink on grape is 3.25:1 — legal for display sizes, not for a 15px label.
+    expect(TEXT_ON.grape.normal).not.toContain('ink');
+    expect(TEXT_ON.grape.large).toContain('ink');
+  });
+});
+
+describe('placeholder and tap target (WL-204)', () => {
+  it('mutes the placeholder without introducing a new hue', () => {
+    expect(inkMuted).toBe(composite(palette.ink, palette.paper, 0.6));
+    expect(inkMuted).not.toBe(palette.ink);
+  });
+
+  it('meets both platforms’ minimum tap target', () => {
+    // iOS HIG 44, Android Material 48 — one number satisfying both.
+    expect(MIN_TAP_TARGET).toBeGreaterThanOrEqual(48);
   });
 });
