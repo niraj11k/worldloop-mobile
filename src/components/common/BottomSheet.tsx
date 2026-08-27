@@ -11,6 +11,7 @@ import {
   shadow,
   typeScale,
 } from '@theme/theme';
+import { SpringIn } from '@components/common/motion/SpringIn';
 
 /**
  * Bottom sheet / modal — Design System §4, "Modals / bottom sheets".
@@ -20,14 +21,17 @@ import {
  * and a 4px `ink` border — §4 sets that as a floor for this component
  * specifically, not the 3px other components use.
  *
- * ## What this deliberately does not do
+ * ## Entry animation
  *
- * **No entry animation.** §4 specifies "spring-based scale/slide, respecting
- * reduced-motion", and §5 owns motion — that is WL-205, which must also supply
- * the non-animated equivalent. Wiring a spring here would mean WL-205 either
- * inherits an untested animation or rips one out. `animationType="none"` is set
- * explicitly rather than left to default, so the absence is a decision rather
- * than an oversight.
+ * §4 asks for a "spring-based scale/slide, respecting reduced-motion". The
+ * sheet is wrapped in `SpringIn` (WL-205), which scales it in and collapses to
+ * an instant appearance when the OS reduced-motion setting is on. `Modal`'s own
+ * `animationType` stays `"none"` so the two do not compound — the platform
+ * slide plus a spring would read as two separate entrances.
+ *
+ * The scrim is deliberately *outside* the spring: dimming should arrive with
+ * the sheet rather than scaling with it, and animating the scrim's own scale
+ * would move the whole screen behind it.
  *
  * ## Dismissal
  *
@@ -84,13 +88,15 @@ export function BottomSheet({
           pointerEvents={dismissOnScrimPress ? 'auto' : 'none'}
         />
 
-        <View
-          style={[styles.sheet, style]}
-          accessibilityViewIsModal
-          accessibilityLabel={title}>
-          {title ? <Text style={styles.title}>{title}</Text> : null}
-          {children}
-        </View>
+        <SpringIn>
+          <View
+            style={[styles.sheet, style]}
+            accessibilityViewIsModal
+            accessibilityLabel={title}>
+            {title ? <Text style={styles.title}>{title}</Text> : null}
+            {children}
+          </View>
+        </SpringIn>
       </View>
     </Modal>
   );
