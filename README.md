@@ -129,10 +129,57 @@ npm test          # Jest, path aliases resolved via jest.moduleNameMapper in pac
 npm run typecheck # tsc --noEmit
 npm run lint      # ESLint 9 flat config (eslint.config.js), @react-native/eslint-config/flat
 npm run audit:ci  # dependency audit gate (see below)
+npm run contrast:verify           # WCAG AA palette gate (WL-202); regenerates the matrix
+npm run contrast:verify -- --check  # same, read-only — also fails if the matrix is stale
+npm run fonts:verify              # bundled font integrity gate (WL-201)
 ```
 
-All four run in CI on push and PR to `main`/`dev`, plus weekly — see
+All six run in CI on push and PR to `main`/`dev`, plus weekly — see
 `.github/workflows/ci.yml`.
+
+`contrast:verify` recomputes every text-on-fill and non-text (border, focus
+ring, state indicator) pairing the design system specifies, from the hexes in
+`src/theme/palette.ts`, and rewrites `proj-docs/WordLoop_Contrast_Matrix.md`.
+It also *derives* the legal-text-colour-per-fill table and fails if `TEXT_ON`
+in `palette.ts` disagrees with the measurements — so the rule component code
+reads cannot drift from the colours it was derived from. CI runs the `--check`
+form, which additionally fails when the committed matrix is stale, so a
+palette change can't land without its verified matrix.
+
+## Fonts (WL-201)
+
+Four static cuts in `src/assets/fonts/` (1.21MB total), referenced through
+`src/theme/typography.ts`:
+
+| Role | Face | Source, pinned |
+| --- | --- | --- |
+| Display 800 — wordmark, required letter | `Baloo2-ExtraBold` | `yanone/Baloo2-Variable` @ `da523dfa` |
+| Display 700 — titles, chain words | `Baloo2-Bold` | same |
+| Mono 400 — body, captions | `JetBrainsMono-Regular` | `JetBrains/JetBrainsMono` `v2.304` |
+| Mono 700 — button labels | `JetBrainsMono-Bold` | same |
+
+Both are SIL OFL and neither declares a Reserved Font Name; the full licence
+texts are committed at `licenses/fonts/` and must also be surfaced in the app's
+Attributions screen (WL-407), alongside the ESDB, WordNet, and LDNOOBW notices.
+
+Three things to know before touching this:
+
+- **Reference a face by `fontFamily` and never also set `fontWeight`.** Each
+  weight is its own file; adding `fontWeight` makes Android synthesise a second
+  layer of boldness and makes iOS resolve to a different family member.
+- **Each filename matches its font's internal PostScript name on purpose** —
+  iOS resolves by PostScript name, Android by asset filename, so identical
+  names are what let one string work on both.
+- **Static cuts, not the variable fonts.** RN cannot select a point on a
+  variable weight axis, so a variable font would render every role at 400.
+
+Because RN font resolution fails *silently* — the system face renders, with no
+error — `npm run fonts:verify` checks the chain end to end: declared family →
+file present → PostScript name parsed from inside the TTF → Android assets →
+iOS `UIAppFonts` → Xcode Resources phase → no dangling `pbxproj` UUIDs. A
+dev-only `FontSpecimen` screen (registered behind `__DEV__`) renders every role
+on-device and self-tests for fallback by measuring probe strings against the
+platform default.
 
 ```bash
 npm run simulate -- --difficulty easy|medium|hard|all [--rounds N] [--seed N]

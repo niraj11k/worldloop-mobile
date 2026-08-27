@@ -41,14 +41,46 @@ High-contrast, saturated, deliberately unconventional pairings. No corporate blu
 - `limeade` is reserved strictly for success/valid states, same reasoning.
 - Every accent color must be paired with `ink` for outlines and either `paper` or `ink` for text — never gray. Grays are excluded from this palette entirely.
 
-**Accessibility reconciliation:** [Design constraint, not optional] Every text/fill combination in this palette must meet WCAG AA contrast (4.5:1 for body text, 3:1 for large text) before shipping. `ink` on `paper`, `ink` on `sunbeam`, `paper` on `grape`, and `paper` on `ink` all pass. Verify any new pairing before using it — this satisfies the Wireframe doc's high-contrast requirement (section 18) without forcing the palette back toward neutral.
+**Accessibility reconciliation:** [Design constraint, not optional] Every text/fill combination in this palette must meet WCAG AA contrast (4.5:1 for body text, 3:1 for large text) before shipping. This satisfies the Wireframe doc's high-contrast requirement (section 18) without forcing the palette back toward neutral.
+
+**Verified under WL-202 (2026-08-26). No hex value changed.** Every pairing the system actually uses was measured; the full results are in `WordLoop_Contrast_Matrix.md`, regenerated from `src/theme/palette.ts` by `npm run contrast:verify`. The palette survived intact — what the audit produced instead is a **mandatory text colour per fill**, which section 1 previously left open by saying text is "either `paper` or `ink`" without saying which:
+
+| Fill | Body / button / caption text | Display text (≥24px) |
+|---|---|---|
+| `paper` | `ink` | `ink` |
+| `ink` | `paper` | `paper` |
+| `grape` | **`paper` only** (ink is 3.25:1) | `paper` or `ink` |
+| `tangerine` | **`ink` only** (paper is 2.66:1) | `ink` only |
+| `bubblegum` | **`ink` only** | `ink` or `paper` (paper is 3.12:1 — thin; prefer `ink`) |
+| `limeade` | **`ink` only** (paper is 1.38:1) | `ink` only |
+| `red-alert` | **`ink` only** (paper is 3.42:1) | `ink` or `paper` |
+| `sunbeam` | **`ink` only** (paper is 1.34:1) | `ink` only |
+
+Read the pattern rather than memorising the table: **`grape` is the only fill dark enough to carry `paper` text, and every other accent takes `ink`.** That is a stronger, simpler rule than section 1's original phrasing, and it is enforced in code — `TEXT_ON` in `src/theme/palette.ts` is the machine-readable copy, and the verifier *derives* it from the hexes and fails if the two disagree, so it cannot rot.
+
+Two findings worth carrying into WL-203 and WL-204:
+
+- **The "always an `ink` outline" rule is doing real accessibility work, not just carrying the aesthetic.** `sunbeam` (1.34:1) and `tangerine` (2.66:1) are too close to `paper` to form a visible boundary against the page on their own. They never have to, because the component language mandates a 2-4px `ink` border on everything. Dropping that border on a badge or callout for visual reasons would create a genuine WCAG 1.4.11 failure, not merely an off-style component.
+- **Disabled controls need `ink` labels.** See section 4.
 
 ---
 
 ## 2. Typography
 
-**Display face: `Baloo 2`** (Black/900 and Bold/700 cuts). **Decided — Delivery Plan D-06,
-closed 2026-08-26.** Chosen over Fredoka (reads warmer/softer, closer to the "kids app"
+**Display face: `Baloo 2`** (ExtraBold/800 and Bold/700 cuts). **Decided — Delivery Plan D-06,
+closed 2026-08-26.**
+
+> **Corrected under WL-201 (2026-08-26): this said "Black/900", a weight Baloo 2 does not
+> have.** Its variable weight axis runs **400–800**, and the static cuts stop at ExtraBold
+> — confirmed from two independent sources (Google Fonts' `METADATA.pb` axis range, and the
+> upstream `yanone/Baloo2-Variable` static set: Regular, Medium, SemiBold, Bold, ExtraBold).
+> **This changes nothing about what was chosen.** The D-06 specimen that Baloo 2 won on
+> rendered it at weight 800 throughout, so 800 is the weight actually evaluated and picked;
+> the "900" was aspirational text written before any face was selected. Recorded as a
+> correction rather than silently amended, per `CLAUDE.md`. Reverting to a true 900 means
+> reopening D-06 and choosing a different display face — **do not** simulate it with
+> synthetic/faux bolding, which on an already-heavy face smears the letterforms at 64px and
+> is exactly the "loses its character" failure the section-2 rule below guards against. Chosen over Fredoka (reads warmer/softer, closer to the "kids app"
 register this doc's thesis warns against overshooting into) and Lilita One (single heavy
 weight only, more comic/sticker-like — closer to the "skate brand" alternative, but with no
 lighter cut available for the 40px wordmark role). Baloo 2 carries the most weight and
@@ -72,15 +104,23 @@ licensing basis as above — mobile bundling is explicitly permitted.
 
 **Type scale:**
 
-| Role | Face | Size | Weight | Notes |
-|---|---|---|---|---|
-| Wordmark / hero | Display | 40px | Black/900 | Home, Welcome screens |
-| Required letter | Display | 64px | Black/900 | Must be the single largest text element on the Game screen — see section 6 |
-| Screen title | Display | 28px | Bold/700 | |
-| Computer/player word | Display | 26px | Bold/700 | |
-| Body / instructions | Monospace | 15px | Regular/400 | |
-| Button label | Monospace | 15px | Bold/700 | Uppercase, letter-spacing +0.02em |
-| Caption / metadata | Monospace | 12px | Regular/400 | Score labels, timestamps |
+| Role | Face | Size | Weight | Font file to reference | Notes |
+|---|---|---|---|---|---|
+| Wordmark / hero | Display | 40px | ExtraBold/800 | `Baloo2-ExtraBold` | Home, Welcome screens |
+| Required letter | Display | 64px | ExtraBold/800 | `Baloo2-ExtraBold` | Must be the single largest text element on the Game screen — see section 6 |
+| Screen title | Display | 28px | Bold/700 | `Baloo2-Bold` | |
+| Computer/player word | Display | 26px | Bold/700 | `Baloo2-Bold` | |
+| Body / instructions | Monospace | 15px | Regular/400 | `JetBrainsMono-Regular` | |
+| Button label | Monospace | 15px | Bold/700 | `JetBrainsMono-Bold` | Uppercase, letter-spacing +0.02em |
+| Caption / metadata | Monospace | 12px | Regular/400 | `JetBrainsMono-Regular` | Score labels, timestamps |
+
+**Reference the face by `fontFamily` and do not also set `fontWeight`** (WL-201). Each
+weight is bundled as its own file whose filename matches its PostScript name, which is what
+lets one string work on both platforms — iOS resolves `fontFamily` by PostScript name,
+Android by asset filename. Setting `fontWeight` on top of an already-weighted face invites
+the platform to synthesise a *second* layer of boldness on Android, and silently picks a
+different face on iOS. `src/theme/typography.ts` encodes this; use it rather than raw
+strings.
 
 **Rule:** never use the display face below 20px — it loses its character and becomes hard to read at small sizes. Never use the monospace face for the required-letter callout — it's not expressive enough to carry that moment.
 
@@ -111,7 +151,11 @@ Every interactive and card-like component follows the same construction:
 - Primary: saturated fill (`grape` or `tangerine`), `ink` border, 6px hard offset shadow bottom-right.
 - Secondary: `paper` fill, `ink` border, same shadow treatment, smaller offset (4px).
 - **Tactile press state:** on press, the button shifts to overlap its own shadow (translate 4-6px toward the shadow direction, shadow shrinks or disappears) so it visually "presses into" the screen. This is the primary tactile feedback mechanism — see section 5.
-- Disabled buttons keep their border and shape but drop to 40% opacity fill and lose the offset shadow entirely (reads as "flat," reinforcing non-interactivity without relying on color alone).
+- Disabled buttons keep their border and shape but drop to 40% opacity fill and lose the offset shadow entirely (reads as "flat," reinforcing non-interactivity without relying on color alone). **The label must switch to `ink`** — see below.
+
+> **WL-202 (2026-08-26): the disabled primary button needs an `ink` label, not the `paper` one it inherits from its enabled state.** A 40%-opacity `grape` fill composites over `paper` to roughly `#CBABEB`, against which `paper` text measures **1.86:1** — effectively unreadable. `ink` on that same fill is 9.30:1.
+>
+> WCAG 1.4.3 *exempts* inactive controls from contrast minimums, so this was legal as written. It is still worth fixing, because the exemption assumes disabled controls are peripheral and here that assumption is wrong: Wireframe section 8 disables Submit whenever the input is empty, which is the state **every single turn opens in**. The disabled Submit button is one of the most-viewed elements in the entire product. Shipping it at 1.86:1 to stay inside a technicality would be the wrong call.
 
 ### Cards
 - `paper` or a light tint fill, `ink` border, 6-8px offset shadow, 20px radius.
@@ -147,8 +191,12 @@ All motion must respect the system-level reduced-motion setting (Wireframe doc s
 - Enter with a spring scale-in (reduced-motion: instant appearance, no scale).
 
 ### Valid word submitted
-- Input field border flashes `limeade` briefly, word "stamps" onto the chain display with a small scale-in.
+- Input field **fill** flashes `limeade` briefly — the `ink` border is retained throughout. Word "stamps" onto the chain display with a small scale-in.
 - Chain display itself doesn't reflow/animate other entries — only the new entry animates in, to avoid a busy, distracting list.
+
+> **Corrected under WL-202 (2026-08-26): this was a border flash, and it was an accessibility defect.** Flashing the *border* to `limeade` replaced the `ink` outline with a colour that sits at **1.38:1 against `paper`** — under WCAG 1.4.11's 3:1 floor for UI component boundaries, so the input field lost its visible boundary at the exact moment it was confirming success. Flashing the fill instead keeps the `ink` border (17.27:1) carrying the boundary and puts the success colour somewhere it reads: `ink` on `limeade` is 12.56:1, so the word the player just typed stays perfectly legible during the flash. See `WordLoop_Contrast_Matrix.md`.
+>
+> **The error state below is deliberately *not* changed to match.** `red-alert` measures 3.42:1 against `paper` and clears 1.4.11 as a border on its own, so there is no defect to fix there — and the error state's border change is doing more work than the success one, since it persists rather than flashing. The resulting asymmetry (success flashes fill, error flashes border) is a measured outcome, not an oversight.
 
 ### Invalid word submitted
 - Input field border flashes `red-alert`, plus a short horizontal shake (reduced-motion: no shake, border flash only) — the shake must never be the only signal, since the error text (section 4, Input fields) already carries the meaning.
@@ -198,7 +246,15 @@ In this system, that means:
 1. ~~Final display and monospace font selection...~~ **Resolved — Delivery Plan D-06,
    closed 2026-08-26: `Baloo 2` (display) + `JetBrains Mono` (body/UI).** Both are Google
    Fonts under SIL OFL, verified to permit mobile app bundling at no cost. See section 2.
-2. Exact palette hex values are a first pass — should be run through a contrast checker against every actual text/fill pairing used in final screens, not just the ones listed in section 1.
+2. ~~Exact palette hex values are a first pass — should be run through a contrast checker
+   against every actual text/fill pairing used in final screens...~~ **Resolved — WL-202,
+   2026-08-26.** Every pairing measured against WCAG 2.1 AA; results in
+   `WordLoop_Contrast_Matrix.md`, regenerated from `src/theme/palette.ts` by
+   `npm run contrast:verify` and gated in CI. **No hex value needed changing** — the
+   palette passes as designed. What the audit produced instead was a mandatory
+   text-colour-per-fill rule (section 1), one corrected motion spec (section 5's
+   valid-move flash was a real 1.4.11 failure), and one corrected disabled-button label
+   colour (section 4).
 3. ~~No dark mode variant has been designed...~~ **Resolved — Delivery Plan D-05, closed
    2026-08-26: no dark mode in v1.** The Wireframe doc's §16 toggle is cut for v1 (updated
    there to match). The v1 token layer (`WL-203`) only needs to produce light-mode values.

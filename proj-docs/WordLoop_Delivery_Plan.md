@@ -846,20 +846,147 @@ filtering and the rule engine fails loudly rather than silently miscounting.
 Goal: a component vocabulary that makes Phase 3 assembly rather than invention. Can run
 partly in parallel with Phase 1 — different skills, no shared files.
 
-**WL-201 · Font selection, licensing, and bundling** — M · 1.5d · D-06
+**WL-201 · Font selection, licensing, and bundling** — M · 1.5d · D-06 — **DONE 2026-08-26**
 Select and license the display and monospace faces. Bundle and verify rendering on both
 platforms. **D-06 closed 2026-08-26 — `Baloo 2` + `JetBrains Mono`, both OFL, licence
 verified to permit mobile bundling** (Design System §2). This task is now bundling and
 on-device verification, not selection.
 *Done when:* both faces render on device at every size in the §2 type scale, including
-64px display and 12px mono, with the licence recorded.
+64px display and 12px mono, with the licence recorded. ✅ — verified on an iPhone 17 Pro
+simulator **and** a `Medium_Phone_API_36.1` emulator, every one of the seven §2 roles, via
+`src/screens/FontSpecimen/FontSpecimenScreen.tsx`.
 
-**WL-202 · Contrast-verify the palette** — S · 1d · none
+**Four static cuts bundled** (`src/assets/fonts/`), 1.21MB total: `Baloo2-ExtraBold` (349KB),
+`Baloo2-Bold` (348KB), `JetBrainsMono-Bold` (271KB), `JetBrainsMono-Regular` (267KB).
+Pinned versions, matching how the dictionary pinned ESDB: Baloo 2 from
+`yanone/Baloo2-Variable` @ `da523dfa` (the commit Google Fonts itself pins), JetBrains Mono
+from release `v2.304`. Full OFL texts committed at `licenses/fonts/`. **Neither font
+declares a Reserved Font Name**, so modification (e.g. subsetting) would not require
+renaming.
+
+> **§2 said "Black/900", a weight Baloo 2 does not have — corrected to ExtraBold/800.**
+> Its variable weight axis is **400–800**; the static cuts stop at ExtraBold. Confirmed from
+> two independent sources (Google Fonts' `METADATA.pb` axis range and the upstream static
+> set). **This changes nothing about the D-06 decision**: the specimen Baloo 2 won on
+> rendered it at 800 throughout, so 800 is the weight actually evaluated. The "900" was
+> aspirational text written before any face was chosen. Flagged rather than silently
+> amended, per `CLAUDE.md`. Reverting to a true 900 means reopening D-06 — not faux-bolding,
+> which smears an already-heavy face at 64px.
+
+**Static cuts, not the variable fonts.** Both faces publish upstream as variable fonts, and
+that is what Google Fonts serves. React Native exposes no way to select a point on a
+variable axis — there is no `fontVariationSettings` equivalent — so a bundled variable font
+renders only its default instance (400), and *every heavier role would have silently come
+out Regular*. Statics are the only option that renders the specified weights at all.
+
+**Three findings that will bite anyone touching fonts again, all recorded in
+`src/theme/typography.ts`:**
+
+1. **Every filename matches its font's internal PostScript name, deliberately.** iOS
+   resolves `fontFamily` by PostScript name; Android resolves it by asset filename. Making
+   the two identical is what lets one string work on both platforms.
+2. **Never pair these with `fontWeight`.** The face already carries its weight; adding
+   `fontWeight` asks Android to synthesise a *second* layer of boldness and makes iOS
+   resolve to a different family member. Asserted by a test.
+3. **RN font resolution fails silently** — a misnamed family, an unlinked file, or a
+   PostScript mismatch all render the platform default with no error, no warning, no red
+   box. A screenshot of correctly-sized text proves nothing on its own. Hence both guards
+   below.
+
+**Two gates added, both in CI:**
+
+- `npm run fonts:verify` (`scripts/verify-fonts.js`, no dependencies) walks the whole chain:
+  declared family → file exists → **the PostScript name inside the TTF** (parsed from the
+  sfnt `name` table directly) → Android assets → iOS `UIAppFonts` → Xcode Resources phase →
+  **no dangling pbxproj UUIDs**. That last check is not paranoia: WL-003 corrupted this
+  exact project file with a scripted edit that left a build-phase UUID pointing at nothing,
+  and `react-native-asset` rewrites the same file. Negative-tested by renaming a font so its
+  filename and internal name diverged; it failed and named the real internal name.
+- `__tests__/typography.test.ts` asserts the §2 rules that are easy to break by eye — no
+  display face below 20px, monospace never on the required letter, the required letter is
+  the single largest role, no `fontWeight` anywhere.
+
+> **The verification screen was wrong twice before it was right, and both bugs are worth
+> knowing.** It detects fallback by rendering each face and the platform default and
+> comparing measured widths. First version hid the probes in a `height: 0` +
+> `overflow: 'hidden'` container — every probe laid out at **0pt**, so all four faces
+> compared "equal" to the system font and it reported a fallback on a build whose fonts were
+> rendering perfectly. Second version used a single probe string, and Baloo2-ExtraBold at
+> 20px measured 153pt — *exactly* San Francisco's 153pt — a coincidental collision that
+> failed a correctly-loaded face. It now uses **three** probe strings with different glyph
+> mixes and treats a face as loaded if it differs on any of them. Both bugs were caught only
+> by looking at the screenshot and disbelieving the banner; a green result would have been
+> taken at face value.
+
+> **Same physical-device caveat as WL-105/WL-106:** verified on a simulator and an emulator,
+> not the WL-005 matrix's physical iPhone SE / small Android handset. Font *rendering* is far
+> less host-sensitive than the timing budgets those tasks measured, but the 64px callout and
+> 12px captions on a genuinely small screen belong in the WL-310 device pass.
+
+> **For WL-203, not a defect:** both faces ship non-Latin coverage this app cannot use —
+> Baloo 2 carries Devanagari, JetBrains Mono carries Cyrillic and Greek (per each font's
+> `METADATA.pb` subsets). Subsetting to Latin would reclaim a meaningful share of the 1.21MB,
+> and the absent Reserved Font Names mean it is legally straightforward. Not done here: it
+> adds a `fonttools` build dependency, and 1.21MB against WL-105's 8MB budget (currently
+> 1.74MB used) does not justify it yet. Revisit if bundle size gets tight.
+
+**Also landed:** `src/theme/typography.ts` (the faces plus the §2 type scale), and a dev-only
+`FontSpecimen` route registered behind `__DEV__` so it cannot reach a release build.
+**WL-206's component gallery should absorb that screen rather than duplicating it.**
+
+**WL-202 · Contrast-verify the palette** — S · 1d · none — **DONE 2026-08-26**
 Design System §9 open item 2: run every actual text-on-fill pairing through a contrast
 checker at WCAG AA (4.5:1 body, 3:1 large). Amend the doc's hex values where a pairing
 fails.
 *Done when:* a committed pairing matrix shows a pass for every combination used, and the
-Design System doc is updated with any changed hexes.
+Design System doc is updated with any changed hexes. ✅ —
+`proj-docs/WordLoop_Contrast_Matrix.md`, 27 text pairings and 7 non-text pairings, all
+passing.
+
+**No hex value changed — the palette passes as designed.** That is the headline result:
+the audit did not force the maximalist palette back toward neutral, which was the risk
+Design System §1 was worried about. What it produced instead was three corrections and a
+rule, none of which touch a colour value:
+
+1. **A mandatory text colour per fill.** §1 said text is "either `paper` or `ink`" without
+   saying which, per fill — an underspecification, not a defect, but one that would have
+   been resolved per-component by whoever built it first. Measurement settles it:
+   **`grape` is the only fill dark enough to carry `paper` text; every other accent takes
+   `ink`.** `paper` on `sunbeam` is 1.34:1 and on `limeade` 1.38:1 — the two that would
+   have looked most plausible in a mockup are the two that fail hardest.
+2. **§5's valid-move border flash was a real WCAG 1.4.11 failure.** Flashing the input
+   *border* to `limeade` replaced the `ink` outline with a colour at **1.38:1 against
+   `paper`**, so the field lost its visible boundary at the moment it confirmed success.
+   Now flashes the **fill** instead, keeping the `ink` border (17.27:1) as the boundary and
+   putting the success colour where it reads (`ink` on `limeade` is 12.56:1). The error
+   state is deliberately *not* changed to match — `red-alert` measures 3.42:1 and clears
+   1.4.11 as a border on its own, so the resulting asymmetry is measured, not sloppy.
+3. **The disabled primary button needed an `ink` label.** A 40%-opacity `grape` fill
+   composites to ~`#CBABEB`, against which the inherited `paper` label is **1.86:1**.
+   WCAG 1.4.3 *exempts* inactive controls, so this was legal — but Wireframe §8 disables
+   Submit whenever the input is empty, which is the state **every turn opens in**, making
+   it one of the most-viewed elements in the product. Fixed rather than excused.
+
+> **Finding worth carrying into WL-204: the "always an `ink` outline" rule is load-bearing
+> for accessibility, not just for the aesthetic.** `sunbeam` (1.34:1) and `tangerine`
+> (2.66:1) are too close to `paper` to form a visible boundary against the page on their
+> own, and never have to be, because §4 mandates a 2-4px `ink` border on everything.
+> Dropping that border on a badge or callout for visual reasons would create a genuine AA
+> failure, not merely an off-style component. Anyone tempted to build a borderless variant
+> should read this row first.
+
+**Mechanically:** the hexes now live in `src/theme/palette.ts` as the single source of
+truth (WL-203 will build the rest of the token layer on it rather than restating it —
+`MIN_WORD_LENGTH`'s four copies at WL-108 are the precedent being avoided). The verifier
+*derives* the legal-text-colour table from the hexes and fails if `TEXT_ON` disagrees, so
+the rule cannot rot away from the values it came from. `npm run contrast:verify -- --check`
+is a CI gate and also fails on a stale committed matrix, so a palette change cannot land
+without its verified matrix landing with it. All three guards were negative-tested
+(lightened `ink`, falsified `TEXT_ON`, staled the matrix) rather than assumed to work.
+
+> **Scope note:** §4's Cards permit a "`paper` or a light tint fill" — *light tint* is
+> undefined, so it could not be verified. WL-203 must either define it as a concrete token
+> (and add it to the matrix) or drop the phrase.
 
 **WL-203 · Token layer** — M · 1.5d · WL-201, WL-202, D-05
 Replace the placeholder `theme.ts` with real tokens: colours, type scale, 4px spacing

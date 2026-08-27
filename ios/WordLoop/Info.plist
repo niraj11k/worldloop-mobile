@@ -56,5 +56,12 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Baloo2-Bold.ttf</string>
+		<string>JetBrainsMono-Bold.ttf</string>
+		<string>JetBrainsMono-Regular.ttf</string>
+		<string>Baloo2-ExtraBold.ttf</string>
+	</array>
 </dict>
 </plist>
