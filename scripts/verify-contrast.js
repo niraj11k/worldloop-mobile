@@ -35,11 +35,7 @@ require('@babel/register')({
 const fs = require('node:fs');
 const path = require('node:path');
 
-const {
-  palette,
-  TEXT_ON,
-  DISABLED_FILL_OPACITY,
-} = require('../src/theme/palette.ts');
+const { palette, TEXT_ON, disabledFill } = require('../src/theme/palette.ts');
 
 const ROOT = path.resolve(__dirname, '..');
 const MATRIX_PATH = path.join(ROOT, 'proj-docs', 'WordLoop_Contrast_Matrix.md');
@@ -61,10 +57,6 @@ const toRgb = hex => {
   ];
 };
 
-const toHex = ([r, g, b]) =>
-  '#' +
-  [r, g, b].map(c => Math.round(c).toString(16).padStart(2, '0').toUpperCase()).join('');
-
 /** WCAG 2.1 relative luminance (sRGB). */
 const luminance = hex => {
   const [r, g, b] = toRgb(hex).map(c => {
@@ -77,13 +69,6 @@ const luminance = hex => {
 const contrast = (a, b) => {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
-};
-
-/** Composite `fg` at `alpha` over opaque `bg` — how a 40% fill actually renders. */
-const composite = (fg, bg, alpha) => {
-  const f = toRgb(fg);
-  const b = toRgb(bg);
-  return toHex(f.map((c, i) => c * alpha + b[i] * (1 - alpha)));
 };
 
 const round = n => Math.round(n * 100) / 100;
@@ -119,14 +104,17 @@ const ROLES = {
 //
 // Sourced line by line from the Design System doc; the `where` column is the
 // section that puts this combination on screen.
+// The disabled fills come from `palette.ts` rather than being recomputed here.
+// WL-203 found the reason the hard way: this script used to composite its own
+// private copy, so it verified a colour that existed nowhere in the app, and
+// the token layer reached for a container `opacity` instead — which fades the
+// border and the label too, landing nowhere near the 9.30:1 measured below.
+// Measuring the exported value is what keeps "verified" and "shipped" the same
+// thing.
 const FILLS = {
   ...palette,
-  disabledGrape: composite(palette.grape, palette.paper, DISABLED_FILL_OPACITY),
-  disabledTangerine: composite(
-    palette.tangerine,
-    palette.paper,
-    DISABLED_FILL_OPACITY,
-  ),
+  disabledGrape: disabledFill.grape,
+  disabledTangerine: disabledFill.tangerine,
 };
 
 // `probe: true` marks a combination the design system does NOT prescribe, tested

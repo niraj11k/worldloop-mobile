@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
 import { normalizeWord, validateMove, getRequiredLetter } from '@features/game/ruleEngine';
@@ -19,6 +19,7 @@ import { generateCandidates, selectComputerWord } from '@features/difficulty/dif
 import { rarityForEntry, scoreWord } from '@features/scoring/scoringEngine';
 import { replyCountForLetter } from '@features/dictionary/dictionaryService';
 import { INVALID_WORD_MESSAGES } from '@constants/gameConstants';
+import { palette, typeScale } from '@theme/theme';
 import type { GameStatus, InvalidReason } from '@app-types/game';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
@@ -190,7 +191,7 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
       ) : (
         <>
           <Text>Required letter</Text>
-          <Text style={{ fontSize: 32, fontWeight: 'bold' }}>
+          <Text style={styles.requiredLetter}>
             {session.requiredLetter.toUpperCase()}
           </Text>
 
@@ -229,3 +230,12 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
     </View>
   );
 }
+
+// WL-203: only the required-letter callout is tokenised here. The rest of this
+// screen is still the unstyled skeleton — WL-301 owns the real layout, and
+// restyling it now would be inventing the design ahead of that task. The
+// callout is done early because it is the one element Design System §6 and
+// Wireframe §8 both constrain: it must be the largest text on screen.
+const styles = StyleSheet.create({
+  requiredLetter: { ...typeScale.requiredLetter, color: palette.ink },
+});

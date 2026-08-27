@@ -14,6 +14,7 @@ import { WordReviewScreen } from '@screens/WordReview/WordReviewScreen';
 import { SettingsScreen } from '@screens/Settings/SettingsScreen';
 import { AccountCreationScreen } from '@screens/AccountCreation/AccountCreationScreen';
 import { FontSpecimenScreen } from '@screens/FontSpecimen/FontSpecimenScreen';
+import { TokenSpecimenScreen } from '@screens/TokenSpecimen/TokenSpecimenScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -63,6 +64,9 @@ export function RootNavigator(): React.JSX.Element {
           */}
           {__DEV__ && (
             <Stack.Screen name="FontSpecimen" component={FontSpecimenScreen} />
+          )}
+          {__DEV__ && (
+            <Stack.Screen name="TokenSpecimen" component={TokenSpecimenScreen} />
           )}
         </Stack.Navigator>
       </SafeAreaView>

@@ -33,7 +33,16 @@ High-contrast, saturated, deliberately unconventional pairings. No corporate blu
 | `limeade` | `#B4E600` | Success / valid move / win state |
 | `red-alert` | `#FF3131` | Error / invalid move — reserved, don't overuse |
 | `sunbeam` | `#FFD400` | Highlight / badge fills, level-up moments |
-| `shadow-ink` | `#161311` at fixed opacity | Used only for offset drop shadows, never as a fill |
+| `shadow-ink` | `#161311`, **fully opaque** | Used only for offset drop shadows, never as a fill |
+
+> **WL-203 (2026-08-27): "at fixed opacity" resolved to 1.0 — fully opaque.** The value was
+> never named, and the palette's own rules decide it: `ink` at any opacity below 1.0
+> composites over `paper` to a **grey** (at 0.85 it lands on `#39352F`), and section 1 states
+> that "Grays are excluded from this palette entirely." Any translucency therefore
+> manufactures the one colour family this palette bans. It also softens the shadow edge,
+> which is the same failure mode as the blur that section 8 explicitly rejects. The token
+> stays separate from `ink` so shadow colour can be retuned later without touching every
+> border in the app — the separation is semantic, not a difference in value.
 
 **Pairing rules:**
 - Never pair two accent colors directly touching without a black outline or paper-colored gap between them — this is what keeps "unconventional" from becoming "illegible."
@@ -158,8 +167,17 @@ Every interactive and card-like component follows the same construction:
 > WCAG 1.4.3 *exempts* inactive controls from contrast minimums, so this was legal as written. It is still worth fixing, because the exemption assumes disabled controls are peripheral and here that assumption is wrong: Wireframe section 8 disables Submit whenever the input is empty, which is the state **every single turn opens in**. The disabled Submit button is one of the most-viewed elements in the entire product. Shipping it at 1.86:1 to stay inside a technicality would be the wrong call.
 
 ### Cards
-- `paper` or a light tint fill, `ink` border, 6-8px offset shadow, 20px radius.
+- `paper` or any section 1 palette fill, `ink` border, 6-8px offset shadow, 20px radius.
 - Slight rotation permitted (see section 3) for informational cards (word review entries, stat cards). Never rotate cards containing the input field or primary game controls.
+
+> **WL-203 (2026-08-27): "a light tint fill" is removed — it was undefined and unverifiable.**
+> No tint values were ever specified, so nothing could be contrast-checked against it, and
+> WL-202 flagged it as the one fill in the system its matrix could not cover. It was also
+> *narrower and vaguer* than this section's own construction block, which already permits
+> "one saturated color from section 1, or `paper`" for any component. Cards now follow that
+> same rule, so every legal card fill is one the contrast matrix has already verified along
+> with its mandatory text colour. If a genuine tint is wanted later, it has to be a named
+> token in section 1 and go through `npm run contrast:verify` like every other fill.
 
 ### Modals / bottom sheets (Hint sheet, Word definition overlay, Pause)
 - Heavier shadow than cards (10-12px offset) to reinforce elevation above the base screen.

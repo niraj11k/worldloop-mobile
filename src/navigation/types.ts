@@ -18,6 +18,8 @@ export type RootStackParamList = {
   AccountCreation: { entryPoint: AccountEntryPoint };
   /** Dev-only (WL-201 font specimen); not registered in release builds. */
   FontSpecimen: undefined;
+  /** Dev-only (WL-203 design token specimen); not registered in release builds. */
+  TokenSpecimen: undefined;
 };
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
