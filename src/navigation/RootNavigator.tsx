@@ -13,8 +13,7 @@ import { HowToPlayScreen } from '@screens/HowToPlay/HowToPlayScreen';
 import { WordReviewScreen } from '@screens/WordReview/WordReviewScreen';
 import { SettingsScreen } from '@screens/Settings/SettingsScreen';
 import { AccountCreationScreen } from '@screens/AccountCreation/AccountCreationScreen';
-import { FontSpecimenScreen } from '@screens/FontSpecimen/FontSpecimenScreen';
-import { TokenSpecimenScreen } from '@screens/TokenSpecimen/TokenSpecimenScreen';
+import { GalleryScreen } from '@screens/Gallery/GalleryScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -58,16 +57,11 @@ export function RootNavigator(): React.JSX.Element {
             options={{ presentation: 'modal' }}
           />
           {/*
-            WL-201 font specimen. Dev builds only — it is a verification
-            surface, not product, and must not be reachable in a release
-            build. WL-206's component gallery should absorb it.
+            WL-206 component gallery. Dev builds only — it is a verification
+            surface, not product, and must not be reachable in a release build.
+            Reached from the dev-only row on Home.
           */}
-          {__DEV__ && (
-            <Stack.Screen name="FontSpecimen" component={FontSpecimenScreen} />
-          )}
-          {__DEV__ && (
-            <Stack.Screen name="TokenSpecimen" component={TokenSpecimenScreen} />
-          )}
+          {__DEV__ && <Stack.Screen name="Gallery" component={GalleryScreen} />}
         </Stack.Navigator>
       </SafeAreaView>
     </NavigationContainer>

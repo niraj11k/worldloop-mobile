@@ -854,7 +854,8 @@ on-device verification, not selection.
 *Done when:* both faces render on device at every size in the §2 type scale, including
 64px display and 12px mono, with the licence recorded. ✅ — verified on an iPhone 17 Pro
 simulator **and** a `Medium_Phone_API_36.1` emulator, every one of the seven §2 roles, via
-`src/screens/FontSpecimen/FontSpecimenScreen.tsx`.
+`src/screens/FontSpecimen/FontSpecimenScreen.tsx` — **since WL-206, the gallery's Type tab
+(`src/screens/Gallery/sections/TypographySection.tsx`)**.
 
 **Four static cuts bundled** (`src/assets/fonts/`), 1.21MB total: `Baloo2-ExtraBold` (349KB),
 `Baloo2-Bold` (348KB), `JetBrainsMono-Bold` (271KB), `JetBrainsMono-Regular` (267KB).
@@ -931,7 +932,8 @@ out Regular*. Statics are the only option that renders the specified weights at 
 > 1.74MB used) does not justify it yet. Revisit if bundle size gets tight.
 
 **Also landed:** `src/theme/typography.ts` (the faces plus the §2 type scale), and a dev-only
-`FontSpecimen` route registered behind `__DEV__` so it cannot reach a release build.
+`FontSpecimen` route registered behind `__DEV__` so it cannot reach a release build
+(absorbed into the WL-206 gallery).
 **WL-206's component gallery should absorb that screen rather than duplicating it.**
 
 **WL-202 · Contrast-verify the palette** — S · 1d · none — **DONE 2026-08-26**
@@ -996,7 +998,8 @@ range. **D-05 closed 2026-08-26 — light-mode tokens only, no dark variant.**
 a lint rule enforces this. ✅ — `src/theme/theme.ts` composes `palette.ts` (WL-202) and
 `typography.ts` (WL-201) rather than restating them, and adds spacing, radii, border
 weights, shadows and rotation. Verified on an iPhone 17 Pro simulator and a
-`Medium_Phone_API_36.1` emulator via a new dev-only `TokenSpecimen` screen.
+`Medium_Phone_API_36.1` emulator via a new dev-only `TokenSpecimen` screen — **since
+WL-206, the gallery's Tokens tab**.
 
 **The lint rule is six `no-restricted-syntax` selectors**, scoped to `src/screens/**` and
 `src/components/**` (the theme directory is where these literals belong): raw hex, raw
@@ -1065,7 +1068,8 @@ sticker (pill, rotated 3–6°), BottomSheet/Modal (10–12px offset shadow).
 *Done when:* each component renders every specified state, disabled buttons drop the
 shadow entirely, and no component uses a blurred shadow. ✅ — all five in
 `src/components/common/`, every state rendered and checked on an iPhone 17 Pro simulator
-and a `Medium_Phone_API_36.1` emulator via the `TokenSpecimen` screen.
+and a `Medium_Phone_API_36.1` emulator via the `TokenSpecimen` screen (**since WL-206, the
+gallery's Components tab**).
 
 **The design goal was to make the rules unrepresentable rather than documented.** Three
 things a caller now cannot express:
@@ -1156,7 +1160,7 @@ surface to serve that.
 ### The reduced-motion checklist walkthrough
 
 Run on an iPhone 17 Pro simulator and a `Medium_Phone_API_36.1` emulator, toggling the OS
-setting **while the app stayed open** in both directions. `TokenSpecimen` shows the live
+setting **while the app stayed open** in both directions. The gallery (WL-206) shows the live
 state in a banner pinned to the top of the screen, so every screenshot records which mode
 it was taken in.
 
@@ -1224,10 +1228,65 @@ Android has no separate "reduce motion" flag, it is the "Remove animations" sett
 > the app on a device, which is a design review or WL-605, not a guess made while writing
 > the primitives.
 
-**WL-206 · Component gallery screen** — S · 1d · WL-204, WL-205
+**WL-206 · Component gallery screen** — S · 1d · WL-204, WL-205 — **DONE 2026-08-27**
 A dev-only screen rendering every component in every state. Cheap, and it's how design
 reviews and visual regressions actually get caught.
-*Done when:* reachable in dev builds and covering all WL-204 and WL-205 output.
+*Done when:* reachable in dev builds and covering all WL-204 and WL-205 output. ✅ —
+`src/screens/Gallery/`, four tabbed sections, reached from a `__DEV__`-only row on Home.
+
+**"Reachable" was the requirement the previous specimen screens quietly failed.** Both
+were registered in the navigator, but nothing linked to them — the only way in was to edit
+`initialRouteName`, which is exactly how a dev tool becomes one nobody opens. There is now
+a single entry point: a dev-only row at the bottom of Home. The route itself is also
+`__DEV__`-gated in `RootNavigator`, so this cannot decay into a dead link in a release
+build.
+
+**Tabbed, not one long scroll.** The single-file specimen had grown past 500 lines across
+four concerns, and finding a section meant scrolling past three others and regularly
+overshooting — which defeats the stated purpose, since a gallery nobody can navigate is a
+gallery nobody checks. Sections: **Tokens** (WL-203, including the hard-vs-blurred shadow
+control), **Components** (every WL-204 component in every §4 state), **Motion** (every
+WL-205 primitive with triggers), **Type** (the WL-201 font instrument). The header —
+including the reduced-motion banner — stays pinned above the scroll, so every screenshot
+of any section records which motion mode it was taken in.
+
+**Both earlier specimen screens are absorbed and deleted**, as WL-201 and WL-204 each said
+they should be. `FontSpecimen` became the Type section; its narrow lint exemption moved
+with it and is now scoped to that one file rather than a whole directory — every other
+section is styled from the tokens, which is what lets the gallery break when the token
+layer does.
+
+> **One duplicate removed on the way through.** The tokens section carried a hand-rolled
+> "button states" block built from raw views. It predated the real `Button` (WL-204) and had
+> become a second button implementation that would drift — and, being hand-rolled, would
+> drift *silently* while still looking plausible. Deleted; the Components section shows the
+> real component.
+
+**The gallery is styled by the system it displays** — tabs use `palette`, `shadow` and
+`textOn` like any other surface, including the selected/unselected raised-vs-flat treatment
+§4 gives buttons. That is deliberate: chrome exempt from the design system would keep
+looking fine while the tokens underneath it broke.
+
+> **Decision: no component-rendering test library, and this was the task to decide it in
+> (flagged by WL-204).** The reasoning against, rather than an absence of one:
+> snapshot-testing styled components catches *structural* churn, not the visual regressions
+> a design system actually suffers, and snapshots over token-driven styles are notoriously
+> noisy — every spacing tweak churns them, which trains people to run `-u` without reading.
+> Meanwhile the failure modes that matter here are already gated by machinery that does not
+> depend on rendering: a blurred shadow fails `__tests__/theme.test.ts`, a failing colour
+> pairing fails `npm run contrast:verify`, a raw value fails lint, a missing font fails
+> `npm run fonts:verify`. What is left — does it *look* right — is what this gallery is
+> for, and what the Delivery Plan already called "how design reviews and visual regressions
+> actually get caught". Revisit if component *logic* grows (a component with real branching
+> would deserve tests, and would want extracting rather than snapshotting).
+
+> **Verified on an iPhone 17 Pro simulator only, and that is a deliberate proportionality
+> call rather than an omission.** All four tabs were walked through from a cold launch via
+> Welcome → Home → Gallery. Android was not re-run for this task: the gallery is
+> **dev-only and never ships**, and everything it displays — tokens, components, motion
+> primitives, fonts — was verified on `Medium_Phone_API_36.1` under WL-203, WL-204 and
+> WL-205. The only genuinely new surface here is a tab bar built from already-verified
+> tokens.
 
 **WL-207 · Custom iconography** — M · 2d · WL-203
 Design System §7 rejects Material/Feather-style line icons. Needs a small custom set

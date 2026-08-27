@@ -16,10 +16,8 @@ export type RootStackParamList = {
   WordReview: { sessionId: string };
   Settings: undefined;
   AccountCreation: { entryPoint: AccountEntryPoint };
-  /** Dev-only (WL-201 font specimen); not registered in release builds. */
-  FontSpecimen: undefined;
-  /** Dev-only (WL-203 design token specimen); not registered in release builds. */
-  TokenSpecimen: undefined;
+  /** Dev-only component gallery (WL-206); not registered in release builds. */
+  Gallery: undefined;
 };
 
 export type Difficulty = 'easy' | 'medium' | 'hard';

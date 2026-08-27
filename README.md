@@ -58,7 +58,8 @@ src/
   navigation/      Route params (types.ts) and the stack navigator.
   screens/         One folder per screen, matches Wireframe doc naming.
   components/
-    common/        Shared, feature-agnostic UI (buttons, inputs — not yet populated)
+    common/        Shared UI: Button, Card, Input, Badge, BottomSheet (WL-204)
+      motion/      Reduced-motion-aware animation primitives (WL-205)
     game/           Game-specific overlays (HintSheet, etc.)
     account/        Account-flow specific UI (not yet populated)
   features/        Domain logic, framework-agnostic where possible:
@@ -75,7 +76,8 @@ src/
   store/            Global app state (zustand)
   types/            Shared TypeScript domain types
   constants/        Copy strings, thresholds
-  theme/            Design tokens (grayscale placeholder, per Wireframe doc section 3)
+  hooks/            Cross-cutting hooks (useReducedMotion)
+  theme/            Design tokens: palette, typography, motion, composed in theme.ts
 ```
 
 This is a **feature-based** structure layered on top of a conventional RN
@@ -169,9 +171,9 @@ Two things worth knowing before styling anything:
   A container opacity fades the `ink` border §4 requires them to keep, and the
   label along with it, landing far below the contrast WL-202 verified.
 
-A dev-only `TokenSpecimen` screen (behind `__DEV__`) renders every token
-on-device, including each hard shadow beside a deliberately blurred control so
-a regression to blurred shadows is visible rather than plausible.
+The gallery's Tokens tab renders every token on-device, including each hard
+shadow beside a deliberately blurred control, so a regression to blurred
+shadows is visible rather than merely plausible.
 
 ## Shared components (WL-204)
 
@@ -188,10 +190,7 @@ accent takes `ink`.*
 Borders are not configurable — WL-202 found the `ink` outline is load-bearing
 for WCAG 1.4.11, not decoration. Neither is shadow blur.
 
-`TokenSpecimen` renders every component in every state. WL-206 will expand it
-into the full gallery, which is also where a component-rendering test library
-belongs if one is ever added — the suite currently tests logic, not rendered
-trees, by design.
+Every component in every state is in the component gallery — see below.
 
 ## Motion (WL-205)
 
@@ -202,8 +201,8 @@ trees, by design.
 Every one has a reduced-motion fallback driven by `useReducedMotion()`, which
 subscribes to the OS setting rather than reading it once — toggling **iOS
 Accessibility → Motion → Reduce Motion** or **Android Accessibility → Remove
-animations** takes effect immediately, without a relaunch. `TokenSpecimen`
-shows the live state in a banner at the top of the screen.
+animations** takes effect immediately, without a relaunch. The gallery shows
+the live state in a banner pinned above every tab.
 
 Two fallbacks are not simply "off", and both are deliberate:
 
@@ -250,7 +249,7 @@ Because RN font resolution fails *silently* — the system face renders, with no
 error — `npm run fonts:verify` checks the chain end to end: declared family →
 file present → PostScript name parsed from inside the TTF → Android assets →
 iOS `UIAppFonts` → Xcode Resources phase → no dangling `pbxproj` UUIDs. A
-dev-only `FontSpecimen` screen (registered behind `__DEV__`) renders every role
+gallery's Type tab (dev builds only) renders every role
 on-device and self-tests for fallback by measuring probe strings against the
 platform default.
 
@@ -387,3 +386,30 @@ an actual Metro bundler or simulator. Treat it as a structural starting
 point that encodes the decisions from the Architecture and Data Model
 docs, not as a verified working build. Run `yarn install` and a typecheck
 locally before trusting it further.
+
+## Component gallery (WL-206)
+
+Dev builds only. **Home → "Component gallery (dev)"** — the route is
+`__DEV__`-gated in `RootNavigator`, so it does not exist in a release build.
+
+Four tabs: **Tokens**, **Components**, **Motion**, **Type**. The header, with
+the live reduced-motion banner, stays pinned above the scroll, so any
+screenshot records which motion mode it was taken in.
+
+This is the project's mechanism for catching visual regressions, and it is
+styled *by* the system it displays — the tabs use the same palette, shadow and
+`textOn` tokens as any other surface, so broken tokens break the gallery's own
+furniture rather than hiding behind exempt chrome.
+
+There is deliberately **no component-rendering test library**. The failure
+modes that matter are already gated without rendering: a blurred shadow fails
+`npm test`, a failing colour pairing fails `npm run contrast:verify`, a raw
+value fails `npm run lint`, a missing font fails `npm run fonts:verify`.
+What's left — does it *look* right — is what the gallery is for. Snapshot
+tests over token-driven styles would mostly generate churn that trains people
+to run `-u` without reading.
+
+The one exception to token-only styling is the Type tab, which must render
+text at arbitrary sizes and with *no* `fontFamily` to compare against the
+platform default. It carries a narrow lint exemption scoped to that single
+file.
