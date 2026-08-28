@@ -1720,10 +1720,52 @@ state leaking from the previous round.
 > screen/game-component task this phase; the `Record` type on `GAME_OVER_CONTENT` is the
 > main correctness guardrail for a content-lookup table like this.
 
-**WL-309 · Difficulty selection wiring** — S · 1d · WL-204
+**WL-309 · Difficulty selection wiring** — S · 1d · WL-204 — **DONE 2026-08-29**
 Wireframe §6: Easy preselected, plain-language descriptions, selection persists into the
 session.
 *Done when:* the selected difficulty demonstrably drives the engine's selection strategy.
+
+> **DONE 2026-08-29.** The functional wiring this task's "Done when" describes already
+> existed before this task started: `DifficultyScreen`'s `selected` state defaulted to
+> `'easy'` and was never `null`, so "Continue disabled until selected, unless Easy
+> preselected" was already trivially satisfied; `Continue` already navigated with
+> `{ difficulty: selected }`, and `GameScreen` already threaded that into both
+> `createSession` and every `selectComputerWord` call; `difficultyEngine.ts`
+> (`DIFFICULTY_WEIGHTS`, `SELECTION_POOL_SIZE`, `HARD_SECOND_BEST_CHANCE`) already
+> implemented three genuinely different per-difficulty strategies, built and unit-tested
+> at WL-108/109. No logic gap remained — flagged rather than inventing wiring work that
+> wasn't there.
+>
+> **What this task actually did:** rebuilt `DifficultyScreen.tsx` from the original
+> bare-primitive stub (`View`/`Text`/`Pressable`, no header, no back button — the same
+> unstyled state `HomeScreen`/`HowToPlayScreen` are still in) into a real screen using the
+> design-system components, since it's the direct predecessor to the already-restyled
+> `GameScreen` and sits on the M1 critical path WL-310 exercises 20 times over. Added: a
+> header row with a back button (`Icon name="back"` + `Pressable`, copied verbatim from
+> `GameScreen.tsx`'s own header pattern — the navigator has `headerShown: false`
+> everywhere, so every screen owns its header), a `typeScale.screenTitle` title, and three
+> `Pressable`-wrapped `Card`s for the options. `Card` has no built-in selected state, so
+> selection reads via `fill` (`sunbeam` selected / `paper` unselected — `sunbeam` reused
+> deliberately from the same tone `Badge` already shows as the in-game difficulty tag) and
+> shadow depth (full `shadow.card` selected, `shadow.control` unselected), **plus** a
+> leading `●`/`○` glyph carried over from the original stub, so the state never reads by
+> colour alone (Design System §4). `Home`/`HowToPlay`/`Settings` were deliberately left
+> untouched — not in this task's WL-204-only dependency chain, restyling them would be
+> scope creep.
+>
+> Verified on the iPhone SE (3rd gen) simulator: Easy renders preselected (sunbeam + ●);
+> tapping Medium then Hard moves the indicator cleanly, previous selection correctly
+> reverts to paper + ○; Continue from Hard opens `GameScreen` with the `HARD` badge shown
+> (confirming the difficulty genuinely reached the session, not just the screen); submitted
+> one word and watched the computer reply land on a scarce letter (Y), consistent with
+> Hard's option-reduction-weighted strategy — re-confirming already-tested engine behaviour
+> end-to-end through the UI, not new logic. Back correctly returns to Home.
+>
+> `npx tsc --noEmit`, `npm run lint` (0 errors, same pre-existing warning set as WL-308 —
+> `DifficultyScreen` no longer appears in the inline-style warnings at all), and `npm test`
+> (14 suites, 276 tests) all pass. No test file added — the screen is composition only
+> (`CLAUDE.md`'s "screens stay thin" rule); the logic it drives already has its own
+> coverage in `difficultyEngine.test.ts` and `gameSession.test.ts`.
 
 **WL-310 · M1 device pass** — M · 1d · all Phase 3
 Play 20 complete rounds across all three difficulties on physical iOS and Android.
