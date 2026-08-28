@@ -16,6 +16,14 @@ export const INVALID_WORD_MESSAGES: Record<InvalidReason, string> = {
   offensive_excluded: 'That word cannot be used in WordLoop.',
 };
 
+/**
+ * Wireframe doc section 9, "No computer move" state. Applies to both
+ * `player_win` and `draw` — both are triggered by the computer having no
+ * legal word (see `gameSession.ts`'s status mapping); the wireframe doesn't
+ * distinguish copy between them, only WL-308's fuller game-over screen will.
+ */
+export const NO_COMPUTER_MOVE_MESSAGE = 'The computer has no valid word.';
+
 export const MIN_WORD_LENGTH = 3;
 export const HINT_LEVELS = ['required_letter', 'word_count', 'example_word', 'definition_clue'] as const;
 
