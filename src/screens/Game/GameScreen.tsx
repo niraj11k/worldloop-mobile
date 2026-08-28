@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
 import { normalizeWord, validateMove, getRequiredLetter } from '@features/game/ruleEngine';
@@ -19,8 +19,13 @@ import { generateCandidates, selectComputerWord } from '@features/difficulty/dif
 import { rarityForEntry, scoreWord } from '@features/scoring/scoringEngine';
 import { replyCountForLetter } from '@features/dictionary/dictionaryService';
 import { INVALID_WORD_MESSAGES } from '@constants/gameConstants';
+import { Badge } from '@components/common/Badge';
+import { Button } from '@components/common/Button';
+import { Card } from '@components/common/Card';
+import { Input } from '@components/common/Input';
 import { Icon } from '@components/common/icons/Icon';
-import { palette, typeScale } from '@theme/theme';
+import { ThinkingDots } from '@components/common/motion/ThinkingDots';
+import { palette, spacing, shadow, typeScale } from '@theme/theme';
 import type { GameStatus, InvalidReason } from '@app-types/game';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
@@ -58,9 +63,16 @@ const ROUND_OVER_MESSAGES: Record<Exclude<GameStatus, 'active'>, string> = {
  * chain, turn indicator, computer-thinking loading state.
  *
  * Round state lives in the WL-110 session machine rather than in loose
- * useState, so the screen only renders and forwards events. Still a
- * grayscale skeleton: the layout, the seven Wireframe section 9 states and
- * the game-over screen are WL-301/302/308, gated on the design system.
+ * useState, so the screen only renders and forwards events.
+ *
+ * Layout done (WL-301): the required-letter callout is the largest text
+ * element on screen (Design System section 6) and the screen composes the
+ * real WL-204/205/207 component set rather than bare RN primitives. Still
+ * pending: the seven Wireframe section 9 states individually verified
+ * (WL-302), keyboard avoidance and the TextInput desync check (WL-303), the
+ * animated no-reflow chain (WL-305), tuned think-delay/timeout (WL-306), and
+ * the full 5-state game-over screen (WL-308) — today's round-over branch is
+ * a single restyled message, not that.
  *
  * Not yet wired: hint sheet, definition overlay, and persistence (WL-403) —
  * the last of which is also what will supply the personal-best baseline the
@@ -84,6 +96,7 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   );
   const [input, setInput] = useState('');
   const [errorReason, setErrorReason] = useState<InvalidReason | null>(null);
+  const [showFullChain, setShowFullChain] = useState(false);
 
   const lastMove = session.chain[session.chain.length - 1];
   const roundOver = isRoundOver(session);
@@ -169,16 +182,20 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
           session.requiredLetter.toUpperCase(),
         );
 
+  const submitDisabled = busy || normalizeWord(input).length === 0;
+  const chainToShow = showFullChain ? session.chain : session.chain.slice(-6);
+
   return (
-    <View style={{ flex: 1 }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+    <View style={styles.screen}>
+      <View style={styles.header}>
         <Pressable
           onPress={() => navigation.goBack()}
           accessibilityRole="button"
-          accessibilityLabel="Back">
+          accessibilityLabel="Back"
+          hitSlop={spacing.sm}>
           <Icon name="back" />
         </Pressable>
-        <Text>{difficulty}</Text>
+        <Badge label={difficulty.toUpperCase()} />
         {/*
           Not yet a control — WL-404 builds the Pause screen and wires this up.
           Rendered without a Pressable on purpose, so it does not advertise a
@@ -187,64 +204,139 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
         <Icon name="pause" />
       </View>
 
-      <Text>
-        Chain: {session.chain.length} words · Score: {session.score}
-      </Text>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled">
+        <Text style={styles.statsRow}>
+          Chain: {session.chain.length} words · Score: {session.score}
+        </Text>
 
-      {/* Whose word is on the board, rather than a hardcoded label. */}
-      <Text>{lastMove?.actor === 'player' ? 'You' : 'Computer'}</Text>
-      <Text>{session.currentWord.toUpperCase()}</Text>
+        {/* Whose word is on the board, rather than a hardcoded label. */}
+        <View style={styles.currentWordRow}>
+          {session.phase === 'computer_thinking' ? (
+            <>
+              <Text style={styles.turnLabel}>WordLoop is thinking…</Text>
+              <ThinkingDots accessibilityLabel="WordLoop is thinking" />
+            </>
+          ) : (
+            <>
+              <Text style={styles.turnLabel}>
+                {lastMove?.actor === 'player' ? 'You' : 'WordLoop'}
+              </Text>
+              <Text style={styles.currentWord}>{session.currentWord.toUpperCase()}</Text>
+            </>
+          )}
+        </View>
 
-      {roundOver ? (
-        <Text>{ROUND_OVER_MESSAGES[session.status as Exclude<GameStatus, 'active'>]}</Text>
-      ) : (
-        <>
-          <Text>Required letter</Text>
-          <Text style={styles.requiredLetter}>
-            {session.requiredLetter.toUpperCase()}
-          </Text>
+        {roundOver ? (
+          <Card style={styles.roundOverCard}>
+            <Text style={styles.roundOverMessage}>
+              {ROUND_OVER_MESSAGES[session.status as Exclude<GameStatus, 'active'>]}
+            </Text>
+          </Card>
+        ) : (
+          <>
+            {/*
+              Design System section 6: the required letter is the single
+              largest element on screen — largest type in the scale, heaviest
+              shadow on the screen (shadow.modal, not the default Card
+              shadow.card), never rotated.
+            */}
+            <Card fill="bubblegum" style={styles.requiredLetterCard}>
+              <Text style={styles.requiredLetterLabel}>Required letter</Text>
+              <Text style={styles.requiredLetter}>
+                {session.requiredLetter.toUpperCase()}
+              </Text>
+            </Card>
 
-          <TextInput
-            value={input}
-            onChangeText={text => {
-              setInput(text);
-              setSession(current => setSessionInput(current, text));
-            }}
-            editable={!busy}
-            autoFocus
-            placeholder={`Enter a word beginning with ${session.requiredLetter.toUpperCase()}`}
-          />
+            <View style={styles.chainSection}>
+              <Text style={styles.chainText}>
+                {chainToShow.map(move => move.normalizedWord).join(' → ')}
+              </Text>
+              {session.chain.length > 6 && (
+                <Button
+                  label={showFullChain ? 'Hide previous words' : 'View previous words'}
+                  variant="secondary"
+                  onPress={() => setShowFullChain(current => !current)}
+                />
+              )}
+            </View>
 
-          {session.phase === 'invalid_word' && errorMessage !== null && <Text>{errorMessage}</Text>}
-          {session.phase === 'computer_thinking' && <Text>WordLoop is thinking…</Text>}
+            <Input
+              accessibilityLabel="Your word"
+              value={input}
+              onChangeText={text => {
+                setInput(text);
+                setSession(current => setSessionInput(current, text));
+              }}
+              editable={!busy}
+              autoFocus
+              placeholder={`Enter a word beginning with ${session.requiredLetter.toUpperCase()}`}
+              error={session.phase === 'invalid_word' ? errorMessage : null}
+              style={styles.input}
+            />
 
-          <Pressable onPress={handleSubmit} disabled={busy || normalizeWord(input).length === 0}>
-            <Text>Submit</Text>
-          </Pressable>
-          <Pressable onPress={() => {/* TODO(WL-307): open Hint bottom sheet */}}>
-            <Text>Hint</Text>
-          </Pressable>
-        </>
-      )}
-
-      {/* Recent chain, so the round is followable (Wireframe section 8). */}
-      {session.chain
-        .slice(-6)
-        .reverse()
-        .map(move => (
-          <Text key={move.moveId}>
-            {move.actor === 'player' ? 'You' : 'WordLoop'}: {move.normalizedWord}
-          </Text>
-        ))}
+            <View style={styles.actionsRow}>
+              <Button
+                label="Submit"
+                onPress={handleSubmit}
+                disabled={submitDisabled}
+                tone="grape"
+              />
+              <Button
+                label="Hint"
+                variant="secondary"
+                onPress={() => {
+                  /* TODO(WL-307): open Hint bottom sheet */
+                }}
+              />
+            </View>
+          </>
+        )}
+      </ScrollView>
     </View>
   );
 }
 
-// WL-203: only the required-letter callout is tokenised here. The rest of this
-// screen is still the unstyled skeleton — WL-301 owns the real layout, and
-// restyling it now would be inventing the design ahead of that task. The
-// callout is done early because it is the one element Design System §6 and
-// Wireframe §8 both constrain: it must be the largest text on screen.
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: palette.paper },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  scroll: { flex: 1 },
+  scrollContent: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxl,
+    gap: spacing.lg,
+  },
+  statsRow: { ...typeScale.body, color: palette.ink },
+  currentWordRow: { alignItems: 'center', gap: spacing.xs },
+  turnLabel: { ...typeScale.body, color: palette.ink },
+  currentWord: { ...typeScale.chainWord, color: palette.ink },
+  // Design System section 6: the required-letter card carries the heaviest
+  // shadow on the screen. Card only exposes the default `shadow.card` (7px),
+  // so the heavier `shadow.modal` (11px) is applied here rather than adding a
+  // shadow prop to Card for this one caller. Never rotated (no `rotation`
+  // prop) — section 3 reserves rotation for decorative elements, and this is
+  // the single most important piece of information on the screen.
+  requiredLetterCard: {
+    alignItems: 'center',
+    boxShadow: shadow.modal,
+  },
+  requiredLetterLabel: { ...typeScale.body, color: palette.ink },
   requiredLetter: { ...typeScale.requiredLetter, color: palette.ink },
+  chainSection: { alignItems: 'center', gap: spacing.sm },
+  chainText: { ...typeScale.chainWord, color: palette.ink, textAlign: 'center' },
+  input: { width: '100%' },
+  actionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.lg,
+  },
+  roundOverCard: { alignItems: 'center' },
+  roundOverMessage: { ...typeScale.screenTitle, color: palette.ink, textAlign: 'center' },
 });
