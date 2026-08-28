@@ -112,6 +112,7 @@ export function createSession(params: {
     isValid: true,
     invalidReason: null,
     hintUsed: false,
+    hintLevel: null,
     scoreAwarded: 0,
   };
 
@@ -149,6 +150,23 @@ export const beginValidation = ignoreIfOver(
 );
 
 /**
+ * The player used the hint sheet (WL-307) — charges the round-level limit
+ * immediately, on use, not deferred to whatever the player eventually
+ * submits. Doesn't touch `phase`; using a hint isn't a turn transition.
+ *
+ * Named `chargeHint`, not `useHint` — a `use`-prefixed name here would read
+ * to React's hooks linter as a custom hook (it goes by naming convention,
+ * not by what the function actually does) and `handleUseHint` calling it
+ * from an event handler would trip "rules of hooks."
+ */
+export const chargeHint = ignoreIfOver(
+  (state: GameSessionState): GameSessionState => ({
+    ...state,
+    hintsUsed: state.hintsUsed + 1,
+  }),
+);
+
+/**
  * Applies the rule engine's verdict on the player's word.
  *
  * An invalid word does not end the turn: Wireframe doc section 10 requires
@@ -158,7 +176,13 @@ export const beginValidation = ignoreIfOver(
 export const applyValidation = ignoreIfOver(
   (
     state: GameSessionState,
-    params: { submittedWord: string; result: ValidationResult; scoreAwarded?: number },
+    params: {
+      submittedWord: string;
+      result: ValidationResult;
+      scoreAwarded?: number;
+      /** WL-307: true if the player used the hint sheet this turn. */
+      hintUsed?: boolean;
+    },
   ): GameSessionState => {
     const { submittedWord, result } = params;
 
@@ -172,6 +196,7 @@ export const applyValidation = ignoreIfOver(
     }
 
     const scoreAwarded = params.scoreAwarded ?? 0;
+    const hintUsed = params.hintUsed ?? false;
     const move: Move = {
       moveId: `${state.sessionId}-${state.chain.length}`,
       turnNumber: state.chain.length + 1,
@@ -180,7 +205,10 @@ export const applyValidation = ignoreIfOver(
       normalizedWord: result.normalizedWord,
       isValid: true,
       invalidReason: null,
-      hintUsed: false,
+      hintUsed,
+      // The sheet always reveals levels 1-3 together (WL-307) — recorded at
+      // the deepest level given, since there is no partial-reveal path yet.
+      hintLevel: hintUsed ? 'example_word' : null,
       scoreAwarded,
     };
 
@@ -223,6 +251,7 @@ export const applyComputerMove = ignoreIfOver(
       isValid: true,
       invalidReason: null,
       hintUsed: false,
+      hintLevel: null,
       scoreAwarded: params.scoreAwarded ?? 0,
     };
 

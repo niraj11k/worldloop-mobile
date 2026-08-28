@@ -7,6 +7,7 @@ import {
   replyCountForLetter,
   maxReplyCount,
   computerPlayableEntriesStartingWith,
+  exampleWordForHint,
   setRuntimeExclusions,
   getRuntimeExclusions,
 } from '@features/dictionary/dictionaryService';
@@ -205,6 +206,34 @@ describe('computerPlayableEntriesStartingWith (WL-106 measurement support)', () 
   it('enumerates the worst-case letter without scanning the whole dictionary', () => {
     // 's' is the largest block; guards against a regression to a full scan.
     expect(computerPlayableEntriesStartingWith('s').length).toBeGreaterThan(5_000);
+  });
+});
+
+describe('exampleWordForHint (WL-307)', () => {
+  it('returns a computer-playable word starting with the requested letter', () => {
+    const example = exampleWordForHint('r', new Set());
+    expect(example).not.toBeNull();
+    expect(example?.startsWith('r')).toBe(true);
+    expect(
+      computerPlayableEntriesStartingWith('r').map(e => e.normalizedWord),
+    ).toContain(example);
+  });
+
+  it('excludes words already used this round', () => {
+    const first = exampleWordForHint('r', new Set());
+    const second = exampleWordForHint('r', new Set([first as string]));
+    expect(second).not.toBeNull();
+    expect(second).not.toBe(first);
+  });
+
+  it('returns null once every computer-playable word for the letter is used', () => {
+    // 'z' is a small block — cheap to exhaust entirely for this test.
+    const all = computerPlayableEntriesStartingWith('z').map(e => e.normalizedWord);
+    expect(exampleWordForHint('z', new Set(all))).toBeNull();
+  });
+
+  it('returns null for a non-letter', () => {
+    expect(exampleWordForHint('1', new Set())).toBeNull();
   });
 });
 

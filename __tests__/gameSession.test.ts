@@ -9,6 +9,7 @@ import {
   applyPlayerCannotMove,
   abandonSession,
   failSession,
+  chargeHint,
   isRoundOver,
   usedWords,
 } from '@features/game/gameSession';
@@ -162,6 +163,36 @@ describe('applyValidation', () => {
     });
     expect(after.phase).toBe('input_empty');
   });
+
+  it('defaults a move to no hint used', () => {
+    const state = playerPlays(newSession('apple'), 'eagle');
+    expect(state.chain[1]).toMatchObject({ hintUsed: false, hintLevel: null });
+  });
+
+  it('records hint use on the move (WL-307)', () => {
+    const base = beginValidation(setInput(newSession('apple'), 'eagle'));
+    const state = applyValidation(base, {
+      submittedWord: 'eagle',
+      result: valid('eagle'),
+      hintUsed: true,
+    });
+    expect(state.chain[1]).toMatchObject({ hintUsed: true, hintLevel: 'example_word' });
+  });
+});
+
+describe('chargeHint (WL-307)', () => {
+  it('increments hintsUsed without touching phase or the chain', () => {
+    const before = newSession('apple');
+    const after = chargeHint(before);
+    expect(after.hintsUsed).toBe(1);
+    expect(after.phase).toBe(before.phase);
+    expect(after.chain).toEqual(before.chain);
+  });
+
+  it('accumulates across multiple uses', () => {
+    const state = chargeHint(chargeHint(newSession('apple')));
+    expect(state.hintsUsed).toBe(2);
+  });
 });
 
 describe('round endings', () => {
@@ -296,6 +327,7 @@ describe('a finished round is immutable', () => {
     expect(applyComputerCannotMove(finished, { playerRepliesRemaining: 9 })).toBe(finished);
     expect(applyPlayerCannotMove(finished)).toBe(finished);
     expect(abandonSession(finished)).toBe(finished);
+    expect(chargeHint(finished)).toBe(finished);
   });
 
   it('still records a technical failure over an existing result', () => {

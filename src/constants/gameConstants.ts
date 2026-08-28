@@ -4,7 +4,7 @@
  * wording without updating that doc, since it's been reviewed for tone
  * ("avoid making casual players feel like they are taking an examination").
  */
-import type { InvalidReason } from '@app-types/game';
+import type { HintLevel, InvalidReason } from '@app-types/game';
 
 export const INVALID_WORD_MESSAGES: Record<InvalidReason, string> = {
   wrong_letter: 'Your word must begin with {letter}.',
@@ -28,7 +28,21 @@ export const NO_COMPUTER_MOVE_MESSAGE = 'The computer has no valid word.';
 export const COMPUTER_TIMEOUT_MESSAGE = 'WordLoop is taking longer than expected.';
 
 export const MIN_WORD_LENGTH = 3;
-export const HINT_LEVELS = ['required_letter', 'word_count', 'example_word', 'definition_clue'] as const;
+export const HINT_LEVELS: readonly HintLevel[] = [
+  'required_letter',
+  'word_count',
+  'example_word',
+  'definition_clue',
+];
+
+/**
+ * PRD section 13 / Wireframe section 11: "hints may be limited per round to
+ * preserve challenge," but no doc gives a number. Explicit inference, same
+ * posture as `GameScreen.tsx`'s `COMPUTER_TURN_TIMEOUT_MS` — flat across
+ * difficulties, since nothing ties hint economy to difficulty (that governs
+ * the computer's play strength, a different axis).
+ */
+export const HINT_LIMIT_PER_ROUND = 3;
 
 /**
  * Delivery Plan D-04 (closed): v1 ships guest-only. Account creation, the

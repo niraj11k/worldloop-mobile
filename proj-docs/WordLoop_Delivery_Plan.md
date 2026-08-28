@@ -1604,13 +1604,56 @@ timeout path is reachable and recoverable.
 > recoverable* — i.e. actually built and working) and comes first, WL-506 should treat
 > this state as already built and re-verify it alongside the other two, not rebuild it.
 
-**WL-307 · Hint sheet, levels 1–3** — M · 1.5d · WL-204, WL-108
+**WL-307 · Hint sheet, levels 1–3** — M · 1.5d · WL-204, WL-108 — **DONE 2026-08-28**
 Wireframe §11 bottom sheet with hint levels 1–3 (required letter, count of available
 common words, example word) — all servable from local data, no API. Level 4
 (definition-based clue) is Phase 5. Per-round limit, and the §11 rule that a word is never
 auto-revealed without the player explicitly choosing that level.
 *Done when:* each level shows correct information, the limit is enforced, and the correct
 hint penalty (−5 / −10) reaches the score.
+
+> **DONE 2026-08-28.** This was a wiring task, not a build: `HintSheet.tsx` already existed
+> from WL-204 on `BottomSheet`+`Button`, its own docblock naming exactly what was left
+> ("Only level 1 + 3 are stubbed here... The remaining hint-level work is WL-307") — level 2
+> (word count) was the one genuinely missing. Added it, plus `Move.hintLevel`
+> (`Data_Model.md` §5 had this flagged as a real, already-ratified gap scoped to this task),
+> a new `exampleWordForHint` in `dictionaryService.ts` (reuses the existing
+> `computerPlayableEntriesStartingWith`, excludes already-used words, prefers common +
+> highest-frequency), and a new `chargeHint` session transition (named to avoid `useHint` —
+> a `use`-prefixed name collides with React's hooks-linter naming convention and broke
+> `react-hooks/rules-of-hooks` when called from an event handler).
+>
+> **Real design decision made here, not stated in any doc:** the sheet reveals all three
+> levels together as one hint, not as separately-costed tiers — matching the existing
+> Wireframe §11 mockup and the `HintSheet` stub's own single `[Use Hint]` action. Confirmed
+> by WL-504's own text (added *after* this): level 4 "applies the −5 penalty (not −10)" —
+> if even the deepest level stays at −5, nothing in the 1-4 set triggers −10, so
+> `hintRevealedWord` stays unreachable by this task, same as it was. The −10 tier most
+> plausibly belongs to PRD §13's separately-listed "one-time skip," which no task currently
+> builds — flagged, not decided here. Flow E's "hint limit reached → show message" branch
+> is instead handled by disabling the Hint button, consistent with every other
+> "unavailable" control in this screen (Submit, Try Again) rather than a one-off modal.
+> Per-round limit (**3**, flat across difficulties) is an explicit inference — no doc gives
+> a number, same posture as WL-306's `COMPUTER_TURN_TIMEOUT_MS`.
+>
+> Verified on the iPhone SE (3rd gen) simulator: all three levels show correct real data
+> (word count and example both changed correctly across three different required letters);
+> Cancel is a true no-op; Use Hint charges immediately (round counter increments, score
+> unaffected) and the penalty lands on whichever word is submitted next — checked twice
+> with different word lengths (13 and 22, both exactly 5 less than the un-hinted formula
+> would give); the Hint button visibly disables after the third use in a round and ignores
+> taps while disabled. **One thing verified by code reasoning only, not by direct UI
+> reproduction:** a hint used, then an invalid submission, then a corrected valid one in the
+> same turn should still charge the penalty exactly once — `hintUsedThisTurn` only resets on
+> a genuine `phase → input_empty` transition, which an invalid submission never causes, so
+> this holds by construction, but a clean manual repro was blocked by this session's
+> text-input tooling (clearing a field with residual text kept appending rather than
+> replacing — a recurring, already-documented simulator quirk, not an app bug). Worth a
+> specific check at WL-310.
+>
+> Added focused unit coverage alongside the fix, per the existing convention for
+> `features/` logic: `chargeHint` and the new `hintUsed`/`hintLevel` wiring in
+> `__tests__/gameSession.test.ts`, `exampleWordForHint` in `__tests__/dictionaryService.test.ts`.
 
 **WL-308 · Game-over screen** — M · 1.5d · WL-110, WL-204
 Wireframe §14: all 5 result states (player win, computer win, draw/exhausted, player exit,
