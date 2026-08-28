@@ -1435,7 +1435,7 @@ move, no computer move. Each has specific input/submit/message behaviour.
 > computer-playable — likely the same POS-CLASS-blank data-tagging gap WL-103 already
 > documented for `robert`/`nike`/`pepsi`.
 
-**WL-303 · Input behaviour** — M · 1.5d · WL-301
+**WL-303 · Input behaviour** — M · 1.5d · WL-301 — **DONE 2026-08-28**
 
 > **Observed 2026-08-19 while play-testing the wired game screen:** the controlled
 > `TextInput` can desync from React state under fast input — the native field showed
@@ -1451,6 +1451,47 @@ spaces, case-insensitive, submission blocked while the computer responds. Plus k
 avoidance — §19 requires input and Submit to stay visible above the keyboard.
 *Done when:* every bullet is verified on both platforms with the keyboard open, on a small
 phone.
+
+> **DONE 2026-08-28, with the device-matrix half of "Done when" explicitly still owed to
+> WL-310** — same posture as WL-105/106/108's perf numbers. `Input.tsx` now forwards a ref
+> (`React.forwardRef`, purely additive, no existing caller broke). `GameScreen` uses it to
+> refocus on every `input_empty` transition — not just mount — which is genuinely "turn
+> start" per the WL-110 machine (set at round start and after every computer move), fixing
+> the fact the old mount-only `autoFocus` prop went stale after turn one. `onSubmitEditing`
+> + `returnKeyType="done"` wire the keyboard's return key to `handleSubmit`. Trim and
+> case-folding needed no screen-level change — both already happen in
+> `ruleEngine.normalizeWord`. Keyboard avoidance: `KeyboardAvoidingView` wraps the
+> `ScrollView` only (header stays fixed), `behavior="padding"` on iOS only — Android already
+> sets `windowSoftInputMode="adjustResize"` in the manifest, so pairing both would
+> double-offset the content, which is why `undefined` there is correct and not a gap.
+>
+> **The prescribed fix, applied exactly:** a `latestInputRef`, updated synchronously inside
+> `onChangeText` alongside the existing `setInput`, is what `handleSubmit` now reads for
+> the empty-check and everything actually validated — `input` (state) stays authoritative
+> only for what render needs (`value`, `submitDisabled`). Verified working end-to-end:
+> `onSubmitEditing` submission, turn-start refocus without an extra tap, and the ordinary
+> Submit-button path all confirmed correct across several real turns on the iPhone SE (3rd
+> gen) simulator.
+>
+> **A distinct artifact surfaced while chasing the original bug, worth recording precisely
+> so it isn't conflated with it later:** submitting via a fast `text+"\n"` injection
+> occasionally delivered one fewer character than typed (`"splendid"` → field held
+> `"Splendi"`) — but critically, the *native field itself* showed the short version too, not
+> just React state. That's the opposite signature from the 2026-08-19 report (native field
+> **ahead of** state) — here the final keystroke's `onChangeText` plausibly never fired
+> before the immediately-following injected Return triggered `onSubmitEditing`, so state and
+> the new ref were equally correct (equally short) for what they'd actually been told. A
+> clean re-test of `"splendid"` with no trailing Return delivered all 8 characters correctly.
+> This reads as a testing-tool injection-speed artifact adjacent to the original report, not
+> a reproduction of it — but it's exactly the kind of platform/timing nuance a physical
+> device is needed to settle, so WL-310 should specifically try fast real typing immediately
+> followed by the keyboard's own return key, not just automated injection.
+>
+> **Not independently re-verified on Android** this session (no emulator was booted) —
+> `adjustResize` was confirmed present in the manifest by inspection, not by watching it
+> work. Both the Android pass and the physical-device keyboard/desync checks are WL-310's,
+> per the pattern already established for the WL-105/106/108 budgets and the WL-001/WL-005
+> device matrix.
 
 **WL-304 · Invalid-word feedback** — M · 1.5d · WL-302, WL-107
 All 7 rows of the Wireframe §10 message table, with the exact copy. Input retains the
