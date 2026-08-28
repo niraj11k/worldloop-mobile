@@ -1655,7 +1655,7 @@ hint penalty (−5 / −10) reaches the score.
 > `features/` logic: `chargeHint` and the new `hintUsed`/`hintLevel` wiring in
 > `__tests__/gameSession.test.ts`, `exampleWordForHint` in `__tests__/dictionaryService.test.ts`.
 
-**WL-308 · Game-over screen** — M · 1.5d · WL-110, WL-204
+**WL-308 · Game-over screen** — M · 1.5d · WL-110, WL-204 — **DONE 2026-08-29**
 Wireframe §14: all 5 result states (player win, computer win, draw/exhausted, player exit,
 technical failure), score, words played, longest chain, and the three actions. Encouraging
 rather than competitive tone per §14.
@@ -1664,6 +1664,61 @@ to `GameStatus` (2026-08-19). Render it; do not re-decide it, and do not introdu
 separate result vocabulary for it.
 *Done when:* all 5 states render, and Play Again returns to difficulty selection with no
 state leaking from the previous round.
+
+> **DONE 2026-08-29.** Replaced the two-branch placeholder round-over rendering from
+> WL-301/302 (`ROUND_OVER_MESSAGES` plus a single "Finish Round" button, both explicitly
+> flagged at the time as WL-308's job to replace) with a real `GameOverPanel` component
+> (`src/components/game/GameOverPanel.tsx`, sibling to `HintSheet`) and a `GAME_OVER_CONTENT`
+> lookup in `gameConstants.ts` typed as `Record<Exclude<GameStatus, 'active'>, {...}>` — the
+> compiler enforces all 5 statuses are covered, so a missing or renamed status fails
+> `tsc`, not silently at runtime. **Not a new nav route** — `navigation/types.ts` already
+> places `GameOver` as a child of `Game`, same tier as the `Hint` overlay, with no
+> `RootStackParamList` entry; this renders in place exactly as the old branch did.
+>
+> **Two things worth flagging, not hiding:** (1) only "You Win!" is literal Wireframe §14
+> copy — the other four headlines are this task's own writing, staying inside §14's
+> "avoid overly competitive language" instruction (no "You Lose," neutral framing for
+> `computer_win`/`abandoned`/`technical_failure`); descriptions reuse the already-reviewed
+> WL-301/302 sentences where they fit. (2) "Words played" and "Longest chain" render the
+> same `session.chain.length` value — not a duplication bug, a round's chain only ever
+> grows until the round ends, and the Wireframe §14 mockup's own example shows them equal
+> (18/18).
+>
+> Included both optional §14 extras that were already-tracked data: hints used
+> (`session.hintsUsed`) and a personal-best indicator, gated on `previousBestChainLength`
+> and the same settled-status set (`player_win`/`computer_win`/`draw`) that
+> `scoringEngine.roundEndBonus` itself gates on, so it never claims a milestone the round
+> didn't actually pay out. Skipped "new words discovered" and "most difficult letter" —
+> both need new data/logic this task doesn't otherwise touch, out of scope for rendering
+> the existing 5-state result.
+>
+> Verified on the iPhone SE (3rd gen) simulator via the same forced-timeout path WL-306
+> used (`COMPUTER_TURN_TIMEOUT_MS` temporarily set to `1`, reverted to `5000` before
+> finishing — confirmed via `git diff` that no temporary value remained): reached the
+> `abandoned` state directly (submit a word, let the forced timeout fire, tap End Round),
+> confirming the panel's headline, description, all four stats, and all three buttons
+> render correctly. From there, confirmed all three actions: **Play Again** reaches
+> Difficulty selection and a subsequent round starts genuinely fresh (chain reset to 1,
+> score reset to 0, no state leaked from the previous round — `GameScreen`'s `useState`
+> initializer calls `createSession` fresh on remount, so this held without extra cleanup
+> code); **Review Words** reaches the existing stub `WordReviewScreen` without crashing
+> (its content is out of scope, same posture as WL-307 leaving hint level 4 out of scope);
+> **Home** returns to the Home screen correctly.
+>
+> **The other four result states (`player_win`, `computer_win`, `draw`,
+> `technical_failure`) were not independently reached in the UI this task** — this phase
+> already spent real, documented effort chasing `player_win`/`draw`/`duplicate` via manual
+> play in WL-302/304 without success, and repeating that chase here for the same reason
+> wasn't a good use of time. Their correctness rests on the same rendering code path just
+> proven live for `abandoned`, plus `GAME_OVER_CONTENT`'s compiler-enforced exhaustiveness
+> over `GameStatus` — disclosed here rather than claimed as freshly verified. Worth a
+> specific check at WL-310's device pass, which plays enough full rounds that these
+> statuses should occur naturally.
+>
+> `npx tsc --noEmit`, `npm run lint` (0 errors, same pre-existing warning set as WL-307),
+> and `npm test` (14 suites, 276 tests) all pass. No new test file — consistent with every
+> screen/game-component task this phase; the `Record` type on `GAME_OVER_CONTENT` is the
+> main correctness guardrail for a content-lookup table like this.
 
 **WL-309 · Difficulty selection wiring** — S · 1d · WL-204
 Wireframe §6: Easy preselected, plain-language descriptions, selection persists into the

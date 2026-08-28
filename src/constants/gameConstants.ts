@@ -4,7 +4,7 @@
  * wording without updating that doc, since it's been reviewed for tone
  * ("avoid making casual players feel like they are taking an examination").
  */
-import type { HintLevel, InvalidReason } from '@app-types/game';
+import type { GameStatus, HintLevel, InvalidReason } from '@app-types/game';
 
 export const INVALID_WORD_MESSAGES: Record<InvalidReason, string> = {
   wrong_letter: 'Your word must begin with {letter}.',
@@ -16,16 +16,49 @@ export const INVALID_WORD_MESSAGES: Record<InvalidReason, string> = {
   offensive_excluded: 'That word cannot be used in WordLoop.',
 };
 
-/**
- * Wireframe doc section 9, "No computer move" state. Applies to both
- * `player_win` and `draw` — both are triggered by the computer having no
- * legal word (see `gameSession.ts`'s status mapping); the wireframe doesn't
- * distinguish copy between them, only WL-308's fuller game-over screen will.
- */
-export const NO_COMPUTER_MOVE_MESSAGE = 'The computer has no valid word.';
-
 /** Wireframe doc section 17, "Computer response timeout" state. */
 export const COMPUTER_TIMEOUT_MESSAGE = 'WordLoop is taking longer than expected.';
+
+/**
+ * Wireframe doc section 14's game-over content, one entry per `GameStatus`
+ * result. Only "You Win!" is literal copy from the doc — the other four
+ * headlines, and all five descriptions, are this task's own writing (WL-308),
+ * kept inside section 14's "avoid overly competitive language" instruction:
+ * no "You Lose", neutral framing for `computer_win`/`abandoned`/
+ * `technical_failure`. Descriptions reuse the reviewed sentences the earlier
+ * minimal round-over treatment (WL-301/302) already used, so the wording
+ * itself isn't new, only its pairing with a headline and richer stats.
+ *
+ * `player_win` and `draw` share the same underlying cause — the computer
+ * having no legal word (see `gameSession.ts`'s status-mapping table) — but
+ * get distinct headlines here since which one occurred matters to the player
+ * even though the mechanic is identical.
+ */
+export const GAME_OVER_CONTENT: Record<
+  Exclude<GameStatus, 'active'>,
+  { headline: string; description: string }
+> = {
+  player_win: {
+    headline: 'You Win!',
+    description: 'WordLoop ran out of valid words.',
+  },
+  computer_win: {
+    headline: 'WordLoop Wins!',
+    description: 'No words were left beginning with that letter.',
+  },
+  draw: {
+    headline: "It's a Draw!",
+    description: 'The dictionary ran out for both of you.',
+  },
+  abandoned: {
+    headline: 'Round Ended',
+    description: 'You left before the round finished.',
+  },
+  technical_failure: {
+    headline: 'Something Went Wrong',
+    description: 'This round had to stop unexpectedly.',
+  },
+};
 
 export const MIN_WORD_LENGTH = 3;
 export const HINT_LEVELS: readonly HintLevel[] = [

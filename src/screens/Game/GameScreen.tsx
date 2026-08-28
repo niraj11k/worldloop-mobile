@@ -31,7 +31,6 @@ import { rarityForEntry, scoreWord } from '@features/scoring/scoringEngine';
 import { replyCountForLetter, exampleWordForHint } from '@features/dictionary/dictionaryService';
 import {
   INVALID_WORD_MESSAGES,
-  NO_COMPUTER_MOVE_MESSAGE,
   COMPUTER_TIMEOUT_MESSAGE,
   HINT_LIMIT_PER_ROUND,
 } from '@constants/gameConstants';
@@ -43,8 +42,9 @@ import { Icon } from '@components/common/icons/Icon';
 import { SpringIn } from '@components/common/motion/SpringIn';
 import { ThinkingDots } from '@components/common/motion/ThinkingDots';
 import { HintSheet } from '@components/game/HintSheet';
+import { GameOverPanel } from '@components/game/GameOverPanel';
 import { palette, spacing, shadow, typeScale } from '@theme/theme';
-import type { GameSessionState, GameStatus, InvalidReason } from '@app-types/game';
+import type { GameSessionState, InvalidReason } from '@app-types/game';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
 
@@ -96,23 +96,6 @@ const COMPUTER_TURN_TIMED_OUT = Symbol('computer-turn-timed-out');
 
 /** Only reachable if the bundled dictionary is missing or corrupt (WL-112). */
 const FALLBACK_STARTING_WORD = 'apple';
-
-/**
- * Round-over copy for the two statuses Wireframe section 9's "No computer
- * move" state actually describes (`player_win` and `draw` — both are caused
- * by the computer having no legal word; see `gameSession.ts`'s status
- * mapping) lives in `NO_COMPUTER_MOVE_MESSAGE` instead, rendered by its own
- * branch below. This table only covers the other three, which section 9
- * doesn't name and WL-308 hasn't designed yet.
- */
-const ROUND_OVER_MESSAGES: Record<
-  Exclude<GameStatus, 'active' | 'player_win' | 'draw'>,
-  string
-> = {
-  computer_win: 'WordLoop wins — no words left beginning with that letter.',
-  abandoned: 'Round ended.',
-  technical_failure: 'Something went wrong, so this round had to stop.',
-};
 
 /**
  * Game screen — the core loop. Highest design/implementation priority
@@ -460,31 +443,14 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
           </View>
 
           {roundOver ? (
-            session.status === 'player_win' || session.status === 'draw' ? (
-              // Wireframe section 9's "No computer move" state — both statuses
-              // are caused by the computer having no legal word (see
-              // `gameSession.ts`'s status mapping). "Finish Round" returns to
-              // Home as a placeholder; WL-308 replaces this whole branch with
-              // the real 3-action game-over screen.
-              <Card style={styles.roundOverCard}>
-                <Text style={styles.roundOverMessage}>{NO_COMPUTER_MOVE_MESSAGE}</Text>
-                <Button
-                  label="Finish Round"
-                  tone="grape"
-                  onPress={() => navigation.navigate('Home')}
-                />
-              </Card>
-            ) : (
-              <Card style={styles.roundOverCard}>
-                <Text style={styles.roundOverMessage}>
-                  {
-                    ROUND_OVER_MESSAGES[
-                      session.status as Exclude<GameStatus, 'active' | 'player_win' | 'draw'>
-                    ]
-                  }
-                </Text>
-              </Card>
-            )
+            <GameOverPanel
+              session={session}
+              onPlayAgain={() => navigation.navigate('Difficulty')}
+              onHome={() => navigation.navigate('Home')}
+              onReviewWords={() =>
+                navigation.navigate('WordReview', { sessionId: session.sessionId })
+              }
+            />
           ) : (
             <>
               {/*
@@ -646,6 +612,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.lg,
   },
-  roundOverCard: { alignItems: 'center' },
-  roundOverMessage: { ...typeScale.screenTitle, color: palette.ink, textAlign: 'center' },
 });
