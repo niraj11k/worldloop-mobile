@@ -1377,12 +1377,26 @@ Checked at 16/24/48pt in the gallery.
 Goal: the thing the whole product rests on. Wireframe §21 says design the game screen
 first; the same applies to building it.
 
-**WL-301 · Game screen layout** — L · 2.5d · WL-204, WL-110
+**WL-301 · Game screen layout** — L · 2.5d · WL-204, WL-110 — **DONE 2026-08-28**
 All Wireframe §8 required elements. The required-letter callout is the single largest
 element on screen (64px display, `bubblegum`, heaviest shadow, never rotated, always
 accompanied by its text label) per Design System §6.
 *Done when:* the callout is verifiably the largest text element, and the layout holds on
 the smallest device in the WL-005 matrix.
+
+> **DONE 2026-08-28.** `GameScreen.tsx` composes the real WL-204/205/207 component set
+> (`Card`, `Button`, `Input`, `Badge`, `Icon`, `ThinkingDots`) in place of the bare RN
+> primitives it launched with — no new components needed. The required-letter card uses
+> `shadow.modal` (11px) rather than the default `Card` shadow (7px) to satisfy "heaviest
+> shadow on the screen," applied locally via the existing `style` prop rather than adding
+> a shadow prop to `Card` for one caller. Verified on the iPhone SE (3rd gen) simulator
+> (375×667, the smallest device in the WL-005 matrix): a full turn — submit, computer
+> reply, chain update, invalid-word error — renders with the required letter unmistakably
+> the largest element and no clipping/overlap, keyboard included. This is layout only;
+> WL-302's seven individually-verified states, WL-303's keyboard-avoidance/input work,
+> WL-305's animated no-reflow chain, WL-306's tuned timing, and WL-308's full 5-state
+> game-over screen are still open — today's round-over branch is a single restyled
+> message, not that.
 
 **WL-302 · The seven game-screen states** — L · 2d · WL-301
 Wireframe §9: player turn, input empty, validating, computer thinking, invalid word, valid
