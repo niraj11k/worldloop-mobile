@@ -18,7 +18,7 @@ import { nextStartingWord } from '@features/game/startingWord';
 import { generateCandidates, selectComputerWord } from '@features/difficulty/difficultyEngine';
 import { rarityForEntry, scoreWord } from '@features/scoring/scoringEngine';
 import { replyCountForLetter } from '@features/dictionary/dictionaryService';
-import { INVALID_WORD_MESSAGES } from '@constants/gameConstants';
+import { INVALID_WORD_MESSAGES, NO_COMPUTER_MOVE_MESSAGE } from '@constants/gameConstants';
 import { Badge } from '@components/common/Badge';
 import { Button } from '@components/common/Button';
 import { Card } from '@components/common/Card';
@@ -41,13 +41,38 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
  */
 const COMPUTER_THINK_MS = 350;
 
+/**
+ * Minimum time the `valid_move` phase stays on screen before the computer's
+ * turn begins.
+ *
+ * Same load-bearing reason as `COMPUTER_THINK_MS`: `gameSession.applyValidation`
+ * computes this phase (word appended to the chain, required letter already
+ * advanced, input ready to clear) on every valid submission, but nothing ever
+ * painted it before WL-302 — `handleSubmit` built the next state
+ * (`computer_thinking`) and called `setSession` only once, so React batched
+ * past it. This is a distinct constant from `COMPUTER_THINK_MS` on purpose:
+ * it is the minimum needed to make Wireframe section 9's "valid move" state
+ * individually reachable, not turn pacing — WL-306 owns pacing, and WL-305's
+ * real stamp-in animation will likely make this redundant later.
+ */
+const VALID_MOVE_DISPLAY_MS = 200;
+
 /** Only reachable if the bundled dictionary is missing or corrupt (WL-112). */
 const FALLBACK_STARTING_WORD = 'apple';
 
-const ROUND_OVER_MESSAGES: Record<Exclude<GameStatus, 'active'>, string> = {
-  player_win: 'You win — WordLoop ran out of words!',
+/**
+ * Round-over copy for the two statuses Wireframe section 9's "No computer
+ * move" state actually describes (`player_win` and `draw` — both are caused
+ * by the computer having no legal word; see `gameSession.ts`'s status
+ * mapping) lives in `NO_COMPUTER_MOVE_MESSAGE` instead, rendered by its own
+ * branch below. This table only covers the other three, which section 9
+ * doesn't name and WL-308 hasn't designed yet.
+ */
+const ROUND_OVER_MESSAGES: Record<
+  Exclude<GameStatus, 'active' | 'player_win' | 'draw'>,
+  string
+> = {
   computer_win: 'WordLoop wins — no words left beginning with that letter.',
-  draw: 'Draw — the dictionary ran out for both of you.',
   abandoned: 'Round ended.',
   technical_failure: 'Something went wrong, so this round had to stop.',
 };
@@ -67,12 +92,17 @@ const ROUND_OVER_MESSAGES: Record<Exclude<GameStatus, 'active'>, string> = {
  *
  * Layout done (WL-301): the required-letter callout is the largest text
  * element on screen (Design System section 6) and the screen composes the
- * real WL-204/205/207 component set rather than bare RN primitives. Still
- * pending: the seven Wireframe section 9 states individually verified
- * (WL-302), keyboard avoidance and the TextInput desync check (WL-303), the
- * animated no-reflow chain (WL-305), tuned think-delay/timeout (WL-306), and
- * the full 5-state game-over screen (WL-308) — today's round-over branch is
- * a single restyled message, not that.
+ * real WL-204/205/207 component set rather than bare RN primitives.
+ *
+ * All seven Wireframe section 9 states are individually reachable (WL-302),
+ * including the two that weren't painted before this task —
+ * `valid_move` and `no_computer_move` — see `VALID_MOVE_DISPLAY_MS` and the
+ * round-over branch below for why. Still pending: keyboard avoidance and the
+ * TextInput desync check (WL-303), auditing the exact invalid-word copy
+ * word-for-word (WL-304), the animated no-reflow chain (WL-305), tuned
+ * think-delay/timeout (WL-306), and the full 5-state game-over screen
+ * (WL-308) — today's round-over branch is two minimal messages-plus-action,
+ * not that.
  *
  * Not yet wired: hint sheet, definition overlay, and persistence (WL-403) —
  * the last of which is also what will supply the personal-best baseline the
@@ -100,7 +130,10 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
 
   const lastMove = session.chain[session.chain.length - 1];
   const roundOver = isRoundOver(session);
-  const busy = session.phase === 'validating' || session.phase === 'computer_thinking';
+  const busy =
+    session.phase === 'validating' ||
+    session.phase === 'valid_move' ||
+    session.phase === 'computer_thinking';
 
   const handleSubmit = async () => {
     if (roundOver || busy || normalizeWord(input).length === 0) {
@@ -139,6 +172,13 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
 
     setErrorReason(null);
     setInput('');
+    // Paint `valid_move` (Wireframe section 9) before moving on — see
+    // `VALID_MOVE_DISPLAY_MS`'s docblock for why this can't be skipped.
+    setSession(afterPlayer);
+    await new Promise<void>(resolve => {
+      setTimeout(resolve, VALID_MOVE_DISPLAY_MS);
+    });
+
     const thinking = beginComputerTurn(afterPlayer);
     setSession(thinking);
     await new Promise<void>(resolve => {
@@ -230,11 +270,31 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
         </View>
 
         {roundOver ? (
-          <Card style={styles.roundOverCard}>
-            <Text style={styles.roundOverMessage}>
-              {ROUND_OVER_MESSAGES[session.status as Exclude<GameStatus, 'active'>]}
-            </Text>
-          </Card>
+          session.status === 'player_win' || session.status === 'draw' ? (
+            // Wireframe section 9's "No computer move" state — both statuses
+            // are caused by the computer having no legal word (see
+            // `gameSession.ts`'s status mapping). "Finish Round" returns to
+            // Home as a placeholder; WL-308 replaces this whole branch with
+            // the real 3-action game-over screen.
+            <Card style={styles.roundOverCard}>
+              <Text style={styles.roundOverMessage}>{NO_COMPUTER_MOVE_MESSAGE}</Text>
+              <Button
+                label="Finish Round"
+                tone="grape"
+                onPress={() => navigation.navigate('Home')}
+              />
+            </Card>
+          ) : (
+            <Card style={styles.roundOverCard}>
+              <Text style={styles.roundOverMessage}>
+                {
+                  ROUND_OVER_MESSAGES[
+                    session.status as Exclude<GameStatus, 'active' | 'player_win' | 'draw'>
+                  ]
+                }
+              </Text>
+            </Card>
+          )
         ) : (
           <>
             {/*
@@ -272,14 +332,22 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
               }}
               editable={!busy}
               autoFocus
+              // Doubles as Wireframe section 9's "input_empty" state message
+              // ("Enter a word beginning with E") — a placeholder is only ever
+              // visible while the field is empty, which is exactly that phase,
+              // so no separate message element is needed here.
               placeholder={`Enter a word beginning with ${session.requiredLetter.toUpperCase()}`}
               error={session.phase === 'invalid_word' ? errorMessage : null}
               style={styles.input}
             />
 
+            {session.phase === 'validating' && (
+              <Text style={styles.statusMessage}>Checking word…</Text>
+            )}
+
             <View style={styles.actionsRow}>
               <Button
-                label="Submit"
+                label={session.phase === 'validating' ? 'Checking…' : 'Submit'}
                 onPress={handleSubmit}
                 disabled={submitDisabled}
                 tone="grape"
@@ -332,6 +400,7 @@ const styles = StyleSheet.create({
   chainSection: { alignItems: 'center', gap: spacing.sm },
   chainText: { ...typeScale.chainWord, color: palette.ink, textAlign: 'center' },
   input: { width: '100%' },
+  statusMessage: { ...typeScale.body, color: palette.ink, textAlign: 'center' },
   actionsRow: {
     flexDirection: 'row',
     justifyContent: 'center',

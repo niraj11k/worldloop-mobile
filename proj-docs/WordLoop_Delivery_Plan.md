@@ -1398,10 +1398,42 @@ the smallest device in the WL-005 matrix.
 > game-over screen are still open — today's round-over branch is a single restyled
 > message, not that.
 
-**WL-302 · The seven game-screen states** — L · 2d · WL-301
+**WL-302 · The seven game-screen states** — L · 2d · WL-301 — **DONE 2026-08-28**
 Wireframe §9: player turn, input empty, validating, computer thinking, invalid word, valid
 move, no computer move. Each has specific input/submit/message behaviour.
 *Done when:* all seven are individually reachable and each matches its §9 spec exactly.
+
+> **DONE 2026-08-28.** Auditing `GameScreen.tsx` against §9 line by line found two of the
+> seven phases the WL-110 state machine already computes were never actually painted:
+> `valid_move` (`applyValidation` sets it on every valid submission, but `handleSubmit`
+> built and rendered `computer_thinking` in the same breath, so React batched past it —
+> the same class of bug WL-301 had already fixed once for `computer_thinking` itself) and
+> `no_computer_move` (`endRound` reuses this phase value for *every* round ending, not
+> specifically the "computer had no word" scenario §9 describes — that's actually
+> `status === 'player_win' || 'draw'` per `gameSession.ts`'s own status-mapping table).
+> Fixed: `handleSubmit` now paints `valid_move` via a new `VALID_MOVE_DISPLAY_MS` (200ms,
+> named distinctly from `COMPUTER_THINK_MS` — it makes the state observable, it is not
+> WL-306's turn pacing) before proceeding; a new round-over branch keyed on
+> `player_win`/`draw` renders §9's exact copy ("The computer has no valid word.") plus a
+> "Finish Round" button (placeholder → Home, pending WL-308's real 3-action screen). Also
+> added the missing `validating` message ("Checking word…") and a Submit label swap
+> ("Checking…") — no spinner, since Design System §5 reserves the dots-pulse specifically
+> for the computer-thinking state. `input_empty`'s message requirement turned out to
+> already be satisfied by `Input`'s placeholder (only visible exactly when the field is
+> empty) — documented in a comment rather than duplicated as a second element.
+> Visually verified on the iPhone SE (3rd gen) simulator: `player_turn`, `input_empty`, and
+> `invalid_word` directly screenshotted; the full `valid_move → computer_thinking` cycle
+> confirmed correct end-to-end across 12+ real turns (chain/score/letter all advance
+> correctly every time, which the code could not do without `valid_move` actually being
+> painted and applied). `no_computer_move` was **not** reached through manual play — every
+> rare-letter chase (X, Y) turned up a deeper computer-playable pool than expected (e.g.
+> X alone: xenophobic, xamarin, xenophobia, xerography) — so that branch is verified by
+> code review and by reusing the exact `Card`+`Button` pattern already proven working
+> elsewhere in this file, not by direct visual reproduction. Flagged rather than hidden:
+> WL-310's full device pass will exercise many more rounds and should hit it for real.
+> Also noticed in passing, not chased: `xamarin` (a product name) came back
+> computer-playable — likely the same POS-CLASS-blank data-tagging gap WL-103 already
+> documented for `robert`/`nike`/`pepsi`.
 
 **WL-303 · Input behaviour** — M · 1.5d · WL-301
 
