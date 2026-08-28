@@ -1,5 +1,14 @@
-import React, { useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+} from 'react-native';
+import type { TextInput } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
 import { normalizeWord, validateMove, getRequiredLetter } from '@features/game/ruleEngine';
@@ -128,6 +137,19 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   const [errorReason, setErrorReason] = useState<InvalidReason | null>(null);
   const [showFullChain, setShowFullChain] = useState(false);
 
+  const inputRef = useRef<TextInput>(null);
+  /**
+   * The word actually submitted always comes from here, not from `input`
+   * state — Wireframe section 9 flagged a real controlled-`TextInput` failure
+   * mode (the native field can visibly hold more text than React's state has
+   * committed yet under fast input) and prescribed exactly this fix: source
+   * the submitted value from the change event, synchronously, rather than
+   * from state. `input` remains the source of truth for everything
+   * render-driven (the field's `value`, `submitDisabled`) — only the act of
+   * submitting reads this ref.
+   */
+  const latestInputRef = useRef('');
+
   const lastMove = session.chain[session.chain.length - 1];
   const roundOver = isRoundOver(session);
   const busy =
@@ -135,8 +157,19 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
     session.phase === 'valid_move' ||
     session.phase === 'computer_thinking';
 
+  // Wireframe section 9: "autofocus on turn start." `Input` is one long-lived
+  // instance for the whole round, so the `autoFocus` prop (mount-only) only
+  // ever covers the first turn — `input_empty` is set both at round start and
+  // after every computer move, i.e. exactly "turn start."
+  useEffect(() => {
+    if (session.phase === 'input_empty') {
+      inputRef.current?.focus();
+    }
+  }, [session.phase]);
+
   const handleSubmit = async () => {
-    if (roundOver || busy || normalizeWord(input).length === 0) {
+    const submitted = latestInputRef.current;
+    if (roundOver || busy || normalizeWord(submitted).length === 0) {
       return;
     }
 
@@ -144,13 +177,13 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
     setSession(validating);
 
     const result = await validateMove({
-      rawInput: input,
+      rawInput: submitted,
       requiredLetter: validating.requiredLetter,
       usedWords: usedWords(validating),
     });
 
     const afterPlayer = applyValidation(validating, {
-      submittedWord: input,
+      submittedWord: submitted,
       result,
       scoreAwarded:
         result.entry === null
@@ -172,6 +205,7 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
 
     setErrorReason(null);
     setInput('');
+    latestInputRef.current = '';
     // Paint `valid_move` (Wireframe section 9) before moving on — see
     // `VALID_MOVE_DISPLAY_MS`'s docblock for why this can't be skipped.
     setSession(afterPlayer);
@@ -244,125 +278,147 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
         <Icon name="pause" />
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled">
-        <Text style={styles.statsRow}>
-          Chain: {session.chain.length} words · Score: {session.score}
-        </Text>
+      {/*
+        Wireframe section 19: input and Submit must stay visible above the
+        keyboard. The header sits outside this so it never shifts — only the
+        scrollable game content moves. Android already sets
+        `windowSoftInputMode="adjustResize"` in the manifest, so pairing that
+        with an app-level `padding` behavior here would double-offset the
+        content; `undefined` on Android leaves the OS-level resize as the only
+        mechanism, which is the standard RN pairing.
+      */}
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoider}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled">
+          <Text style={styles.statsRow}>
+            Chain: {session.chain.length} words · Score: {session.score}
+          </Text>
 
-        {/* Whose word is on the board, rather than a hardcoded label. */}
-        <View style={styles.currentWordRow}>
-          {session.phase === 'computer_thinking' ? (
-            <>
-              <Text style={styles.turnLabel}>WordLoop is thinking…</Text>
-              <ThinkingDots accessibilityLabel="WordLoop is thinking" />
-            </>
+          {/* Whose word is on the board, rather than a hardcoded label. */}
+          <View style={styles.currentWordRow}>
+            {session.phase === 'computer_thinking' ? (
+              <>
+                <Text style={styles.turnLabel}>WordLoop is thinking…</Text>
+                <ThinkingDots accessibilityLabel="WordLoop is thinking" />
+              </>
+            ) : (
+              <>
+                <Text style={styles.turnLabel}>
+                  {lastMove?.actor === 'player' ? 'You' : 'WordLoop'}
+                </Text>
+                <Text style={styles.currentWord}>{session.currentWord.toUpperCase()}</Text>
+              </>
+            )}
+          </View>
+
+          {roundOver ? (
+            session.status === 'player_win' || session.status === 'draw' ? (
+              // Wireframe section 9's "No computer move" state — both statuses
+              // are caused by the computer having no legal word (see
+              // `gameSession.ts`'s status mapping). "Finish Round" returns to
+              // Home as a placeholder; WL-308 replaces this whole branch with
+              // the real 3-action game-over screen.
+              <Card style={styles.roundOverCard}>
+                <Text style={styles.roundOverMessage}>{NO_COMPUTER_MOVE_MESSAGE}</Text>
+                <Button
+                  label="Finish Round"
+                  tone="grape"
+                  onPress={() => navigation.navigate('Home')}
+                />
+              </Card>
+            ) : (
+              <Card style={styles.roundOverCard}>
+                <Text style={styles.roundOverMessage}>
+                  {
+                    ROUND_OVER_MESSAGES[
+                      session.status as Exclude<GameStatus, 'active' | 'player_win' | 'draw'>
+                    ]
+                  }
+                </Text>
+              </Card>
+            )
           ) : (
             <>
-              <Text style={styles.turnLabel}>
-                {lastMove?.actor === 'player' ? 'You' : 'WordLoop'}
-              </Text>
-              <Text style={styles.currentWord}>{session.currentWord.toUpperCase()}</Text>
+              {/*
+                Design System section 6: the required letter is the single
+                largest element on screen — largest type in the scale, heaviest
+                shadow on the screen (shadow.modal, not the default Card
+                shadow.card), never rotated.
+              */}
+              <Card fill="bubblegum" style={styles.requiredLetterCard}>
+                <Text style={styles.requiredLetterLabel}>Required letter</Text>
+                <Text style={styles.requiredLetter}>
+                  {session.requiredLetter.toUpperCase()}
+                </Text>
+              </Card>
+
+              <View style={styles.chainSection}>
+                <Text style={styles.chainText}>
+                  {chainToShow.map(move => move.normalizedWord).join(' → ')}
+                </Text>
+                {session.chain.length > 6 && (
+                  <Button
+                    label={showFullChain ? 'Hide previous words' : 'View previous words'}
+                    variant="secondary"
+                    onPress={() => setShowFullChain(current => !current)}
+                  />
+                )}
+              </View>
+
+              <Input
+                ref={inputRef}
+                accessibilityLabel="Your word"
+                value={input}
+                onChangeText={text => {
+                  latestInputRef.current = text;
+                  setInput(text);
+                  setSession(current => setSessionInput(current, text));
+                }}
+                editable={!busy}
+                autoFocus
+                // Wireframe section 8: submit via the keyboard's return key,
+                // not just the Submit button.
+                onSubmitEditing={handleSubmit}
+                returnKeyType="done"
+                // Doubles as Wireframe section 9's "input_empty" state message
+                // ("Enter a word beginning with E") — a placeholder is only
+                // ever visible while the field is empty, which is exactly
+                // that phase, so no separate message element is needed here.
+                // Trimming and case-folding (section 8's other two bullets)
+                // already happen in `ruleEngine.normalizeWord`, run inside
+                // `validateMove` — nothing to duplicate at this layer.
+                placeholder={`Enter a word beginning with ${session.requiredLetter.toUpperCase()}`}
+                error={session.phase === 'invalid_word' ? errorMessage : null}
+                style={styles.input}
+              />
+
+              {session.phase === 'validating' && (
+                <Text style={styles.statusMessage}>Checking word…</Text>
+              )}
+
+              <View style={styles.actionsRow}>
+                <Button
+                  label={session.phase === 'validating' ? 'Checking…' : 'Submit'}
+                  onPress={handleSubmit}
+                  disabled={submitDisabled}
+                  tone="grape"
+                />
+                <Button
+                  label="Hint"
+                  variant="secondary"
+                  onPress={() => {
+                    /* TODO(WL-307): open Hint bottom sheet */
+                  }}
+                />
+              </View>
             </>
           )}
-        </View>
-
-        {roundOver ? (
-          session.status === 'player_win' || session.status === 'draw' ? (
-            // Wireframe section 9's "No computer move" state — both statuses
-            // are caused by the computer having no legal word (see
-            // `gameSession.ts`'s status mapping). "Finish Round" returns to
-            // Home as a placeholder; WL-308 replaces this whole branch with
-            // the real 3-action game-over screen.
-            <Card style={styles.roundOverCard}>
-              <Text style={styles.roundOverMessage}>{NO_COMPUTER_MOVE_MESSAGE}</Text>
-              <Button
-                label="Finish Round"
-                tone="grape"
-                onPress={() => navigation.navigate('Home')}
-              />
-            </Card>
-          ) : (
-            <Card style={styles.roundOverCard}>
-              <Text style={styles.roundOverMessage}>
-                {
-                  ROUND_OVER_MESSAGES[
-                    session.status as Exclude<GameStatus, 'active' | 'player_win' | 'draw'>
-                  ]
-                }
-              </Text>
-            </Card>
-          )
-        ) : (
-          <>
-            {/*
-              Design System section 6: the required letter is the single
-              largest element on screen — largest type in the scale, heaviest
-              shadow on the screen (shadow.modal, not the default Card
-              shadow.card), never rotated.
-            */}
-            <Card fill="bubblegum" style={styles.requiredLetterCard}>
-              <Text style={styles.requiredLetterLabel}>Required letter</Text>
-              <Text style={styles.requiredLetter}>
-                {session.requiredLetter.toUpperCase()}
-              </Text>
-            </Card>
-
-            <View style={styles.chainSection}>
-              <Text style={styles.chainText}>
-                {chainToShow.map(move => move.normalizedWord).join(' → ')}
-              </Text>
-              {session.chain.length > 6 && (
-                <Button
-                  label={showFullChain ? 'Hide previous words' : 'View previous words'}
-                  variant="secondary"
-                  onPress={() => setShowFullChain(current => !current)}
-                />
-              )}
-            </View>
-
-            <Input
-              accessibilityLabel="Your word"
-              value={input}
-              onChangeText={text => {
-                setInput(text);
-                setSession(current => setSessionInput(current, text));
-              }}
-              editable={!busy}
-              autoFocus
-              // Doubles as Wireframe section 9's "input_empty" state message
-              // ("Enter a word beginning with E") — a placeholder is only ever
-              // visible while the field is empty, which is exactly that phase,
-              // so no separate message element is needed here.
-              placeholder={`Enter a word beginning with ${session.requiredLetter.toUpperCase()}`}
-              error={session.phase === 'invalid_word' ? errorMessage : null}
-              style={styles.input}
-            />
-
-            {session.phase === 'validating' && (
-              <Text style={styles.statusMessage}>Checking word…</Text>
-            )}
-
-            <View style={styles.actionsRow}>
-              <Button
-                label={session.phase === 'validating' ? 'Checking…' : 'Submit'}
-                onPress={handleSubmit}
-                disabled={submitDisabled}
-                tone="grape"
-              />
-              <Button
-                label="Hint"
-                variant="secondary"
-                onPress={() => {
-                  /* TODO(WL-307): open Hint bottom sheet */
-                }}
-              />
-            </View>
-          </>
-        )}
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -375,6 +431,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.lg,
   },
+  keyboardAvoider: { flex: 1 },
   scroll: { flex: 1 },
   scrollContent: {
     paddingHorizontal: spacing.lg,

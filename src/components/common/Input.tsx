@@ -46,14 +46,16 @@ export interface InputProps
   style?: StyleProp<ViewStyle>;
 }
 
-export function Input({
-  accessibilityLabel,
-  error = null,
-  style,
-  onFocus,
-  onBlur,
-  ...rest
-}: InputProps): React.JSX.Element {
+/**
+ * Forwards a ref to the underlying `TextInput` so callers can imperatively
+ * focus it (Wireframe section 9: "autofocus on turn start" — the game screen
+ * reuses one long-lived `Input` instance across turns, so autofocus-on-mount
+ * alone only covers the first turn).
+ */
+export const Input = React.forwardRef<TextInput, InputProps>(function InputImpl(
+  { accessibilityLabel, error = null, style, onFocus, onBlur, ...rest },
+  ref,
+) {
   const [focused, setFocused] = useState(false);
 
   const borderColor = error
@@ -65,6 +67,7 @@ export function Input({
   return (
     <View style={style}>
       <TextInput
+        ref={ref}
         {...rest}
         accessibilityLabel={accessibilityLabel}
         // Ties the field to its message, so the error is reachable from the
@@ -110,7 +113,7 @@ export function Input({
       ) : null}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   field: {
