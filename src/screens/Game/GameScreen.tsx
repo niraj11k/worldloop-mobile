@@ -20,6 +20,7 @@ import {
   beginComputerTurn,
   applyComputerMove,
   applyComputerCannotMove,
+  abandonSession,
   isRoundOver,
   usedWords,
 } from '@features/game/gameSession';
@@ -27,7 +28,11 @@ import { nextStartingWord } from '@features/game/startingWord';
 import { generateCandidates, selectComputerWord } from '@features/difficulty/difficultyEngine';
 import { rarityForEntry, scoreWord } from '@features/scoring/scoringEngine';
 import { replyCountForLetter } from '@features/dictionary/dictionaryService';
-import { INVALID_WORD_MESSAGES, NO_COMPUTER_MOVE_MESSAGE } from '@constants/gameConstants';
+import {
+  INVALID_WORD_MESSAGES,
+  NO_COMPUTER_MOVE_MESSAGE,
+  COMPUTER_TIMEOUT_MESSAGE,
+} from '@constants/gameConstants';
 import { Badge } from '@components/common/Badge';
 import { Button } from '@components/common/Button';
 import { Card } from '@components/common/Card';
@@ -36,7 +41,7 @@ import { Icon } from '@components/common/icons/Icon';
 import { SpringIn } from '@components/common/motion/SpringIn';
 import { ThinkingDots } from '@components/common/motion/ThinkingDots';
 import { palette, spacing, shadow, typeScale } from '@theme/theme';
-import type { GameStatus, InvalidReason } from '@app-types/game';
+import type { GameSessionState, GameStatus, InvalidReason } from '@app-types/game';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
 
@@ -45,9 +50,9 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
  *
  * Also load-bearing, not just cosmetic: without an await between setting the
  * thinking phase and doing the synchronous candidate work, React batches the
- * two updates and that phase never paints. WL-306 owns the real orchestration
- * (tuned delay, timeout path); this is the smallest version that makes the
- * turn observable.
+ * two updates and that phase never paints. No doc gives a figure to tune this
+ * against — real timing tuning is a dedicated pass (WL-605), same posture
+ * `theme/motion.ts` takes for its own untuned first-pass values.
  */
 const COMPUTER_THINK_MS = 350;
 
@@ -62,10 +67,29 @@ const COMPUTER_THINK_MS = 350;
  * (`computer_thinking`) and called `setSession` only once, so React batched
  * past it. This is a distinct constant from `COMPUTER_THINK_MS` on purpose:
  * it is the minimum needed to make Wireframe section 9's "valid move" state
- * individually reachable, not turn pacing — WL-306 owns pacing, and WL-305's
- * real stamp-in animation will likely make this redundant later.
+ * individually reachable, not turn pacing — WL-305's stamp-in animation
+ * likely makes this redundant eventually.
  */
 const VALID_MOVE_DISPLAY_MS = 200;
+
+/**
+ * Wireframe section 17's "computer response timeout" threshold — past this,
+ * the thinking state gives way to "WordLoop is taking longer than expected"
+ * with Try Again / End Round.
+ *
+ * Explicitly untuned, like `COMPUTER_THINK_MS`: no doc gives a figure. Unlike
+ * that constant, this one also can't fire during real play today — the
+ * computer's work is synchronous JS with no network or real async risk, and
+ * WL-108/109 measured it well under 60ms worst-case on real hardware. It
+ * exists as a safety net (a slower device, or a future async dictionary
+ * lookup), the same reason `technical_failure` exists for a corrupt
+ * dictionary asset without normally occurring. 5s is a common "something is
+ * wrong" UX threshold, not derived from any measurement.
+ */
+const COMPUTER_TURN_TIMEOUT_MS = 5000;
+
+/** Sentinel distinguishing "the timeout won the race" from a real result. */
+const COMPUTER_TURN_TIMED_OUT = Symbol('computer-turn-timed-out');
 
 /** Only reachable if the bundled dictionary is missing or corrupt (WL-112). */
 const FALLBACK_STARTING_WORD = 'apple';
@@ -107,12 +131,14 @@ const ROUND_OVER_MESSAGES: Record<
  * All seven Wireframe section 9 states are individually reachable (WL-302),
  * including the two that weren't painted before this task —
  * `valid_move` and `no_computer_move` — see `VALID_MOVE_DISPLAY_MS` and the
- * round-over branch below for why. Still pending: keyboard avoidance and the
- * TextInput desync check (WL-303), auditing the exact invalid-word copy
- * word-for-word (WL-304), the animated no-reflow chain (WL-305), tuned
- * think-delay/timeout (WL-306), and the full 5-state game-over screen
- * (WL-308) — today's round-over branch is two minimal messages-plus-action,
- * not that.
+ * round-over branch below for why. Keyboard avoidance and the TextInput
+ * desync fix are in (WL-303); invalid-word copy is audited exact against
+ * Wireframe section 10 (WL-304); the chain stamps in without reflowing older
+ * entries (WL-305); the computer's turn has a minimum think delay and
+ * Wireframe section 17's timeout/retry path (WL-306, see
+ * `COMPUTER_TURN_TIMEOUT_MS`). Still pending: the full 5-state game-over
+ * screen (WL-308) — today's round-over branch is two minimal
+ * messages-plus-action, not that.
  *
  * Not yet wired: hint sheet, definition overlay, and persistence (WL-403) —
  * the last of which is also what will supply the personal-best baseline the
@@ -137,6 +163,7 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   const [input, setInput] = useState('');
   const [errorReason, setErrorReason] = useState<InvalidReason | null>(null);
   const [showFullChain, setShowFullChain] = useState(false);
+  const [computerTimedOut, setComputerTimedOut] = useState(false);
 
   const inputRef = useRef<TextInput>(null);
   /**
@@ -167,6 +194,72 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
       inputRef.current?.focus();
     }
   }, [session.phase]);
+
+  /**
+   * The computer's actual turn: the think delay, candidate generation, and
+   * selection, returning the next session state rather than applying it —
+   * that split is what lets `attemptComputerTurn` retry this from the same
+   * `thinkingSession` without duplicating the logic.
+   */
+  const runComputerTurn = async (
+    thinkingSession: GameSessionState,
+  ): Promise<GameSessionState> => {
+    await new Promise<void>(resolve => {
+      setTimeout(resolve, COMPUTER_THINK_MS);
+    });
+
+    const usedAfterPlayer = usedWords(thinkingSession);
+    const choice = selectComputerWord(
+      generateCandidates({
+        requiredLetter: thinkingSession.requiredLetter,
+        usedWords: usedAfterPlayer,
+      }),
+      difficulty,
+    );
+
+    if (choice === null) {
+      // Player wins unless the letter is dead for the wider player set too,
+      // which is a draw (WL-110).
+      return applyComputerCannotMove(thinkingSession, {
+        playerRepliesRemaining: replyCountForLetter(
+          thinkingSession.requiredLetter,
+          usedAfterPlayer,
+        ),
+      });
+    }
+
+    const usedAfterComputer = new Set(usedAfterPlayer).add(choice.word);
+    return applyComputerMove(thinkingSession, {
+      word: choice.word,
+      playerRepliesRemaining: replyCountForLetter(
+        getRequiredLetter(choice.word),
+        usedAfterComputer,
+      ),
+    });
+  };
+
+  /**
+   * Races the computer's turn against Wireframe section 17's timeout. If the
+   * timeout wins, `runComputerTurn`'s promise is simply never read again —
+   * harmless, since nothing else awaits it — and the screen offers Try Again
+   * (calls this again with the same `thinkingSession`) or End Round.
+   */
+  const attemptComputerTurn = async (thinkingSession: GameSessionState) => {
+    setComputerTimedOut(false);
+
+    const result = await Promise.race([
+      runComputerTurn(thinkingSession),
+      new Promise<typeof COMPUTER_TURN_TIMED_OUT>(resolve => {
+        setTimeout(() => resolve(COMPUTER_TURN_TIMED_OUT), COMPUTER_TURN_TIMEOUT_MS);
+      }),
+    ]);
+
+    if (result === COMPUTER_TURN_TIMED_OUT) {
+      setComputerTimedOut(true);
+      return;
+    }
+    setSession(result);
+  };
 
   const handleSubmit = async () => {
     const submitted = latestInputRef.current;
@@ -216,37 +309,19 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
 
     const thinking = beginComputerTurn(afterPlayer);
     setSession(thinking);
-    await new Promise<void>(resolve => {
-      setTimeout(resolve, COMPUTER_THINK_MS);
-    });
+    await attemptComputerTurn(thinking);
+  };
 
-    const usedAfterPlayer = usedWords(thinking);
-    const choice = selectComputerWord(
-      generateCandidates({ requiredLetter: thinking.requiredLetter, usedWords: usedAfterPlayer }),
-      difficulty,
-    );
-
-    if (choice === null) {
-      // Player wins unless the letter is dead for the wider player set too,
-      // which is a draw (WL-110).
-      setSession(
-        applyComputerCannotMove(thinking, {
-          playerRepliesRemaining: replyCountForLetter(thinking.requiredLetter, usedAfterPlayer),
-        }),
-      );
-      return;
-    }
-
-    const usedAfterComputer = new Set(usedAfterPlayer).add(choice.word);
-    setSession(
-      applyComputerMove(thinking, {
-        word: choice.word,
-        playerRepliesRemaining: replyCountForLetter(
-          getRequiredLetter(choice.word),
-          usedAfterComputer,
-        ),
-      }),
-    );
+  /**
+   * Wireframe section 17: End Round from the timeout state. Resets
+   * `computerTimedOut` explicitly — `currentWordRow` renders unconditionally
+   * (outside the `roundOver` branch), so without this the timeout UI and the
+   * round-over card would render at the same time once `abandonSession`
+   * flips `roundOver` true.
+   */
+  const handleEndRoundAfterTimeout = () => {
+    setComputerTimedOut(false);
+    setSession(abandonSession(session));
   };
 
   const errorMessage =
@@ -305,7 +380,24 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
 
           {/* Whose word is on the board, rather than a hardcoded label. */}
           <View style={styles.currentWordRow}>
-            {session.phase === 'computer_thinking' ? (
+            {computerTimedOut ? (
+              // Wireframe section 17: "computer response timeout."
+              <>
+                <Text style={styles.turnLabel}>{COMPUTER_TIMEOUT_MESSAGE}</Text>
+                <View style={styles.actionsRow}>
+                  <Button
+                    label="Try Again"
+                    tone="grape"
+                    onPress={() => attemptComputerTurn(session)}
+                  />
+                  <Button
+                    label="End Round"
+                    variant="secondary"
+                    onPress={handleEndRoundAfterTimeout}
+                  />
+                </View>
+              </>
+            ) : session.phase === 'computer_thinking' ? (
               <>
                 <Text style={styles.turnLabel}>WordLoop is thinking…</Text>
                 <ThinkingDots accessibilityLabel="WordLoop is thinking" />

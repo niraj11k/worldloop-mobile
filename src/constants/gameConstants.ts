@@ -24,6 +24,9 @@ export const INVALID_WORD_MESSAGES: Record<InvalidReason, string> = {
  */
 export const NO_COMPUTER_MOVE_MESSAGE = 'The computer has no valid word.';
 
+/** Wireframe doc section 17, "Computer response timeout" state. */
+export const COMPUTER_TIMEOUT_MESSAGE = 'WordLoop is taking longer than expected.';
+
 export const MIN_WORD_LENGTH = 3;
 export const HINT_LEVELS = ['required_letter', 'word_count', 'example_word', 'definition_clue'] as const;
 
