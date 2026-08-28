@@ -381,6 +381,40 @@ export function allowedEntriesStartingWith(letter: string): DictionaryWord[] {
   return entriesStartingWithMatching(letter, entry => entry.isAllowed);
 }
 
+/**
+ * One example word for the hint sheet's level 3 (WL-307) — a word the player
+ * could actually submit right now, so it excludes anything already used this
+ * round. Drawn from `computerPlayableEntriesStartingWith` rather than the
+ * wider `allowedEntriesStartingWith`: a hint should be recognizable, and that
+ * set already excludes the obscure tier for exactly this kind of reason (PRD
+ * section 8.7).
+ *
+ * Prefers the common-word band, then the highest `frequencyScore` within
+ * whatever pool remains — `frequencyScore` is `(1 - normalizedTier) * 1000`
+ * (see `decodeAt`), so higher is more common, not rarer. Returns `null` only
+ * when the letter has no remaining candidate at all — a near-dead-letter
+ * edge case the caller (the hint sheet) handles by omitting the line rather
+ * than showing an empty example.
+ */
+export function exampleWordForHint(
+  letter: string,
+  usedWords: Iterable<string>,
+): string | null {
+  const used = usedWords instanceof Set ? usedWords : new Set(usedWords);
+  const candidates = computerPlayableEntriesStartingWith(letter).filter(
+    entry => !used.has(entry.normalizedWord),
+  );
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  const common = candidates.filter(entry => entry.isCommonWord);
+  const pool = common.length > 0 ? common : candidates;
+  return pool.reduce((best, entry) =>
+    entry.frequencyScore > best.frequencyScore ? entry : best,
+  ).normalizedWord;
+}
+
 export interface DefinitionResult {
   word: string;
   partOfSpeech: string;

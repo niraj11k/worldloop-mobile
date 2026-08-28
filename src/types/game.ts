@@ -44,6 +44,12 @@ export type TurnPhase =
   | 'valid_move'
   | 'no_computer_move';
 
+/**
+ * Wireframe doc section 11 / PRD section 13's four hint levels. Levels 1-3
+ * are wired at WL-307; level 4 (definition-based clue) is WL-504, Phase 5.
+ */
+export type HintLevel = 'required_letter' | 'word_count' | 'example_word' | 'definition_clue';
+
 export interface Move {
   moveId: string;
   turnNumber: number;
@@ -53,6 +59,8 @@ export interface Move {
   isValid: boolean;
   invalidReason: InvalidReason | null;
   hintUsed: boolean;
+  /** The deepest hint level shown this move, or `null` if no hint was used. */
+  hintLevel: HintLevel | null;
   scoreAwarded: number;
 }
 

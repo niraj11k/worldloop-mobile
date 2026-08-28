@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -21,17 +21,19 @@ import {
   applyComputerMove,
   applyComputerCannotMove,
   abandonSession,
+  chargeHint,
   isRoundOver,
   usedWords,
 } from '@features/game/gameSession';
 import { nextStartingWord } from '@features/game/startingWord';
 import { generateCandidates, selectComputerWord } from '@features/difficulty/difficultyEngine';
 import { rarityForEntry, scoreWord } from '@features/scoring/scoringEngine';
-import { replyCountForLetter } from '@features/dictionary/dictionaryService';
+import { replyCountForLetter, exampleWordForHint } from '@features/dictionary/dictionaryService';
 import {
   INVALID_WORD_MESSAGES,
   NO_COMPUTER_MOVE_MESSAGE,
   COMPUTER_TIMEOUT_MESSAGE,
+  HINT_LIMIT_PER_ROUND,
 } from '@constants/gameConstants';
 import { Badge } from '@components/common/Badge';
 import { Button } from '@components/common/Button';
@@ -40,6 +42,7 @@ import { Input } from '@components/common/Input';
 import { Icon } from '@components/common/icons/Icon';
 import { SpringIn } from '@components/common/motion/SpringIn';
 import { ThinkingDots } from '@components/common/motion/ThinkingDots';
+import { HintSheet } from '@components/game/HintSheet';
 import { palette, spacing, shadow, typeScale } from '@theme/theme';
 import type { GameSessionState, GameStatus, InvalidReason } from '@app-types/game';
 
@@ -164,6 +167,13 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   const [errorReason, setErrorReason] = useState<InvalidReason | null>(null);
   const [showFullChain, setShowFullChain] = useState(false);
   const [computerTimedOut, setComputerTimedOut] = useState(false);
+  const [hintSheetVisible, setHintSheetVisible] = useState(false);
+  /**
+   * Whether the hint sheet was used this turn — carried through an invalid
+   * resubmission (only a genuine new turn resets it, below) so the penalty
+   * still applies to whichever submission this turn eventually succeeds.
+   */
+  const [hintUsedThisTurn, setHintUsedThisTurn] = useState(false);
 
   const inputRef = useRef<TextInput>(null);
   /**
@@ -192,8 +202,23 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   useEffect(() => {
     if (session.phase === 'input_empty') {
       inputRef.current?.focus();
+      // WL-307: a hint used on a prior turn must not discount this one.
+      setHintUsedThisTurn(false);
     }
   }, [session.phase]);
+
+  // WL-307: the sheet's data. Depends on the whole `session` object (its
+  // identity only changes on a real `setSession`, e.g. a turn resolving —
+  // not on `setInput`), so this skips recomputing on every keystroke
+  // re-render without needing a narrower, lint-unsafe dependency list.
+  const hintWordCount = useMemo(
+    () => replyCountForLetter(session.requiredLetter, usedWords(session)),
+    [session],
+  );
+  const hintExampleWord = useMemo(
+    () => exampleWordForHint(session.requiredLetter, usedWords(session)),
+    [session],
+  );
 
   /**
    * The computer's actual turn: the think delay, candidate generation, and
@@ -279,15 +304,19 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
     const afterPlayer = applyValidation(validating, {
       submittedWord: submitted,
       result,
+      hintUsed: hintUsedThisTurn,
       scoreAwarded:
         result.entry === null
           ? 0
           : scoreWord({
               wordLength: result.normalizedWord.length,
               rarity: rarityForEntry(result.entry),
-              // TODO(WL-307): the hint sheet is the only thing that can set
-              // these; until it exists no turn can carry a penalty.
-              hintUsed: false,
+              hintUsed: hintUsedThisTurn,
+              // WL-307's sheet only ever gives levels 1-3 (letter, count,
+              // example) — none of which hand over the exact required word,
+              // so this task never reaches the -10 tier. See the Delivery
+              // Plan's WL-307 note for why (short version: even WL-504's
+              // level 4 stays at -5, so nothing in the 1-4 set triggers it).
               hintRevealedWord: false,
             }),
     });
@@ -324,6 +353,19 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
     setSession(abandonSession(session));
   };
 
+  /**
+   * Wireframe section 11: charges the round's hint limit the moment the
+   * player commits (`[Use Hint]`), not deferred to whatever they eventually
+   * submit — matching the sheet's own "reduces your available hints by one"
+   * copy. `hintUsedThisTurn` is what `handleSubmit` reads to apply the -5
+   * penalty to this turn's eventual score.
+   */
+  const handleUseHint = () => {
+    setSession(chargeHint(session));
+    setHintUsedThisTurn(true);
+    setHintSheetVisible(false);
+  };
+
   const errorMessage =
     errorReason === null
       ? null
@@ -333,6 +375,11 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
         );
 
   const submitDisabled = busy || normalizeWord(input).length === 0;
+  // Wireframe section 9: "Hint: enabled if available." Reusing the app's
+  // existing disabled-control language for "unavailable" (Submit, Try Again)
+  // rather than a separate "hint limit" message — see the WL-307 Delivery
+  // Plan note for why that's a deliberate simplification of Flow E.
+  const hintDisabled = busy || roundOver || session.hintsUsed >= HINT_LIMIT_PER_ROUND;
   const chainToShow = showFullChain ? session.chain : session.chain.slice(-6);
   // Keyed to the actual newest move, not "whichever entry renders last" —
   // toggling "View previous words" must never animate anything (see
@@ -532,15 +579,23 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
                 <Button
                   label="Hint"
                   variant="secondary"
-                  onPress={() => {
-                    /* TODO(WL-307): open Hint bottom sheet */
-                  }}
+                  disabled={hintDisabled}
+                  onPress={() => setHintSheetVisible(true)}
                 />
               </View>
             </>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <HintSheet
+        visible={hintSheetVisible}
+        requiredLetter={session.requiredLetter}
+        wordCount={hintWordCount}
+        exampleWord={hintExampleWord}
+        onUseHint={handleUseHint}
+        onCancel={() => setHintSheetVisible(false)}
+      />
     </View>
   );
 }
