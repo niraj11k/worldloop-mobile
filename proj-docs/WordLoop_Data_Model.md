@@ -69,6 +69,71 @@ Notes:
 
 ---
 
+### 2.1 GuestProfile (v1 client runtime shape — implemented)
+
+**Added 2026-08-29 by WL-402**, which implemented this entity as `GuestProfile` in
+`src/types/profile.ts`. Same treatment as section 4.1: the shape above is what a guest
+record looks like in general (including the server-side branch); this is what a
+guest-only, local-first v1 actually stores. Field names are camelCase in code, matching
+`GameSessionState` and every other shipped type.
+
+```text
+GuestProfile
+------------
+schemaVersion          (number — see "How this survives an app update" below)
+guestId
+createdAt
+lastActiveAt           (last round played)
+lastSeenAt             (last app launch)
+gamesPlayed            (settled rounds only — see below)
+localScores            (RoundSummary[], newest first, capped at 100)
+bests                  ({ score, chainLength })
+localStreak            ({ current, best } — consecutive wins, see below)
+discoveredWords        (DiscoveredWord[] — section 7)
+settings               ({ soundEnabled, hapticsEnabled })
+isLinked
+linkedUserId
+```
+
+Differences from section 2, each deliberate:
+
+- **`data_expiry_at` is absent.** Section 2 already scopes it to "only if stored
+  server-side", and D-03 leaves no server. It returns with the server-side branch.
+- **`local_scores` is `RoundSummary[]`, capped, with `bests` beside it.** Section 2 gives
+  `local_scores` no shape. Storing every round forever inside a value rewritten after
+  every round grows unbounded for the life of an install, so the history is capped at the
+  100 most recent — which means a personal best can age out of it. `bests` is therefore
+  stored rather than derived: without it, trimming would silently lower the player's
+  record. Not a field section 2 needs, since an uncapped server-side record wouldn't have
+  the problem.
+- **`local_streak` is `{ current, best }`, counting consecutive wins.** No doc defines
+  what a WordLoop streak counts. Wireframe §5 offers "best streak **or** longest chain"
+  as alternatives, which rules out longest chain; Architecture §8.2 lists "returning on a
+  new day" as a milestone separate from "streak milestone", which rules out a day streak.
+  Consecutive wins is what's left. **Flagged, not settled** — WL-405 displays this and may
+  overrule it.
+- **`lastActiveAt` and `lastSeenAt` are given distinct meanings.** Section 2 lists both
+  without distinguishing them; opening the app writes `lastSeenAt`, finishing a round
+  writes `lastActiveAt`. Either could have been the "activity" one — this is the reading
+  that keeps both fields useful.
+- **`schemaVersion` is new.** It is what makes "survives an app update" enforceable rather
+  than hoped for: any future incompatible change to this shape has to state, in
+  `parseProfile`, how the profiles already on players' phones become readable. Reading is
+  otherwise tolerant — a missing or wrong-typed collection or counter is repaired to its
+  empty value, and only an unusable `guestId` makes a stored profile unreadable, so one
+  bad field can't cost a player every score they have.
+
+**Which rounds count.** `gamesPlayed`, `bests` and `localStreak` only move on a *settled*
+result (`player_win` / `computer_win` / `draw`) — the same gate `roundEndBonus` uses, so
+the profile can never refuse to record a milestone a round already paid a bonus for.
+`gamesPlayed` in particular is what the trigger doc's "after first completed game" /
+"after three more completed games" prompts read. `localScores` and `discoveredWords`, by
+contrast, record every finished round including abandoned ones: the history should agree
+with what the player actually did, and a word the player found is found whether or not
+they stayed to the end.
+
+---
+
 ## 3. Account (User)
 
 **Status: [Inference] — reviewed for internal consistency 2026-08-17, not yet ratified against code.** No `Account` type exists anywhere in `src/` (confirmed by search); `AccountCreationScreen.tsx` is a UI stub with no data shape behind it yet. This entity can't be ratified the way `GameSession`/`Move` were — there's nothing shipped to compare it against — so this pass checked it for consistency against the docs it's built from instead of against code.

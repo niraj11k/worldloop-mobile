@@ -1905,13 +1905,84 @@ Android back never silently destroys an in-progress game.
 > handler yet (How to Play's "Got It" is a no-op) — expected at this stage, noted so
 > it isn't mistaken for the same bug.
 
-**WL-402 · Guest profile and local persistence** — M · 2d · WL-002
+**WL-402 · Guest profile and local persistence** — M · 2d · WL-002 — **DONE 2026-08-29**
 Persist the `GuestProfile` shape from the trigger policy doc: `guest_id`, `created_at`,
 `last_active_at`, `games_played`, `local_scores`, `local_streak`, `discovered_words`,
 `settings`. Created locally on first launch, no server call (Architecture §8.1, Guest
 Deletion doc "best v1 approach").
 *Done when:* profile survives cold start and app update; a fresh install creates a new
 guest.
+
+> **DONE 2026-08-29.** Three layers, split the way the rest of the codebase already
+> splits: `features/profile/guestProfile.ts` is pure (create, record a round, reset,
+> serialize, parse — every function takes `now`, same posture as `gameSession.ts` and
+> `promptPolicy.ts`), `services/profile/profileRepository.ts` is the only thing that
+> touches storage, and `store/useProfileStore.ts` is the only writer, applying a pure
+> function and persisting the result so the in-memory and stored copies can't drift.
+> Loaded once at launch from `App.tsx` — nothing is gated on it, so the game stays
+> playable before it resolves.
+>
+> **The shape is documented as Data Model §2.1**, mirroring the §4.1 treatment
+> `GameSessionState` already gets. Five deliberate differences from §2 are recorded
+> there; the two that were real decisions rather than transcription:
+>
+> - **`local_streak` counts consecutive wins.** No doc defines a WordLoop streak.
+>   Wireframe §5's "best streak **or** longest chain" rules out longest chain, and
+>   Architecture §8.2 listing "returning on a new day" separately from "streak milestone"
+>   rules out a day streak. Consecutive wins is what remains. **Flagged for WL-405**,
+>   which displays it and may overrule.
+> - **`local_scores` is capped at 100 rounds, with `bests` stored beside it.** §2 gives
+>   `local_scores` no shape, and an uncapped array inside a value rewritten after every
+>   round grows for the life of the install. Capping means a record can age out, so bests
+>   are stored rather than derived — otherwise trimming would silently lower a player's
+>   personal best.
+>
+> **Which rounds count** is the other rule worth stating: `gamesPlayed`, `bests` and the
+> streak move only on a settled result, using the *same* `isSettledResult` gate as
+> `roundEndBonus` — pulled out into one function here, since `GameOverPanel` had its own
+> third copy of it. Three copies meant a bonus could be paid for a milestone the profile
+> then refused to record. History and discovered words, by contrast, keep every finished
+> round including abandoned ones.
+>
+> **Also wired, because they were this task's own loose ends:**
+> - `GameScreen` reads `previousBestChainLength` from the profile at session creation —
+>   the value WL-111 designed for and `createSession`'s docblock has been waiting on, so
+>   the personal-best bonus can finally pay out. Read via `getState()`, not subscribed:
+>   the baseline is defined as of session creation and must not move mid-round.
+> - **WL-401's open item is closed.** Discarding a round now records it as `abandoned`
+>   before the held navigation action is replayed. It lands in the history and keeps the
+>   words found, but doesn't count as a game played, touch a best, or break the streak.
+> - `useSettingsStore` was a standalone store whose own docblock said persistence "is not
+>   yet wired up". It is now a view over the profile's `settings` field rather than a
+>   second store — Data Model §2 makes settings part of `GuestProfile`, and the Guest
+>   Deletion doc deletes them with it, so two stores would have needed to agree about
+>   creation, reset, and deletion.
+> - Home's Best Score / Best Streak read the profile instead of showing hardcoded `--`
+>   (the TODO there asked for exactly this). Layout and Wireframe §17's empty state stay
+>   WL-405's.
+>
+> **Verification.** 49 new unit tests across the pure module, the repository, and the
+> store — including cold start, reinstall, the capped history, a best that has aged out
+> of it, and tolerant parsing of a corrupt or older stored profile.
+>
+> On the iPhone SE simulator, read back from the app's actual MMKV file: a guest is
+> created on first launch and keeps its id across a relaunch; `lastSeenAt` advances on
+> launch while `lastActiveAt` stays at the last round; two rounds recorded newest-first
+> with the right results and scores; discovered words accumulate across rounds without
+> duplicates and exclude the computer's words; `gamesPlayed`/`bests`/`localStreak` all
+> correctly stayed at zero because both rounds were abandoned.
+>
+> **What that on-device pass could not cover: a settled round.** Ending one by playing
+> requires exhausting a letter, and the thinnest letter in the bundled dictionary (`x`)
+> still offers the computer 34 candidates — not reachable by hand in a session. The
+> settled path is covered by the store-level tests instead, which run a won round through
+> the real store and storage adapter. Worth re-checking during WL-310's 20-round pass,
+> where settled results happen naturally.
+>
+> **Flagged in passing, not fixed (dictionary quality, PRD §25 / WL-103 / WL-505):** the
+> computer played `xiongnu` — a proper noun the filter did not catch — plus `xml` and
+> `xmas`. Rare letters are where the word list is thinnest, so they are where its
+> misclassifications surface first.
 
 **WL-403 · In-progress game save and restore** — M · 1.5d · WL-402, WL-110
 Wireframe §13 requires the chain to survive a temporary exit. Save after every turn;
