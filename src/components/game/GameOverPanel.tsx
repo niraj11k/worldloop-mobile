@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '@components/common/Button';
 import { Card } from '@components/common/Card';
 import { GAME_OVER_CONTENT } from '@constants/gameConstants';
+import { isSettledResult } from '@features/scoring/scoringEngine';
 import { palette, spacing, typeScale } from '@theme/theme';
 import type { GameSessionState, GameStatus } from '@app-types/game';
 
@@ -42,14 +43,11 @@ export function GameOverPanel({
   const content = GAME_OVER_CONTENT[session.status as Exclude<GameStatus, 'active'>];
   const wordsPlayed = session.chain.length;
 
-  // Mirrors `roundEndBonus`'s own settled-status gate, so this never claims a
-  // milestone that round didn't actually pay out.
-  const isSettled =
-    session.status === 'player_win' ||
-    session.status === 'computer_win' ||
-    session.status === 'draw';
+  // The same settled-status gate `roundEndBonus` and the profile's own
+  // recording use (WL-402 pulled it out into one function), so this can never
+  // claim a milestone the round didn't pay out or the profile won't keep.
   const isPersonalBest =
-    isSettled &&
+    isSettledResult(session.status) &&
     session.previousBestChainLength !== null &&
     session.chain.length > session.previousBestChainLength;
 

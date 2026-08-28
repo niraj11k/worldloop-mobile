@@ -47,6 +47,7 @@ import { ThinkingDots } from '@components/common/motion/ThinkingDots';
 import { HintSheet } from '@components/game/HintSheet';
 import { GameOverPanel } from '@components/game/GameOverPanel';
 import { useConfirmBeforeLeave } from '@hooks/useConfirmBeforeLeave';
+import { useProfileStore } from '@store/useProfileStore';
 import { palette, spacing, shadow, typeScale } from '@theme/theme';
 import type { GameSessionState, InvalidReason } from '@app-types/game';
 
@@ -130,17 +131,31 @@ const FALLBACK_STARTING_WORD = 'apple';
  * screen (WL-308) — today's round-over branch is two minimal
  * messages-plus-action, not that.
  *
- * Not yet wired: hint sheet, definition overlay, and persistence (WL-403) —
- * the last of which is also what will supply the personal-best baseline the
- * round-end bonus needs (WL-402).
+ * The round now both reads from and writes to the guest profile (WL-402):
+ * the personal-best baseline comes in at session creation, and a finished
+ * round is folded back in once. Not yet wired: the definition overlay, and
+ * saving a round *in progress* so it survives leaving the app (WL-403).
  */
 export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   const { difficulty } = route.params;
+  const recordRound = useProfileStore(state => state.recordRound);
 
   const [session, setSession] = useState(() =>
     createSession({
       sessionId: `local-${Date.now()}`,
       difficulty,
+      /*
+        WL-402's baseline for the round-end personal-best bonus, read once,
+        here, rather than subscribed to: `previousBestChainLength` is defined
+        as the value *at session creation* (WL-111), so a best recorded while
+        this round is in play must not move the bar mid-round. `getState()`
+        rather than the hook is what keeps it a snapshot.
+
+        `null` while the profile is still loading, which is the documented
+        "no baseline known" case and awards no milestone — distinct from a
+        real best of 0, which a first round beats.
+      */
+      previousBestChainLength: useProfileStore.getState().profile?.bests.chainLength ?? null,
       // `null` means no letter in the dictionary could offer a usable
       // opening word, which with the bundled asset means the asset itself is
       // missing or corrupt. Falling back keeps the round playable rather
@@ -174,6 +189,13 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
    * submitting reads this ref.
    */
   const latestInputRef = useRef('');
+  /**
+   * A round is folded into the profile exactly once (WL-402). The guard is a
+   * ref rather than state because it must not cause a render, and because
+   * every path that ends a round — a win, a block, a draw, the timeout's End
+   * Round, the discard confirmation — converges on the same record.
+   */
+  const roundRecordedRef = useRef(false);
 
   const lastMove = session.chain[session.chain.length - 1];
   const roundOver = isRoundOver(session);
@@ -204,6 +226,21 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
       setHintUsedThisTurn(false);
     }
   }, [session.phase]);
+
+  /**
+   * WL-402: the finished round goes into the profile — games played, bests,
+   * streak, history, and the words the player found.
+   *
+   * In an effect rather than at each ending because the endings are computed
+   * in four different places (`applyComputerMove`'s block,
+   * `applyComputerCannotMove`, the timeout's End Round, and `failSession`);
+   * watching `status` catches all of them, including any added later.
+   */
+  useEffect(() => {
+    if (!roundOver || roundRecordedRef.current) return;
+    roundRecordedRef.current = true;
+    recordRound(session);
+  }, [roundOver, session, recordRound]);
 
   // WL-307: the sheet's data. Depends on the whole `session` object (its
   // identity only changes on a real `setSession`, e.g. a turn resolving —
@@ -349,6 +386,28 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   const handleEndRoundAfterTimeout = () => {
     setComputerTimedOut(false);
     setSession(abandonSession(session));
+  };
+
+  /**
+   * The player chose to leave a round in progress (WL-401's confirmation).
+   *
+   * Records it as `abandoned` before replaying the held navigation action —
+   * the gap WL-401 left open and WL-402 closes. The screen is about to
+   * unmount, so this deliberately does not `setSession`: the state is written
+   * to the profile, not to a component that is going away. `recordRound` is
+   * not awaited for the same reason, and does not need to be — the write
+   * underneath is synchronous MMKV.
+   *
+   * An abandoned round still lands in the history and still keeps any words
+   * the player found; it just doesn't count as a game played, doesn't touch
+   * a best, and doesn't break the streak (see `recordRoundCompleted`).
+   */
+  const handleConfirmLeave = () => {
+    if (!roundRecordedRef.current) {
+      roundRecordedRef.current = true;
+      recordRound(abandonSession(session));
+    }
+    confirmLeave();
   };
 
   /**
@@ -593,11 +652,9 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
         replays the exact navigation action that was held, so back goes back
         and Home goes Home.
 
-        The discarded round is not recorded anywhere yet — `abandonSession`
-        would only write to state this screen is about to unmount. WL-402/403
-        own that: once a round is persisted, this is the point that has to
-        mark it `abandoned` before the action is replayed, and it is the same
-        point WL-602's "game abandoned" analytics event belongs at.
+        `handleConfirmLeave` records the round as abandoned on the way out
+        (WL-402); it is also the point WL-602's "game abandoned" analytics
+        event belongs at.
       */}
       <ConfirmSheet
         visible={confirmVisible}
@@ -605,7 +662,7 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
         message={DISCARD_ROUND_CONFIRM.message}
         confirmLabel={DISCARD_ROUND_CONFIRM.confirmLabel}
         cancelLabel={DISCARD_ROUND_CONFIRM.cancelLabel}
-        onConfirm={confirmLeave}
+        onConfirm={handleConfirmLeave}
         onCancel={cancelLeave}
       />
     </View>

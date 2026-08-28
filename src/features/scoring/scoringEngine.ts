@@ -73,6 +73,20 @@ export const ROUND_WIN_BONUS = 20;
 export const PERSONAL_BEST_MILESTONE_BONUS = 5;
 
 /**
+ * A round that reached a real result: someone won, or the dictionary ran out.
+ *
+ * The gate on every achievement in the game — the round-end bonus below, the
+ * profile's recorded games/bests/streak (WL-402), and the game-over panel's
+ * "New personal best!" line all read this one function. An abandoned round is
+ * not an achievement, and a technical failure must not pay out, or a broken
+ * build reads as a generous one; with three separate copies of that rule, a
+ * bonus could be paid for a milestone the profile then refused to record.
+ */
+export function isSettledResult(status: GameStatus): boolean {
+  return status === 'player_win' || status === 'computer_win' || status === 'draw';
+}
+
+/**
  * The one-off bonus a finished round adds on top of its per-word scores.
  *
  * `previousBestChainLength` is `null` when no personal best is known — a
@@ -90,8 +104,7 @@ export function roundEndBonus(params: {
   chainLength: number;
   previousBestChainLength: number | null;
 }): number {
-  const settled: GameStatus[] = ['player_win', 'computer_win', 'draw'];
-  if (!settled.includes(params.status)) {
+  if (!isSettledResult(params.status)) {
     return 0;
   }
 
