@@ -11,6 +11,7 @@ import {
   failSession,
   chargeHint,
   isRoundOver,
+  isRoundInProgress,
   usedWords,
 } from '@features/game/gameSession';
 import type { GameSessionState, GameStatus, TurnPhase } from '@app-types/game';
@@ -192,6 +193,47 @@ describe('chargeHint (WL-307)', () => {
   it('accumulates across multiple uses', () => {
     const state = chargeHint(chargeHint(newSession('apple')));
     expect(state.hintsUsed).toBe(2);
+  });
+});
+
+describe('isRoundInProgress (WL-401)', () => {
+  it('is false on a fresh round, which holds only the computer opener', () => {
+    // Leaving here discards nothing the next round would not deal out again,
+    // so the confirm-before-discard dialog must not appear.
+    expect(isRoundInProgress(newSession('apple'))).toBe(false);
+  });
+
+  it('is false when a hint was charged but nothing has been played', () => {
+    expect(isRoundInProgress(chargeHint(newSession('apple')))).toBe(false);
+  });
+
+  it('is true once the player has played a word', () => {
+    expect(isRoundInProgress(playerPlays(newSession('apple'), 'eagle'))).toBe(true);
+  });
+
+  it('stays false while a rejected word is on screen', () => {
+    // An invalid submission leaves the round active but adds nothing to the
+    // chain, so there is still nothing to lose.
+    const rejected = applyValidation(beginValidation(setInput(newSession('apple'), 'zebra')), {
+      submittedWord: 'zebra',
+      result: invalid('zebra', 'wrong_letter'),
+    });
+    expect(rejected.status).toBe('active');
+    expect(isRoundInProgress(rejected)).toBe(false);
+  });
+
+  it('is false again the moment the round ends', () => {
+    // Game Over's own Home / Play Again must not be gated behind a dialog
+    // asking about a round that already finished.
+    const played = playerPlays(newSession('apple'), 'eagle');
+    const over = applyComputerCannotMove(played, { playerRepliesRemaining: 5 });
+    expect(isRoundOver(over)).toBe(true);
+    expect(isRoundInProgress(over)).toBe(false);
+  });
+
+  it('is false after the player abandons the round', () => {
+    const played = playerPlays(newSession('apple'), 'eagle');
+    expect(isRoundInProgress(abandonSession(played))).toBe(false);
   });
 });
 

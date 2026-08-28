@@ -1774,15 +1774,116 @@ Play 20 complete rounds across all three difficulties on physical iOS and Androi
 > **M1 gate:** a full round is playable on a real device. Anyone on the team can pick up a
 > phone and finish a game. Also the point to start D-10 name clearance.
 
+> **NOT DONE — physical-device requirement unmet, simulator/emulator pass only
+> (2026-08-29).** This task explicitly asks for *physical* iOS and Android hardware — this
+> environment has neither, only the iPhone SE (3rd gen) iOS Simulator and the
+> `Medium_Phone_API_36.1` Android emulator. Marking this DONE from simulator/emulator
+> evidence would misrepresent the gate: the M1 note itself is "anyone on the team can pick
+> up a *phone*," and every perf budget this doc already deferred here (WL-105, WL-106,
+> WL-108) was deferred specifically because simulators/emulators run on the host Mac's own
+> CPU, not representative low-end hardware. This task stays open until someone runs it on
+> real devices.
+>
+> **What this pass did cover, prompted by a request to specifically verify Android
+> (previously unverified in any session — every prior Phase 3 visual check was iOS
+> Simulator only):** built and installed a fresh Debug APK on the Android emulator
+> (`JAVA_HOME` pointed at Android Studio's bundled JBR, `env-wordloop-android-java`'s
+> already-documented requirement), then played through Welcome → Home → Difficulty → Game
+> across 5 chained turns on Easy, with the keyboard opened, typed into, and dismissed
+> repeatedly. Cross-checked against a fresh iOS Simulator pass over the same flow.
+> Everything already built in Phase 3 renders and behaves identically on both: claymorphism
+> shadows/borders (`boxShadow`, no blur) render correctly on Android — a real cross-platform
+> risk given the design system's "hard offset shadow, no blur" requirement, not previously
+> confirmed on Android in any prior task; `windowSoftInputMode="adjustResize"` correctly
+> keeps Submit/Hint above the keyboard on Android (WL-303's Android-side claim, unverified
+> until now); the 5-word chain wraps correctly (WL-305); turn orchestration, scoring, and
+> the newly-styled Difficulty screen (WL-309) are all pixel-consistent with iOS. `adb
+> logcat` showed no `FATAL`/`AndroidRuntime` crash across the whole session — only routine
+> IME/system noise.
+>
+> **Not attempted this pass, left for the real device-pass:** 20 complete rounds (only
+> partial rounds played — reaching game-over deliberately wasn't repeated here since WL-308
+> already verified `GameOverPanel` thoroughly on iOS Simulator), Medium/Hard on Android
+> specifically (only exercised on iOS this pass — Android's engine code path is identical,
+> not platform-specific, so this is a low-risk gap, but it's still unexercised), and every
+> other Phase 4+ concern (persistence, accessibility, orientation) this task's scope never
+> covered anyway.
+
 ---
 
 ### Phase 4 — App shell, persistence, accessibility
 
-**WL-401 · Navigation and back behaviour** — M · 1.5d · WL-308
+**WL-401 · Navigation and back behaviour** — M · 1.5d · WL-308 — **DONE 2026-08-29**
 Wireframe §2 structure. Android hardware back and iOS safe areas per §19. Confirmation
 before any action that discards a round.
 *Done when:* every screen's back behaviour is defined and correct on both platforms, and
 Android back never silently destroys an in-progress game.
+
+> **DONE 2026-08-29.** Three things were wrong, only one of which this task's title
+> predicts.
+>
+> **1. Nothing guarded an in-progress round.** `GameScreen`'s back control called
+> `navigation.goBack()` outright, and Android's hardware back and the iOS edge-swipe
+> never touched that handler at all. The guard is `useConfirmBeforeLeave`
+> (`src/hooks/`), built on React Navigation 7's `usePreventRemove`, which intercepts the
+> *navigation action* rather than any one control — so the header button, the hardware
+> button, the swipe gesture, and any future in-screen `goBack`/`popTo` are all covered
+> by one guard. `usePreventRemove` specifically (not a bare `beforeRemove` listener) is
+> what makes the iOS gesture stop: `native-stack` reads its prevented-route registry and
+> sets `preventNativeDismiss`, so the platform never starts the dismissal. Confirming
+> replays the exact held action, so back goes back and Home goes Home.
+>
+> What counts as "in progress" is `isRoundInProgress` (`gameSession.ts`, unit-tested):
+> deliberately narrower than "not over" — a round the player hasn't moved in holds only
+> the computer's opener, and confirming there would put a dialog in front of the Back
+> button on a screen just opened, which is how confirmations stop being read.
+>
+> The dialog is `ConfirmSheet` (`components/common/`) on the existing `BottomSheet`,
+> whose own docblock already named this task as the caller needing
+> `dismissOnScrimPress={false}`. Not RN's `Alert`: that renders the platform dialog,
+> which carries none of Design System §4's component language. Android back *inside* the
+> dialog resolves to cancel, so back can't become a two-tap way to destroy the round.
+> The destructive action is the `secondary` button and the safe one is primary — §4
+> offers no destructive button fill (`red-alert` is for error text and input borders,
+> not a fill in the WL-202 matrix), so emphasis is inverted rather than inventing a tone.
+> Copy is in `gameConstants.ts` (`DISCARD_ROUND_CONFIRM`) with the other reviewed
+> strings; §13 states the rule but gives no wording. WL-404's Pause reuses all of it.
+>
+> **2. Every backwards `navigate` was pushing a duplicate screen.** React Navigation 7
+> only pops back to an existing route when told to (`popTo`); a plain `navigate` to a
+> route that isn't the current one pushes. So Game Over's "Play Again" and "Home", and
+> Word Review's "Back to Home", each grew the stack — three rounds left
+> Home → Difficulty → Game → Difficulty → Game → … behind the player, with Android back
+> walking backwards through every finished round. All three now use `popTo`, which is
+> what makes §2's flat Home → Difficulty → Game structure actually flat.
+>
+> **3. Two screens had no back control at all.** With `headerShown: false` stack-wide,
+> Settings and the dev Gallery could only be left by the invisible iOS edge swipe —
+> Android's hardware back always worked, which is why the gap was easy to miss. Both now
+> carry the same `Icon name="back"` control the other screens use. Settings' styling
+> stays WL-407's.
+>
+> Per-screen back behaviour is now documented as a table in `RootNavigator`'s docblock,
+> next to the stack it describes.
+>
+> **Verified on both platforms** (iPhone SE 3rd-gen simulator, `Medium_Phone_API_36.1`
+> emulator — no physical hardware here, same limitation WL-310 is held open for).
+> iOS: back on an untouched round leaves immediately (no dialog); after one played word,
+> both the back control *and* the edge-swipe raise the confirmation without the screen
+> moving; Keep Playing leaves the chain and score intact; Discard lands on Difficulty.
+> Word Review → "Back to Home" lands on Home with nothing beneath it (edge-swipe does
+> nothing), confirming `popTo` unwound rather than pushed. Settings' new control returns
+> to Home. Android: hardware back mid-round raises the same dialog; a second hardware
+> back *cancels* it with the round intact (chain and score unchanged); Discard lands on
+> Difficulty; back from Difficulty reaches Home; back at Home exits to the launcher
+> rather than returning to Welcome. `adb logcat` showed no `FATAL`/`AndroidRuntime`
+> across the session.
+>
+> **Not covered here:** the discarded round isn't *recorded* anywhere — `abandonSession`
+> would only write to state the screen is about to unmount. Once WL-402/403 persist a
+> round, the confirm handler in `GameScreen` is the point that has to mark it
+> `abandoned` before replaying the action, and the same point WL-602's "game abandoned"
+> event belongs at. Marked in the code at that spot.
 
 > **Defect found on-device 2026-08-18 (during WL-107 verification) — FIXED 2026-08-19.**
 > No screen wrapped its content in a safe-area view, so on a notched device the first

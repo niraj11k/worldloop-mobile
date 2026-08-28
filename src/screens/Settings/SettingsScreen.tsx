@@ -3,6 +3,7 @@ import { View, Text, Pressable, Switch } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
 import { ACCOUNTS_ENABLED_V1 } from '@constants/gameConstants';
+import { Icon } from '@components/common/icons/Icon';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
@@ -26,6 +27,21 @@ export function SettingsScreen({ navigation }: Props): React.JSX.Element {
 
   return (
     <View style={{ flex: 1 }}>
+      {/*
+        WL-401: `headerShown` is false for the whole stack, so a screen with
+        no back control of its own leaves iOS users with nothing but the edge
+        swipe — an invisible affordance, and the only way out of this screen
+        on that platform. Android's hardware back always worked, which is
+        exactly why the gap was easy to miss. Styling belongs to WL-407, which
+        owns this screen's real layout; this is the control itself.
+      */}
+      <Pressable
+        onPress={() => navigation.goBack()}
+        accessibilityRole="button"
+        accessibilityLabel="Back">
+        <Icon name="back" />
+      </Pressable>
+
       <Text>Settings</Text>
 
       <View>

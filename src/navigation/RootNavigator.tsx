@@ -33,9 +33,40 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
  * doc section 19 requires iOS safe areas.
  *
  * Applied once here rather than per screen so no future screen can forget
- * it. This is the minimum fix for the defect; WL-401's full pass still owns
- * per-screen back behaviour, and WL-409 owns any screen that later wants to
- * draw deliberately edge-to-edge.
+ * it. WL-409 owns any screen that later wants to draw deliberately
+ * edge-to-edge.
+ *
+ * ## Back behaviour (WL-401)
+ *
+ * `headerShown: false` means there is no platform back button anywhere, so
+ * every screen carries its own control, and Android's hardware back plus the
+ * iOS edge-swipe both resolve through this stack. What "back" does per screen:
+ *
+ * | Screen | Back goes to | Notes |
+ * |---|---|---|
+ * | Welcome | exits the app | stack root on first launch |
+ * | Home | exits the app | Welcome uses `replace`, so Home is the root |
+ * | Difficulty | Home | |
+ * | Game | Difficulty | **confirms first** while a round is in progress |
+ * | HowToPlay | wherever it was opened from | Welcome or Home |
+ * | WordReview | Game Over, or Home | "Back to Home" unwinds with `popTo` |
+ * | Settings | Home | |
+ * | AccountCreation | Settings | modal; dormant behind D-04 |
+ * | Gallery | Home | dev builds only |
+ *
+ * Only the Game row differs from the platform default, and it is the reason
+ * this task exists: Android back and the iOS swipe would otherwise destroy a
+ * round in progress with no warning. `useConfirmBeforeLeave` holds the
+ * navigation action itself rather than guarding any one control, so all three
+ * routes off that screen — control, hardware button, gesture — are covered by
+ * one guard. See that hook, and `isRoundInProgress` for what counts as a
+ * round worth protecting.
+ *
+ * Nothing in this stack `navigate`s backwards. In React Navigation 7 a
+ * `navigate` to a route that is not the current one pushes a duplicate rather
+ * than returning to the instance already below, so returning to an earlier
+ * screen uses `popTo` — the flat Home → Difficulty → Game structure in
+ * Wireframe section 2 is only actually flat if it is unwound that way.
  */
 export function RootNavigator(): React.JSX.Element {
   return (

@@ -60,6 +60,25 @@ export const GAME_OVER_CONTENT: Record<
   },
 };
 
+/**
+ * WL-401's confirm-before-discard copy (Wireframe section 13, "confirm before
+ * restarting or exiting"). The doc states the rule but gives no wording, so
+ * this is written to section 10's reviewed tone — states the consequence
+ * plainly, no scolding, no "are you sure".
+ *
+ * The labels name the outcome rather than answering a question ("Discard
+ * Round" / "Keep Playing", not "Yes" / "No"), so the destructive one is still
+ * unambiguous when a screen reader reads the buttons apart from the message.
+ * Reused by WL-404's Pause screen, whose Exit and Restart discard the same
+ * round in the same way.
+ */
+export const DISCARD_ROUND_CONFIRM = {
+  title: 'Leave this round?',
+  message: 'Your chain and score for this round will be lost.',
+  confirmLabel: 'Discard Round',
+  cancelLabel: 'Keep Playing',
+} as const;
+
 export const MIN_WORD_LENGTH = 3;
 export const HINT_LEVELS: readonly HintLevel[] = [
   'required_letter',

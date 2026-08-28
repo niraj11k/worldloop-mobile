@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import type { RootStackParamList } from '@navigation/types';
+import { Icon } from '@components/common/icons/Icon';
 import { gallery } from './galleryStyles';
 import { ComponentsSection } from './sections/ComponentsSection';
 import { FoundationsSection } from './sections/FoundationsSection';
@@ -59,7 +62,9 @@ const SECTIONS = [
 
 type SectionKey = (typeof SECTIONS)[number]['key'];
 
-export function GalleryScreen(): React.JSX.Element {
+type Props = NativeStackScreenProps<RootStackParamList, 'Gallery'>;
+
+export function GalleryScreen({ navigation }: Props): React.JSX.Element {
   const [active, setActive] = useState<SectionKey>('foundations');
   const reducedMotion = useReducedMotion();
 
@@ -68,7 +73,22 @@ export function GalleryScreen(): React.JSX.Element {
   return (
     <View style={gallery.page}>
       <View style={styles.header}>
-        <Text style={styles.title}>Gallery</Text>
+        {/*
+          WL-401: with `headerShown` false stack-wide, this screen had no back
+          control at all — reachable from Home, leaveable only by the iOS edge
+          swipe or Android's hardware back. Dev-only is not a reason to be the
+          one screen that can strand you.
+        */}
+        <View style={styles.titleRow}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            hitSlop={spacing.sm}>
+            <Icon name="back" />
+          </Pressable>
+          <Text style={styles.title}>Gallery</Text>
+        </View>
 
         <View
           style={[
@@ -133,6 +153,7 @@ const styles = StyleSheet.create({
     borderBottomColor: palette.ink,
     backgroundColor: palette.paper,
   },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   title: { ...typeScale.screenTitle, color: palette.ink },
   banner: {
     borderWidth: borderWidth.thin,
