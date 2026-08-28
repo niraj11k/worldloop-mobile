@@ -22,6 +22,7 @@ import {
   applyComputerCannotMove,
   abandonSession,
   chargeHint,
+  isRoundInProgress,
   isRoundOver,
   usedWords,
 } from '@features/game/gameSession';
@@ -32,17 +33,20 @@ import { replyCountForLetter, exampleWordForHint } from '@features/dictionary/di
 import {
   INVALID_WORD_MESSAGES,
   COMPUTER_TIMEOUT_MESSAGE,
+  DISCARD_ROUND_CONFIRM,
   HINT_LIMIT_PER_ROUND,
 } from '@constants/gameConstants';
 import { Badge } from '@components/common/Badge';
 import { Button } from '@components/common/Button';
 import { Card } from '@components/common/Card';
+import { ConfirmSheet } from '@components/common/ConfirmSheet';
 import { Input } from '@components/common/Input';
 import { Icon } from '@components/common/icons/Icon';
 import { SpringIn } from '@components/common/motion/SpringIn';
 import { ThinkingDots } from '@components/common/motion/ThinkingDots';
 import { HintSheet } from '@components/game/HintSheet';
 import { GameOverPanel } from '@components/game/GameOverPanel';
+import { useConfirmBeforeLeave } from '@hooks/useConfirmBeforeLeave';
 import { palette, spacing, shadow, typeScale } from '@theme/theme';
 import type { GameSessionState, InvalidReason } from '@app-types/game';
 
@@ -173,6 +177,17 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
 
   const lastMove = session.chain[session.chain.length - 1];
   const roundOver = isRoundOver(session);
+  /**
+   * WL-401: every route off this screen — the header back control, Android's
+   * hardware back button, the iOS swipe-back gesture, and Game Over's own
+   * Home / Play Again — is held here until the player confirms, for as long
+   * as there is a round to lose. `isRoundInProgress` goes false the moment
+   * the round ends, so the game-over actions are never gated behind a dialog
+   * asking about a round that is already finished.
+   */
+  const { confirmVisible, confirmLeave, cancelLeave } = useConfirmBeforeLeave(
+    isRoundInProgress(session),
+  );
   const busy =
     session.phase === 'validating' ||
     session.phase === 'valid_move' ||
@@ -445,8 +460,18 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
           {roundOver ? (
             <GameOverPanel
               session={session}
-              onPlayAgain={() => navigation.navigate('Difficulty')}
-              onHome={() => navigation.navigate('Home')}
+              /*
+                `popTo`, not `navigate` (WL-401). In React Navigation 7 a
+                `navigate` to a route that is not the current one *pushes*
+                rather than returning to the existing instance, so playing
+                three rounds left a Home → Difficulty → Game → Difficulty →
+                Game → … stack behind the player, and Android back walked
+                back through every finished round. `popTo` unwinds to the
+                instance already on the stack, which is also what Wireframe
+                section 2's flat Home → Difficulty → Game structure describes.
+              */
+              onPlayAgain={() => navigation.popTo('Difficulty')}
+              onHome={() => navigation.popTo('Home')}
               onReviewWords={() =>
                 navigation.navigate('WordReview', { sessionId: session.sessionId })
               }
@@ -561,6 +586,27 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
         exampleWord={hintExampleWord}
         onUseHint={handleUseHint}
         onCancel={() => setHintSheetVisible(false)}
+      />
+
+      {/*
+        Wireframe section 13's confirm-before-discard rule. `confirmLeave`
+        replays the exact navigation action that was held, so back goes back
+        and Home goes Home.
+
+        The discarded round is not recorded anywhere yet — `abandonSession`
+        would only write to state this screen is about to unmount. WL-402/403
+        own that: once a round is persisted, this is the point that has to
+        mark it `abandoned` before the action is replayed, and it is the same
+        point WL-602's "game abandoned" analytics event belongs at.
+      */}
+      <ConfirmSheet
+        visible={confirmVisible}
+        title={DISCARD_ROUND_CONFIRM.title}
+        message={DISCARD_ROUND_CONFIRM.message}
+        confirmLabel={DISCARD_ROUND_CONFIRM.confirmLabel}
+        cancelLabel={DISCARD_ROUND_CONFIRM.cancelLabel}
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
       />
     </View>
   );

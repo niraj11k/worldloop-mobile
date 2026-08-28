@@ -57,6 +57,26 @@ export function isRoundOver(state: GameSessionState): boolean {
 }
 
 /**
+ * A round that would actually lose something if the player left right now —
+ * what WL-401's confirm-before-discard rule (Wireframe section 13, "do not
+ * lose the chain") is protecting.
+ *
+ * Deliberately narrower than `!isRoundOver`. A round the player hasn't moved
+ * in yet holds nothing but the computer's opening word, which the next round
+ * would deal out again anyway; confirming there would put a dialog between
+ * the player and the Back button on a screen they just opened, which is how a
+ * confirmation stops being read. So "in progress" means the player has
+ * committed at least one valid word.
+ *
+ * Hints are not counted: charging a hint before submitting anything spends a
+ * round-scoped allowance that a new round resets, so leaving at that point
+ * still discards nothing that survives the round.
+ */
+export function isRoundInProgress(state: GameSessionState): boolean {
+  return !isRoundOver(state) && state.chain.some(move => move.actor === 'player');
+}
+
+/**
  * The single place a round's score is finalized, so every ending path — win,
  * loss, draw, abandonment, failure — prices itself the same way (WL-111).
  * `roundEndBonus` decides which of those actually pay out.

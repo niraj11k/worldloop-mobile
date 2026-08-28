@@ -40,7 +40,14 @@ export function WordReviewScreen({ route, navigation }: Props): React.JSX.Elemen
           )}
         />
       )}
-      <Pressable onPress={() => navigation.navigate('Home')}>
+      {/*
+        `popTo`, not `navigate` (WL-401): reached from Game Over, the stack
+        below this screen is Home → Difficulty → Game, and a `navigate` would
+        push a *second* Home on top of all of it in React Navigation 7. `popTo`
+        unwinds to the Home already there, from either entry point (Game Over
+        or Home itself).
+      */}
+      <Pressable onPress={() => navigation.popTo('Home')}>
         <Text>Back to Home</Text>
       </Pressable>
     </View>
