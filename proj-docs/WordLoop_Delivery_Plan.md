@@ -1493,12 +1493,42 @@ phone.
 > per the pattern already established for the WL-105/106/108 budgets and the WL-001/WL-005
 > device matrix.
 
-**WL-304 · Invalid-word feedback** — M · 1.5d · WL-302, WL-107
+**WL-304 · Invalid-word feedback** — M · 1.5d · WL-302, WL-107 — **DONE 2026-08-28**
 All 7 rows of the Wireframe §10 message table, with the exact copy. Input retains the
 submitted word so the player can edit rather than retype. No internal dictionary detail
 leaks into the message.
 *Done when:* each of the 7 reasons produces its specified message and the player can
 recover from every one.
+
+> **DONE 2026-08-28 — audit only, no code changes needed.** Byte-level diff of
+> `gameConstants.ts`'s `INVALID_WORD_MESSAGES` against Wireframe §10's table (script, not
+> eyeball) found all 7 already match exactly, including the curly-quote character in
+> "this game's word list" — copied verbatim back when the rule engine shipped (WL-107).
+> The recovery mechanism (`Input` retains the submitted word, error clears and Submit
+> re-enables once `busy` clears) is the same code path for all 7 reasons, already proven
+> generically in WL-301/WL-303. "No dictionary detail leaks" holds — every message is a
+> fixed string, none echo an internal reason code or dictionary term.
+>
+> **6 of 7 reasons directly triggered and screenshotted on the iPhone SE simulator this
+> session** (`too_short`, `unsupported_symbols`, `proper_noun`, `offensive_excluded` now;
+> `wrong_letter`, `unknown_word` were already hit incidentally during WL-301/302/303
+> testing) — each showed its exact §10 copy and left the word editable. `offensive_excluded`
+> needed a real excluded+dictionary-present word, found by decoding `dictionary.pack.json`'s
+> flag bytes directly rather than guessing (`data/excluded-words.txt` has many single words
+> that turn out not to be in ESDB at all, e.g. `dick`/`erotic`, and produce `unknown_word`
+> instead — a real trap for manual testing, not a bug).
+>
+> **`duplicate` was not directly reached in the UI**, despite real effort: the turn
+> structure means a player can only ever face the required letter the *computer's* last
+> word ended in, never the letter their own last word ended in — so deliberately steering
+> into a repeat isn't controllable, only lucky. Chased it two ways (a 30-move single round
+> hand-picking endings toward already-used start letters, and ~10 fresh-round restarts
+> hoping for a first-letter-equals-last-letter opener to immediately resubmit) without a
+> hit. Confidence instead comes from `__tests__/ruleEngine.test.ts` (`rejects a duplicate
+> word`, plus two tests confirming `duplicate` wins its precedence order over
+> `unknown_word`) — deterministic coverage the UI attempt couldn't be — combined with the
+> shared, already-proven recovery mechanism. Flagged rather than assumed: worth a specific
+> look at WL-310's device pass, where 20 full rounds make a natural repeat far more likely.
 
 **WL-305 · Chain display** — M · 1d · WL-301
 Recent chain plus a "view previous words" expansion. New entries stamp in with a scale-in;
