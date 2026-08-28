@@ -33,6 +33,7 @@ import { Button } from '@components/common/Button';
 import { Card } from '@components/common/Card';
 import { Input } from '@components/common/Input';
 import { Icon } from '@components/common/icons/Icon';
+import { SpringIn } from '@components/common/motion/SpringIn';
 import { ThinkingDots } from '@components/common/motion/ThinkingDots';
 import { palette, spacing, shadow, typeScale } from '@theme/theme';
 import type { GameStatus, InvalidReason } from '@app-types/game';
@@ -258,6 +259,10 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
 
   const submitDisabled = busy || normalizeWord(input).length === 0;
   const chainToShow = showFullChain ? session.chain : session.chain.slice(-6);
+  // Keyed to the actual newest move, not "whichever entry renders last" —
+  // toggling "View previous words" must never animate anything (see
+  // SpringIn's own docblock on this exact constraint).
+  const latestMoveId = session.chain[session.chain.length - 1]?.moveId;
 
   return (
     <View style={styles.screen}>
@@ -357,9 +362,34 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
               </Card>
 
               <View style={styles.chainSection}>
-                <Text style={styles.chainText}>
-                  {chainToShow.map(move => move.normalizedWord).join(' → ')}
-                </Text>
+                {/*
+                  Design System section 5: a valid word "stamps" onto the
+                  chain with a small scale-in, and existing entries must not
+                  reflow or animate. Each entry is its own keyed node (by
+                  `moveId`) so only the genuinely newest one — never whichever
+                  happens to render last, which the "View previous words"
+                  toggle would otherwise get wrong — mounts inside `SpringIn`.
+                  Older entries keep the same key and element type across
+                  renders, so React never remounts (and never replays) them.
+                  Grouped with one accessibility label so a screen reader
+                  hears the chain as a phrase, not N fragments.
+                */}
+                <View
+                  style={styles.chainRow}
+                  accessible
+                  accessibilityLabel={chainToShow
+                    .map(move => move.normalizedWord)
+                    .join(', ')}>
+                  {chainToShow.map((move, index) => {
+                    const word = <Text style={styles.chainText}>{move.normalizedWord}</Text>;
+                    return (
+                      <React.Fragment key={move.moveId}>
+                        {index > 0 && <Text style={styles.chainText}> → </Text>}
+                        {move.moveId === latestMoveId ? <SpringIn>{word}</SpringIn> : word}
+                      </React.Fragment>
+                    );
+                  })}
+                </View>
                 {session.chain.length > 6 && (
                   <Button
                     label={showFullChain ? 'Hide previous words' : 'View previous words'}
@@ -455,7 +485,13 @@ const styles = StyleSheet.create({
   requiredLetterLabel: { ...typeScale.body, color: palette.ink },
   requiredLetter: { ...typeScale.requiredLetter, color: palette.ink },
   chainSection: { alignItems: 'center', gap: spacing.sm },
-  chainText: { ...typeScale.chainWord, color: palette.ink, textAlign: 'center' },
+  chainRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chainText: { ...typeScale.chainWord, color: palette.ink },
   input: { width: '100%' },
   statusMessage: { ...typeScale.body, color: palette.ink, textAlign: 'center' },
   actionsRow: {
