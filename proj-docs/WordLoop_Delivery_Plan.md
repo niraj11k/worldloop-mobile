@@ -1562,12 +1562,47 @@ existing entries must not reflow or animate (Design System §5).
 > per-item measurement step regardless of count, so there's no structural reason it
 > would thrash, but a literal 30-word visual check is left for WL-310's device pass.
 
-**WL-306 · Computer turn orchestration** — M · 1.5d · WL-302, WL-109
+**WL-306 · Computer turn orchestration** — M · 1.5d · WL-302, WL-109 — **DONE 2026-08-28**
 Thinking state, a deliberate minimum think delay so instant responses don't feel
 mechanical, and the Wireframe §17 timeout state ("taking longer than expected" with Try
 Again / End Round).
 *Done when:* the thinking indicator is always visible for the minimum duration, and the
 timeout path is reachable and recoverable.
+
+> **DONE 2026-08-28.** The minimum think delay (`COMPUTER_THINK_MS`, 350ms) already
+> existed from WL-301 and needed no change — no doc gives a figure to tune it against,
+> so real timing tuning stays WL-605's, same posture `theme/motion.ts` already takes for
+> its own first-pass values. The real work was the timeout path, built from scratch:
+> `GameScreen`'s computer-turn body (think delay → candidate generation → selection) was
+> extracted into `runComputerTurn`, which `attemptComputerTurn` races against a new
+> `COMPUTER_TURN_TIMEOUT_MS` (5000ms, explicitly untuned — no doc gives a number here
+> either). If the timeout wins, `computerTimedOut` (screen-local `useState`, not a new
+> `TurnPhase` — WL-302 already closed that union at seven values, and Wireframe §17
+> states are explicitly outside it) shows "WordLoop is taking longer than expected." with
+> Try Again (`attemptComputerTurn(session)` — while timed out, `session` is still exactly
+> the `thinking` state from `beginComputerTurn`, so no extra ref was needed) and End Round
+> (reuses the existing `abandonSession`, already handled by the WL-301/302 round-over
+> rendering).
+>
+> **Can't fire during real play today, by design**: the computer's work is synchronous
+> JS with no network or real async risk, and WL-108/109 measured it under 60ms worst-case
+> on real hardware — same category as `technical_failure`, a safety net for a slower
+> device or a future async dictionary lookup, not a response to an observed problem.
+> Verified by the same pattern WL-003 used for crash-reporting (temporary instrumentation,
+> confirmed working, then reverted — here, temporarily setting the constant to `1`):
+> confirmed the exact §17 copy and both buttons render, **Try Again** re-enters cleanly
+> (times out again immediately at that threshold, no error, no double-fire), and **End
+> Round** reaches the existing `abandoned` round-over card with no leftover timeout UI
+> underneath it — that last part needed an explicit `computerTimedOut` reset in the End
+> Round handler, since `currentWordRow` renders unconditionally outside the `roundOver`
+> branch and would otherwise show both at once. Constant confirmed back at `5000` before
+> finishing; `git status`/diff show no leftover test value.
+>
+> **Doc overlap flagged, not silently resolved:** WL-506 (Phase 5) also lists "computer
+> timeout" among its three Wireframe §17 states, with a vaguer "reachable in a test build"
+> criterion. Given WL-306's own criterion is the more specific one (*reachable and
+> recoverable* — i.e. actually built and working) and comes first, WL-506 should treat
+> this state as already built and re-verify it alongside the other two, not rebuild it.
 
 **WL-307 · Hint sheet, levels 1–3** — M · 1.5d · WL-204, WL-108
 Wireframe §11 bottom sheet with hint levels 1–3 (required letter, count of available
@@ -1725,6 +1760,11 @@ Wireframe §17: offline notice, dictionary unavailable, computer timeout. Under 
 app is offline-native, so these are mostly reassurance rather than degradation — worth
 stating plainly to the player.
 *Done when:* each state is reachable in a test build and none of them blocks play.
+
+> **Note (flagged at WL-306, 2026-08-28):** the computer-timeout state is already built
+> as of WL-306 — `GameScreen`'s `computerTimedOut`/`attemptComputerTurn`, Try Again/End
+> Round both working. This task re-verifies it alongside offline notice and dictionary
+> unavailable (which are still unbuilt), not a second build.
 
 ---
 
