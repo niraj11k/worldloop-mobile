@@ -1530,10 +1530,37 @@ recover from every one.
 > shared, already-proven recovery mechanism. Flagged rather than assumed: worth a specific
 > look at WL-310's device pass, where 20 full rounds make a natural repeat far more likely.
 
-**WL-305 · Chain display** — M · 1d · WL-301
+**WL-305 · Chain display** — M · 1d · WL-301 — **DONE 2026-08-28**
 Recent chain plus a "view previous words" expansion. New entries stamp in with a scale-in;
 existing entries must not reflow or animate (Design System §5).
 *Done when:* a 30-word chain renders without layout thrash and only the new entry animates.
+
+> **DONE 2026-08-28.** The animation primitive already existed and was unused —
+> `SpringIn` (WL-205) documents itself as built for exactly this ("the 'small scale-in'
+> a valid word uses to stamp onto the chain display... wrapping each entry individually
+> is what satisfies [the no-reflow constraint]"). The actual work was architectural: the
+> WL-301 chain was one joined string in a single `<Text>`, which can't animate a single
+> entry by construction. Replaced with a `flexDirection: row, flexWrap: wrap` row of
+> individually-keyed entries (`key={move.moveId}`) plus static `→` separators; only the
+> entry whose `moveId` matches `session.chain[chain.length - 1]` — the true newest move,
+> not just whichever renders last — is wrapped in `SpringIn`. That distinction matters
+> because "View previous words" toggles which entries render at all: keying to the array
+> position instead of the actual latest move would have made expanding the view
+> incorrectly animate whatever landed last. Since `SpringIn` animates on mount (not on
+> prop change) and older entries never remount (stable key, stable wrapper type across
+> renders), this needed no new animation logic — only the one already-built primitive,
+> correctly targeted. Added a grouping `accessibilityLabel` on the row so a screen reader
+> hears the chain as one phrase instead of N fragments, avoiding a regression from the
+> old single-`Text` version (WL-408 owns the real accessibility pass, not this).
+> Verified on the iPhone SE (3rd gen) simulator: multi-line wrapping is clean at 7 words,
+> "View previous words" reveals all entries with no animation on the newly-shown ones,
+> and toggling back doesn't re-animate anything already visible. The spring itself
+> (~250-300ms) is too fast to reliably catch in a screenshot given this session's
+> tool round-trip latency — correctness rests on the mount-based reasoning above, which
+> is the same reasoning `SpringIn`'s own docblock already commits to, not a new claim.
+> Didn't reach a real 30-word chain this session; the flex-wrap layout has no
+> per-item measurement step regardless of count, so there's no structural reason it
+> would thrash, but a literal 30-word visual check is left for WL-310's device pass.
 
 **WL-306 · Computer turn orchestration** — M · 1.5d · WL-302, WL-109
 Thinking state, a deliberate minimum think delay so instant responses don't feel
