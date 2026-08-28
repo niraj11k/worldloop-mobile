@@ -59,6 +59,7 @@ src/
   screens/         One folder per screen, matches Wireframe doc naming.
   components/
     common/        Shared UI: Button, Card, Input, Badge, BottomSheet (WL-204)
+      icons/       The custom icon set — no stock icon library (WL-207)
       motion/      Reduced-motion-aware animation primitives (WL-205)
     game/           Game-specific overlays (HintSheet, etc.)
     account/        Account-flow specific UI (not yet populated)
@@ -413,3 +414,34 @@ The one exception to token-only styling is the Type tab, which must render
 text at arbitrary sizes and with *no* `fontFamily` to compare against the
 platform default. It carries a narrow lint exemption scoped to that single
 file.
+
+## Icons (WL-207)
+
+`src/components/common/icons/Icon.tsx` — eight glyphs: settings, back, pause,
+hint, close, sound, haptics, alert. **There is no icon library and no SVG
+renderer**; Design System §7 rejects stock icon sets, and the glyphs are drawn
+from plain Views.
+
+That's not dependency-avoidance for its own sake. §7 asks for strokes
+"matching the border weight used on components", and View-drawn icons use
+`borderWidth.base` and `palette` — the same tokens the components do — so the
+match is enforced rather than eyeballed. An SVG would hard-code a stroke width
+that silently stops matching when the border scale is retuned.
+
+**If the set ever needs organic or illustrative shapes, that's the point to add
+`react-native-svg`** — not to keep torturing Views. Callers only ever see
+`<Icon name=… />`. `__tests__/icons.test.ts` asserts the current absence of
+both an icon library and an SVG renderer, so adding either is a deliberate
+change rather than a silent one.
+
+Two rules when using them:
+
+- **Icon-only controls carry their own `accessibilityLabel`.** The glyph is
+  decorative and hidden from assistive tech — a gear is only "Settings" in
+  context.
+- **Never use an emoji as an icon.** Lint rejects pictographic emoji in screens
+  and components (arrows are exempt, since they appear in real prose). Beyond
+  §7, emoji render as tofu boxes wherever the platform lacks the glyph.
+
+`ICON_NAMES` is a runtime value, so the gallery renders the whole set
+automatically — a new glyph can't be added without appearing there for review.

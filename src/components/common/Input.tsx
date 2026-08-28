@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import type { StyleProp, TextInputProps, ViewStyle } from 'react-native';
 
+import { Icon } from '@components/common/icons/Icon';
 import {
   palette,
   inkMuted,
@@ -93,14 +94,17 @@ export function Input({
           accessibilityRole="alert"
           accessibilityLiveRegion="assertive">
           {/*
-            A typographic marker, not an icon from a library: §7 rejects stock
-            icon sets, and the custom set is WL-207. This is the same reasoning
-            §5 gives for the 3-dot "thinking" indicator over a spinner. WL-207
-            may replace it with a drawn glyph.
+            The drawn `alert` glyph from the WL-207 set, replacing the
+            typographic `!` WL-204 shipped as a placeholder.
+
+            No filled badge behind it: the glyph already carries a ring, so
+            wrapping it in a second bordered circle produced two concentric
+            rings at 20pt, which reads as mud rather than as an alert. Drawn in
+            `red-alert` directly — that pairing is already in the contrast
+            matrix as a non-text row ("Input ERROR border + error icon", 3.42:1
+            against `paper`), clearing 1.4.11's 3:1 for a graphical object.
           */}
-          <View style={styles.errorMarker}>
-            <Text style={styles.errorMarkerText}>!</Text>
-          </View>
+          <Icon name="alert" size={20} color={palette.redAlert} />
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
@@ -131,18 +135,5 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.sm,
   },
-  errorMarker: {
-    width: 20,
-    height: 20,
-    borderRadius: radius.pill,
-    backgroundColor: palette.redAlert,
-    borderWidth: borderWidth.thin,
-    borderColor: palette.ink,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // `ink` on `red-alert` is 5.05:1 (WL-202); `paper` would be 3.42:1 and fail
-  // at this size.
-  errorMarkerText: { ...typeScale.caption, color: palette.ink },
   errorText: { ...typeScale.caption, color: palette.ink, flexShrink: 1 },
 });

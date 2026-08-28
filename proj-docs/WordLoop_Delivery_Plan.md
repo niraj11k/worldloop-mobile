@@ -1288,11 +1288,72 @@ looking fine while the tokens underneath it broke.
 > WL-205. The only genuinely new surface here is a tab bar built from already-verified
 > tokens.
 
-**WL-207 · Custom iconography** — M · 2d · WL-203
+**WL-207 · Custom iconography** — M · 2d · WL-203 — **DONE 2026-08-27**
 Design System §7 rejects Material/Feather-style line icons. Needs a small custom set
 (settings, back, pause, hint, close, sound, haptics) at 3–4px single-weight strokes
 matching component border weight.
 *Done when:* every icon in the app is from this set; no stock icon library is a dependency.
+✅ — `src/components/common/icons/Icon.tsx`, eight glyphs, verified on an iPhone 17 Pro
+simulator via the gallery's Components tab.
+
+**Drawn from Views, not SVG — and §7's own wording is the reason.** It does not ask for
+illustration; it asks for strokes *"matching the border weight used on components (3-4px)"*.
+Built from Views, these icons literally use `borderWidth.base` and `palette`, the same
+tokens the components do, so "matching" is enforced rather than eyeballed — an SVG would
+hard-code a stroke width that silently stops matching the day the border scale is retuned.
+Every glyph is bars, rings, arcs and one triangle, which is what Views draw cleanly, so
+this is not a case of contorting a design to dodge a dependency. It also avoids adding
+`react-native-svg` — a native dependency with a pod install, a Gradle surface and a CI
+native-build risk — for eight glyphs.
+
+> **The escape hatch is documented in the file, not left implicit:** if the set ever needs
+> organic or illustrative shapes (§7 also contemplates illustration for empty states), that
+> is the point to add `react-native-svg`, not to keep torturing Views. Callers use
+> `<Icon name=… />` and never see the implementation, so nothing here makes that harder.
+> `__tests__/icons.test.ts` asserts the *current* absence of an SVG renderer, so adding one
+> becomes a deliberate change with a reason attached rather than something that arrives
+> alongside an unrelated package.
+
+**An eighth icon beyond §7's list, flagged rather than slipped in: `alert`.** §4's Input
+error state requires "an icon/text label" beside the message, and WL-204 shipped a
+typographic `!` as an acknowledged placeholder pending this task. §7's list reads as
+illustrative ("a small custom set") rather than exhaustive, so this is an addition, not a
+contradiction — but it is the one icon the doc's own list was missing for a component that
+already shipped.
+
+**Everything replaced:** `⚙` on Home, `←` and `⏸` on Game, and Input's typographic `!`.
+Icon-only controls now carry their own `accessibilityLabel` and the glyphs are hidden from
+assistive tech — a gear is only "Settings" in context, and exposing each glyph as its own
+focusable node would add unlabelled stops to the traversal order. Game's pause glyph is
+deliberately *not* wrapped in a `Pressable`: WL-404 builds the Pause screen, and advertising
+a tap target that does nothing is worse than showing none.
+
+**"Every icon in the app is from this set" is now enforced, not just done once.** Two
+`no-restricted-syntax` selectors reject pictographic emoji in `JSXText` and string literals
+across screens and components. Arrows (`→`) are deliberately *not* on the list because they
+appear in real prose — negative-tested with a probe file containing four emoji icons and one
+line of arrow prose: four errors, prose untouched. This also catches a second problem, which
+is that emoji render as tofu boxes wherever the platform lacks the glyph — the `⚙` and the
+gallery's own `🎨` were both doing exactly that on the simulator.
+
+> **Two things the on-device pass changed, both found by looking rather than by a test.**
+> `hint` first tapered its base bars (neck wider than base), which is backwards for a bulb
+> and made the glyph read closer to a ♀ symbol than a light; the threads are now equal-width
+> and clearly below. And Input's error marker initially kept WL-204's filled red badge
+> *around* the new `alert` glyph — which has its own ring — producing two concentric rings
+> at 20pt that read as mud. The badge is gone; the glyph is drawn in `red-alert` directly,
+> a pairing the contrast matrix already covers as a non-text row ("Input ERROR border +
+> error icon", 3.42:1, clearing 1.4.11's 3:1 for a graphical object).
+
+**`ICON_NAMES` is a runtime value, not only a type**, so the gallery iterates the whole set
+rather than listing it by hand — a new glyph appears for review automatically and cannot be
+added without being seen. Stroke weight scales with the box (floor `borderWidth.base`,
+`size / 8` above that), because a 3px stroke in a 48pt box reads as spindly; "single-weight"
+means every icon shares one weight at a given size, not that weight never responds to size.
+Checked at 16/24/48pt in the gallery.
+
+> **iOS-only verification, same proportionality call as WL-206** — the glyphs are Views
+> using already-Android-verified tokens, and the gallery that displays them is dev-only.
 
 ---
 
