@@ -54,6 +54,13 @@ jobs:
       - name: Font integrity gate
         run: npm run fonts:verify
 
+      # WL-407: the attribution notices in Settings are licence obligations,
+      # and their sources live outside the app — the licence review doc and
+      # the bundled OFL files. A paraphrase in the app copy satisfies nobody
+      # and looks perfectly fine on screen, so it is checked here instead.
+      - name: Attribution notices gate
+        run: npm run attributions:verify
+
       # Fails on any advisory that is not a reviewed, unexpired exception in
       # audit-allowlist.json, and on exceptions that have gone stale. See the
       # "Dependency audit state" section of README.md.

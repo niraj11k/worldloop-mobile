@@ -169,6 +169,34 @@ export const HOW_TO_PLAY_RULES = [
   'Stuck? Use a hint — {hints} per round.',
 ] as const;
 
+/**
+ * Wireframe section 16's two destructive settings (WL-407). Both confirm
+ * first, like every other way a player can lose something (WL-401's rule).
+ *
+ * They are separate actions with separate warnings because they destroy
+ * different things: a reset clears the scoreboard, a deletion ends the guest.
+ * The deletion message itemises what goes, as the Guest Deletion doc's own
+ * wireframe does — "explain what will be deleted and require confirmation" —
+ * and says plainly that the words go too, since `resetStatistics`
+ * deliberately keeps those and a player who has done both should be able to
+ * tell them apart.
+ */
+export const RESET_STATISTICS_CONFIRM = {
+  title: 'Reset statistics?',
+  message:
+    'Your scores, streak, and game history will be cleared. Words you have discovered are kept.',
+  confirmLabel: 'Reset',
+  cancelLabel: 'Cancel',
+} as const;
+
+export const DELETE_GUEST_DATA_CONFIRM = {
+  title: 'Delete your data?',
+  message:
+    'This deletes your scores, game history, discovered words, and settings from this device, and starts a new guest. It cannot be undone.',
+  confirmLabel: 'Delete',
+  cancelLabel: 'Cancel',
+} as const;
+
 export const MIN_WORD_LENGTH = 3;
 export const HINT_LEVELS: readonly HintLevel[] = [
   'required_letter',

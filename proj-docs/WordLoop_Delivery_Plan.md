@@ -2243,7 +2243,7 @@ apple→elephant→table example, not abstract rules.
 > reinstall → first launch again), since that is the part with a rule rather than a
 > layout. 360 tests pass.
 
-**WL-407 · Settings screen** — M · 1.5d · WL-405, D-05
+**WL-407 · Settings screen** — M · 1.5d · WL-405, D-05 — **DONE 2026-08-29**
 Wireframe §16 minus whatever D-04 and D-05 remove: sound, haptics, text size, reset
 statistics, privacy policy, terms, report a word, contact support. Plus the Attributions
 screen carrying the WL-101 notices, and "Delete guest data" per the Guest Deletion doc.
@@ -2253,6 +2253,77 @@ screen carrying the WL-101 notices, and "Delete guest data" per the Guest Deleti
 "Continue as guest," gated behind `ACCOUNTS_ENABLED_V1`, ahead of the rest of this task.
 *Done when:* every toggle persists and takes effect immediately; reset and delete both
 confirm first.
+
+> **DONE 2026-08-29.** Settings rebuilt on the WL-204 component set, plus a new
+> `Attributions` route carrying the notices this project has taken on.
+>
+> **Four notices, not three.** ESDB and WordNet (WL-101), LDNOOBW under CC-BY-4.0
+> (WL-104) — and the two OFL fonts, which Design System §2 assigns to this screen and
+> this task's line above does not mention. OFL 1.1 requires the licence text itself to
+> travel with the software, so the full body ships, not a reference to it; both fonts
+> carry byte-identical licence bodies and differ only in their copyright line, hence one
+> entry with two copyright lines rather than two near-duplicate entries.
+>
+> **The notices are copied from their sources, and CI proves they stay that way.** A
+> paraphrase satisfies nobody and looks perfectly fine on screen, so
+> `npm run attributions:verify` re-reads the licence review and `licenses/fonts/` and
+> fails on any drift — a script beside `contrast:verify` and `fonts:verify` rather than a
+> Jest test, because it reads repository files the app never sees and this TypeScript
+> project has no Node types. Added to the CI `verify` job. A smaller Jest suite covers
+> what is about the app rather than the documents: that all four entries exist, each has
+> something a player can read, and the CC-BY entry names work, source, licence, and the
+> fact that WordLoop modified the list.
+>
+> **Notices are re-wrapped but not rewritten.** They are typed for an 80-column terminal,
+> and every hard line break lands mid-sentence on a phone, which then wraps the wrapped
+> line — the first render looked broken rather than legal. Each paragraph is now reflowed
+> at display time (single newlines become spaces, blank lines stay paragraph breaks).
+> The *stored* text is untouched and byte-identical to source, which is what the verifier
+> checks; the obligation is that the notice appear, not that it appear 78 characters
+> wide.
+>
+> **Toggles are buttons, because the design system has no toggle.** §4 defines buttons,
+> cards, modals, inputs and badges and nothing else, and Wireframe §16 itself draws each
+> setting as `Sound [On]`. So a setting is a `Button` whose label is its state: `grape`
+> and "ON", or `paper` and "OFF" — state carried by both word and fill, never colour
+> alone. That is right to look at and wrong to *announce* ("Sound, ON, button" leaves the
+> listener guessing whether ON is the state or the outcome), so `Button` gained an
+> optional `role="switch"` + `checked`, changing nothing else about it. **Flagged as a
+> Design System gap**: if toggles spread beyond this screen, §4 should either define a
+> real toggle or record this substitution.
+>
+> Both toggles persist through the guest profile (WL-402's `useSettingsStore`), which is
+> what makes §16's "takes effect immediately" true — verified by toggling Sound off and
+> reading `soundEnabled: false` straight out of the app's MMKV file.
+>
+> **Text size is a statement, not a control**: the app already scales with the OS
+> setting, and a second in-app scale would be a competing source of truth. WL-408 owns
+> making that scaling *usable* at the extremes.
+>
+> **What §16 lists that is deliberately not here.** A row that opens nothing is worse
+> than a row that is not there, so each is omitted and tracked instead:
+> **Report a word** → WL-505, which depends on this task and owns both its entry points.
+> **Privacy policy** and **Terms of use** → WL-801, whose own "done when" is that both
+> documents are live *and linked in-app*; nothing exists to link to yet.
+> **Contact / support** → **no owner and no decision**: §16 lists it, but no project
+> document names a support address. Added to the Store Submission Checklist as a gap
+> rather than invented here.
+>
+> Reset Statistics and Delete My Data both confirm through WL-401's `ConfirmSheet`, with
+> separate copy because they destroy different things — a reset clears the scoreboard and
+> keeps discovered words (`resetStatistics`'s own rule), a deletion ends the guest and
+> itemises what goes, as the Guest Deletion doc's wireframe requires.
+>
+> **Verified on both platforms.** iPhone SE simulator: toggled Sound off and confirmed
+> `settings.soundEnabled: false` on disk; both destructive dialogs appear with their own
+> copy; Delete My Data replaced the stored profile with a fresh guest and defaults back
+> on (`soundEnabled: true`), which is also proof that settings are part of what deletion
+> removes; Attributions renders all four notices including the full OFL clause list.
+> Android emulator: identical rendering, no `FATAL`/`AndroidRuntime` in `adb logcat`.
+>
+> **Store Submission Checklist updated**: the "attribution notices actually shipped
+> in-app" row is now ✅, with new rows for the CI drift gate, the LDNOOBW creator
+> question, and the missing support contact.
 
 **WL-408 · Accessibility pass** — L · 2.5d · all Phase 3
 Wireframe §18: screen-reader labels on every control, error announcements via live region,

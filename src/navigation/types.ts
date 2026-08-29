@@ -22,6 +22,12 @@ export type RootStackParamList = {
   HowToPlay: undefined;
   WordReview: { sessionId: string };
   Settings: undefined;
+  /**
+   * The licence notices WordLoop is obliged to display (WL-407). A route of
+   * its own rather than a sheet: it is long, it is read rarely and slowly,
+   * and store review looks for it.
+   */
+  Attributions: undefined;
   AccountCreation: { entryPoint: AccountEntryPoint };
   /** Dev-only component gallery (WL-206); not registered in release builds. */
   Gallery: undefined;
