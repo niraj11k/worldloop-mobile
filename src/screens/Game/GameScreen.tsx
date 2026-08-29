@@ -35,6 +35,7 @@ import {
   COMPUTER_TIMEOUT_MESSAGE,
   DISCARD_ROUND_CONFIRM,
   HINT_LIMIT_PER_ROUND,
+  RESTART_ROUND_CONFIRM,
 } from '@constants/gameConstants';
 import { Badge } from '@components/common/Badge';
 import { Button } from '@components/common/Button';
@@ -46,6 +47,7 @@ import { SpringIn } from '@components/common/motion/SpringIn';
 import { ThinkingDots } from '@components/common/motion/ThinkingDots';
 import { HintSheet } from '@components/game/HintSheet';
 import { GameOverPanel } from '@components/game/GameOverPanel';
+import { PauseSheet } from '@components/game/PauseSheet';
 import { useConfirmBeforeLeave } from '@hooks/useConfirmBeforeLeave';
 import { useProfileStore } from '@store/useProfileStore';
 import { useSavedRoundStore } from '@store/useSavedRoundStore';
@@ -128,14 +130,15 @@ const FALLBACK_STARTING_WORD = 'apple';
  * Wireframe section 10 (WL-304); the chain stamps in without reflowing older
  * entries (WL-305); the computer's turn has a minimum think delay and
  * Wireframe section 17's timeout/retry path (WL-306, see
- * `COMPUTER_TURN_TIMEOUT_MS`). Still pending: the full 5-state game-over
- * screen (WL-308) — today's round-over branch is two minimal
- * messages-plus-action, not that.
+ * `COMPUTER_TURN_TIMEOUT_MS`); the hint sheet is wired (WL-307); and the
+ * round-over branch is `GameOverPanel`, covering all five Wireframe section
+ * 14 result states (WL-308).
  *
- * The round now both reads from and writes to the guest profile (WL-402):
- * the personal-best baseline comes in at session creation, and a finished
- * round is folded back in once. Not yet wired: the definition overlay, and
- * saving a round *in progress* so it survives leaving the app (WL-403).
+ * The round both reads from and writes to the guest profile (WL-402) — the
+ * personal-best baseline comes in at session creation and a finished round is
+ * folded back in once — and is saved after every change so it survives the
+ * app being killed (WL-403). Pause is wired to the four Wireframe section 13
+ * actions (WL-404). Not yet wired: the definition overlay (Phase 5).
  */
 export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   const { difficulty } = route.params;
@@ -189,6 +192,9 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   const [showFullChain, setShowFullChain] = useState(false);
   const [computerTimedOut, setComputerTimedOut] = useState(false);
   const [hintSheetVisible, setHintSheetVisible] = useState(false);
+  /** WL-404: Wireframe section 13's pause sheet, and Restart's confirmation. */
+  const [pauseSheetVisible, setPauseSheetVisible] = useState(false);
+  const [confirmRestart, setConfirmRestart] = useState(false);
   /**
    * Whether the hint sheet was used this turn — carried through an invalid
    * resubmission (only a genuine new turn resets it, below) so the penalty
@@ -218,17 +224,19 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
 
   const lastMove = session.chain[session.chain.length - 1];
   const roundOver = isRoundOver(session);
+  /** Is there anything here the player would mind losing? (WL-401) */
+  const roundInProgress = isRoundInProgress(session);
   /**
    * WL-401: every route off this screen — the header back control, Android's
-   * hardware back button, the iOS swipe-back gesture, and Game Over's own
-   * Home / Play Again — is held here until the player confirms, for as long
-   * as there is a round to lose. `isRoundInProgress` goes false the moment
-   * the round ends, so the game-over actions are never gated behind a dialog
-   * asking about a round that is already finished.
+   * hardware back button, the iOS swipe-back gesture, Game Over's own Home /
+   * Play Again, and Pause's Exit to Home (WL-404) — is held here until the
+   * player confirms, for as long as there is a round to lose.
+   * `isRoundInProgress` goes false the moment the round ends, so the
+   * game-over actions are never gated behind a dialog asking about a round
+   * that is already finished.
    */
-  const { confirmVisible, confirmLeave, cancelLeave } = useConfirmBeforeLeave(
-    isRoundInProgress(session),
-  );
+  const { confirmVisible, confirmLeave, cancelLeave } =
+    useConfirmBeforeLeave(roundInProgress);
   const busy =
     session.phase === 'validating' ||
     session.phase === 'valid_move' ||
@@ -431,6 +439,45 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   };
 
   /**
+   * Wireframe section 13's Restart, after the player confirms it (WL-404).
+   *
+   * Rebuilds the round in place rather than re-entering the route: a
+   * `replace('Game', …)` would remove this screen, which WL-401's guard would
+   * intercept with "Leave this round?" — a second dialog asking about the
+   * round the player has just agreed to give up. Everything a round owns is
+   * reset here, including the two refs, so the new round is indistinguishable
+   * from one started from the Difficulty screen.
+   *
+   * The round being replaced is recorded as `abandoned` first, the same way
+   * leaving records it (WL-402) — a round given up is a round given up,
+   * whichever control did it. `previousBestChainLength` is re-read for the
+   * new round, since a best set since this screen mounted should count
+   * against the round starting now.
+   */
+  const handleRestart = () => {
+    if (!roundRecordedRef.current) {
+      recordRound(abandonSession(session));
+    }
+    roundRecordedRef.current = false;
+
+    setSession(
+      createSession({
+        sessionId: `local-${Date.now()}`,
+        difficulty,
+        previousBestChainLength: useProfileStore.getState().profile?.bests.chainLength ?? null,
+        startingWord: nextStartingWord() ?? FALLBACK_STARTING_WORD,
+      }),
+    );
+    setInput('');
+    latestInputRef.current = '';
+    setErrorReason(null);
+    setShowFullChain(false);
+    setComputerTimedOut(false);
+    setHintUsedThisTurn(false);
+    setConfirmRestart(false);
+  };
+
+  /**
    * Wireframe section 17: End Round from the timeout state. Resets
    * `computerTimedOut` explicitly — `currentWordRow` renders unconditionally
    * (outside the `roundOver` branch), so without this the timeout UI and the
@@ -515,11 +562,31 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
         </Pressable>
         <Badge label={difficulty.toUpperCase()} />
         {/*
-          Not yet a control — WL-404 builds the Pause screen and wires this up.
-          Rendered without a Pressable on purpose, so it does not advertise a
-          tap target that does nothing.
+          WL-404. Unavailable while a turn is resolving, and that is doing
+          real work rather than being fussy: `attemptComputerTurn` has a
+          promise in flight that will `setSession` an absolute value when it
+          lands, so a Restart taken mid-turn would be overwritten seconds
+          later by the round it just replaced. Blocking the entry point makes
+          that unreachable, and it is also the nearest thing this build has to
+          Wireframe section 13's "pause computer timers if timers are added
+          later" — the only live timer is that turn.
+
+          The window is one turn (a few hundred milliseconds), and the control
+          keeps its glyph while disabled: Design System section 4 rejects
+          opacity for disabled states, and an icon has no fill or shadow to
+          drop instead. `accessibilityState` carries it to assistive tech
+          regardless; a visual treatment for disabled icon controls is
+          WL-408's to design once, for all of them.
         */}
-        <Icon name="pause" />
+        <Pressable
+          onPress={() => setPauseSheetVisible(true)}
+          disabled={busy || roundOver}
+          accessibilityRole="button"
+          accessibilityLabel="Pause"
+          accessibilityState={{ disabled: busy || roundOver }}
+          hitSlop={spacing.sm}>
+          <Icon name="pause" />
+        </Pressable>
       </View>
 
       {/*
@@ -697,6 +764,58 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/*
+        Wireframe section 13. Every action closes the sheet first so no
+        dialog has to render on top of it.
+
+        Exit to Home deliberately has no confirmation of its own: `popTo` is
+        exactly the navigation WL-401's guard intercepts, so the player gets
+        the same "Leave this round?" dialog the back button raises — one
+        question, asked once, in one wording. Restart isn't a navigation, so
+        it confirms below.
+      */}
+      <PauseSheet
+        visible={pauseSheetVisible}
+        onResume={() => setPauseSheetVisible(false)}
+        onHowToPlay={() => {
+          setPauseSheetVisible(false);
+          navigation.navigate('HowToPlay');
+        }}
+        onRestart={() => {
+          setPauseSheetVisible(false);
+          // Same rule the leave guard uses, for the same reason: a round the
+          // player hasn't moved in holds only the computer's opener, and
+          // asking them to confirm giving up nothing is how a confirmation
+          // stops being read. Restarting there is a reroll, not a loss.
+          if (roundInProgress) {
+            setConfirmRestart(true);
+          } else {
+            handleRestart();
+          }
+        }}
+        onExit={() => {
+          setPauseSheetVisible(false);
+          navigation.popTo('Home');
+        }}
+      />
+
+      {/*
+        Cancelling puts the player back in the pause sheet they came from —
+        they declined the restart, not the pause.
+      */}
+      <ConfirmSheet
+        visible={confirmRestart}
+        title={RESTART_ROUND_CONFIRM.title}
+        message={RESTART_ROUND_CONFIRM.message}
+        confirmLabel={RESTART_ROUND_CONFIRM.confirmLabel}
+        cancelLabel={RESTART_ROUND_CONFIRM.cancelLabel}
+        onConfirm={handleRestart}
+        onCancel={() => {
+          setConfirmRestart(false);
+          setPauseSheetVisible(true);
+        }}
+      />
 
       <HintSheet
         visible={hintSheetVisible}

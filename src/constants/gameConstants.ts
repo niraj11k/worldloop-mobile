@@ -96,6 +96,23 @@ export const START_NEW_ROUND_CONFIRM = {
   cancelLabel: 'Cancel',
 } as const;
 
+/**
+ * WL-404: Pause's Restart, the third place a round can be given up
+ * (Wireframe section 13, "confirm before restarting or exiting").
+ *
+ * Restart gets its own copy rather than reusing `DISCARD_ROUND_CONFIRM`
+ * because the two answer different questions: leaving asks whether to give up
+ * the round, restarting asks whether to trade it for another one. Exit to
+ * Home has no copy of its own at all — it is a navigation, so WL-401's
+ * "Leave this round?" already covers it.
+ */
+export const RESTART_ROUND_CONFIRM = {
+  title: 'Restart this round?',
+  message: 'Your chain and score for this round will be lost, and a new word dealt.',
+  confirmLabel: 'Restart',
+  cancelLabel: 'Keep Playing',
+} as const;
+
 export const MIN_WORD_LENGTH = 3;
 export const HINT_LEVELS: readonly HintLevel[] = [
   'required_letter',

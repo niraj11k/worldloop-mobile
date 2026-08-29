@@ -2054,9 +2054,70 @@ round state including chain, score, and hints used.
 > mid-computer-turn restore, which is the one case too fast to trigger by hand (the
 > window is one 350ms think delay).
 
-**WL-404 · Pause screen** — S · 1d · WL-401
+**WL-404 · Pause screen** — S · 1d · WL-401 — **DONE 2026-08-29**
 Wireframe §13: Resume, How to Play, Restart, Exit to Home. Confirm before restart or exit.
 *Done when:* all four actions work and both destructive ones confirm first.
+
+> **DONE 2026-08-29.** `PauseSheet` on the existing `BottomSheet`, the same tier as the
+> Hint sheet — `navigation/types.ts` already placed Pause there rather than in
+> `RootStackParamList`. That is also what satisfies §13's first requirement ("preserve
+> the current game state") by construction: the round stays mounted underneath, so there
+> is nothing to save and reload in order to show four buttons.
+>
+> **Only one of the two destructive actions has a confirmation of its own.** Exit to
+> Home is a navigation, and WL-401's guard already holds every route off the game screen
+> behind "Leave this round?" — so Exit simply performs the `popTo` and lets that dialog
+> do the asking. Adding a second, near-identical dialog first would ask the same question
+> twice in a row, in two wordings. Restart is not a navigation and nothing else guards
+> it, so it confirms (`RESTART_ROUND_CONFIRM`, distinct copy: leaving asks whether to
+> give up the round, restarting asks whether to trade it for another).
+>
+> Both destructive actions skip the confirmation when the player hasn't moved yet — the
+> same `isRoundInProgress` rule WL-401 established, for the same reason: a round holding
+> only the computer's opener has nothing to lose, and confirming there is how a
+> confirmation stops being read. Restart on an untouched round is a reroll, and behaves
+> like one.
+>
+> **Restart rebuilds the round in place** rather than re-entering the route. A
+> `replace('Game', …)` would remove the screen, which WL-401's guard would intercept —
+> a second dialog about a round the player just agreed to give up. The round being
+> replaced is recorded as `abandoned` first, exactly as leaving records it (WL-402), and
+> the personal-best baseline is re-read for the new round.
+>
+> **The pause control is disabled while a turn resolves**, which is doing real work
+> rather than being fussy: `attemptComputerTurn` has a promise in flight that will
+> `setSession` an absolute value when it lands, so a Restart taken mid-turn would be
+> overwritten seconds later by the round it just replaced. Blocking the entry point
+> makes that unreachable. It is also the nearest thing this build has to §13's "pause
+> computer timers if timers are added later" — that turn is the only live timer. The
+> window is a few hundred milliseconds. **Flagged for WL-408:** the control keeps its
+> glyph while disabled, since Design System §4 rejects opacity for disabled states and
+> an icon has no fill or shadow to drop instead; `accessibilityState` carries it to
+> assistive tech, but a visual treatment for disabled icon controls should be designed
+> once, there, for all of them.
+>
+> No new unit tests: this task adds nothing to `src/features/` — it is screen wiring
+> over rules WL-401/402/403 already own and test. The 357 existing tests still pass.
+>
+> **Verified on both platforms.** iPhone SE simulator: all four actions, in §13's order.
+> Resume closes the sheet with the round untouched; How to Play navigates and returns to
+> the round intact (chain 5, score 25 across the round trip); Restart confirms, and
+> cancelling returns to the pause sheet rather than dumping the player back in the game;
+> confirming dealt a fresh round (chain 1, score 0, new starting word, hints reset) while
+> the profile recorded the replaced round as `abandoned` and the save slot took the new
+> one — both read back from the app's MMKV file; Restart on an untouched round skipped
+> the dialog as designed; Exit to Home raised WL-401's "Leave this round?" and, after
+> confirming, landed on Home with no Resume entry — the save slot cleared, so WL-403's
+> rule holds through this path too. Android emulator: the sheet renders identically, and
+> hardware back while it is open resumes (closes the sheet, round intact at chain 3 /
+> score 16) rather than leaving the round — the "back must not become a two-tap way to
+> destroy the round" rule, holding one level deeper. No `FATAL`/`AndroidRuntime` in
+> `adb logcat`.
+>
+> **Corrected while here:** `GameScreen`'s docblock still said the five-state game-over
+> screen was "still pending" and that the round-over branch was two minimal messages.
+> WL-308 shipped `GameOverPanel` and the screen has been rendering it since. Stale
+> comment, fixed.
 
 **WL-405 · Home screen** — M · 1.5d · WL-402, WL-204
 Wireframe §5: start game, best score, best streak, Word Review, How to Play, Settings.
