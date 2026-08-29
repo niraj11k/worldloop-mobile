@@ -1,0 +1,11 @@
+<resources>
+    <!--
+      WL-409: 600dp smallest-width is Android's own tablet threshold. A screen
+      that size has more short-axis room in landscape than the smallest
+      supported phone has in portrait, so the portrait layout holds there
+      without redrawing anything.
+
+      10 = ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR.
+    -->
+    <integer name="screen_orientation">10</integer>
+</resources>

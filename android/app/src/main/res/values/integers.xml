@@ -1,0 +1,25 @@
+<resources>
+    <!--
+      WL-409: phones are locked to portrait, tablets are not.
+
+      Wireframe §19 makes portrait the primary target and sets a hard rule for
+      the game screen: "the input and Submit button should not be hidden below
+      the keyboard". On a phone in landscape they already are — the
+      required-letter callout fills the short axis on its own, the input lands
+      on the bottom edge before the keyboard even opens, and Submit and Hint
+      sit below the fold. Redesigning the core screen for a viewport it was
+      never drawn for is not v1 work, so the orientation is locked and the
+      decision is recorded (Delivery Plan, WL-409).
+
+      `screenOrientation` is an enum attribute, so this is an *integer*
+      resource, not a string: the values are `ActivityInfo`'s own constants.
+      1 = SCREEN_ORIENTATION_PORTRAIT. A string resource here resolves to
+      nothing and the activity silently falls back to unspecified — which is
+      exactly what happened on the first attempt at this, and it rotated.
+
+      Tablets override this in values-sw600dp. iOS already ships the same
+      split: portrait-only on iPhone, all four orientations on iPad
+      (Info.plist's UISupportedInterfaceOrientations~ipad).
+    -->
+    <integer name="screen_orientation">1</integer>
+</resources>

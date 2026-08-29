@@ -2397,10 +2397,60 @@ game screen stays usable at the largest system text size.
 > recorded in the Store Submission Checklist as its own row rather than folded into the
 > engineering rows it would otherwise hide behind.
 
-**WL-409 · Responsive and orientation pass** — M · 1.5d · WL-301
+**WL-409 · Responsive and orientation pass** — M · 1.5d · WL-301 — **DONE 2026-08-30**
 Wireframe §19: small phones, large phones, tablets, landscape.
 *Done when:* the game screen is usable at every size in the WL-005 matrix in portrait, and
 landscape either works or is deliberately locked out with that decision recorded.
+
+> **DONE 2026-08-30.**
+>
+> **The landscape decision: phones portrait-only, tablets unrestricted.** Not a
+> preference — §19 sets a hard rule for the game screen ("the input and Submit button
+> should not be hidden below the keyboard") and landscape on a phone breaks it before the
+> keyboard is even open. Captured on the emulator at 2400×1080: the required-letter
+> callout fills the short axis on its own, the input sits on the bottom edge, and Submit
+> and Hint are already below the fold. Redrawing the core screen for a viewport it was
+> never designed for is not v1 work, so the orientation is locked rather than
+> half-supported. Recorded in the README beside the device matrix, not only here.
+>
+> **Android was the platform that actually allowed it.** iOS has shipped portrait-only on
+> iPhone since the template (`UISupportedInterfaceOrientations`), and Android had no
+> `screenOrientation` at all — so Android phones could rotate into a layout iPhones were
+> never permitted to reach, and nobody had looked at it. Now
+> `android:screenOrientation="@integer/screen_orientation"`: `portrait` by default,
+> `fullSensor` under `values-sw600dp`, matching iOS's iPhone/iPad split.
+>
+> **A silent failure worth recording:** the first attempt used a *string* resource.
+> `screenOrientation` is an enum attribute, so the reference resolved to nothing, the
+> activity fell back to unspecified, and the app kept rotating — with no build error and
+> nothing visibly wrong. Caught only because the rotation was actually tested afterwards.
+> The values are `ActivityInfo`'s own integers (1 = portrait, 10 = fullSensor), and both
+> configurations were confirmed present in the built APK with `aapt2 dump resources`
+> (`() 1`, `(sw600dp) 10`) rather than trusted a second time.
+>
+> **Tablets: a centred column, not a stretched phone.** Nothing was broken on an iPad —
+> it just read as a mistake: a one-line sentence in a card 820pt wide, buttons a foot
+> long, a measure far past readable. `CONTENT_MAX_WIDTH` (560) caps and centres each
+> screen's content column, chosen so **no phone is affected** — the widest device in the
+> WL-005 matrix is 440pt, so every phone renders byte-identically and only tablets see
+> the change.
+>
+> **Verified in portrait across the matrix.** iPhone SE (3rd gen, 375pt — small):
+> the full core loop, repeatedly, across this whole phase. iPhone 17 Pro Max (440pt —
+> large): Welcome, Home, Difficulty and the game screen with the keyboard open; the input
+> and both controls stay above it. iPad (A16, 820pt — tablet): Welcome and Home in the
+> centred column. Android `Medium_Phone_API_36.1` (mid): the same flows throughout this
+> phase, and the portrait lock confirmed by rotating the device and watching Android
+> Settings go landscape while WordLoop stayed portrait.
+>
+> **Not verified, and why:** *tablet landscape on either platform.* The iOS simulator
+> cannot be rotated from this environment (no AppleScript automation permission), and no
+> Android tablet AVD exists here. The tablet path is therefore reasoned rather than seen:
+> an iPad's short axis in landscape is 820pt, more than the smallest supported phone has
+> in portrait (667pt), and every screen is now a scrolling, width-capped column — so the
+> layout that already works on the smallest phone has strictly more room. Existing iPad
+> orientation support was left as it is rather than removed on no evidence. **Flagged for
+> WL-805's device pass**, which is where a real tablet belongs anyway.
 
 ---
 

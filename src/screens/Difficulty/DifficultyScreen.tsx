@@ -5,7 +5,7 @@ import type { RootStackParamList, Difficulty } from '@navigation/types';
 import { Button } from '@components/common/Button';
 import { Card } from '@components/common/Card';
 import { IconButton } from '@components/common/IconButton';
-import { palette, spacing, shadow, typeScale, displayTextProps } from '@theme/theme';
+import { palette, spacing, shadow, typeScale, displayTextProps, CONTENT_MAX_WIDTH } from '@theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Difficulty'>;
 
@@ -83,7 +83,16 @@ export function DifficultyScreen({ navigation }: Props): React.JSX.Element {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
+  content: {
+    padding: spacing.lg,
+    gap: spacing.lg,
+    paddingBottom: spacing.xxl,
+    // WL-409: tablets get a centred column rather than a stretched phone
+    // layout; no phone is affected (see CONTENT_MAX_WIDTH).
+    width: '100%',
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: 'center',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',

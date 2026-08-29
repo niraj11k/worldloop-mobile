@@ -74,7 +74,7 @@ decision" anymore, since the decision is made; "N/A for v1" below means exactly 
 | Confirmation step required before deletion executes | N/A for v1 | `WordLoop_Guest_Data_Deletion_Policy.md` | WL-708 (1.1) |
 | If deletion is asynchronous, the user is told expected processing time (Apple specifically advises this) | N/A for v1 | `WordLoop_Guest_Data_Deletion_Policy.md` | WL-708 (1.1) |
 | Google Play web deletion-request page is live and linked from the store listing | N/A for v1 | `WordLoop_Guest_Data_Deletion_Policy.md`; Google Play account-deletion policy | WL-709 (1.1) |
-| "Delete guest data" option available in Settings for unlinked guests, independent of full account deletion | ⬜ (applies to v1 — not deferred, this one is guest-only by design, not accounts-gated) | `WordLoop_Guest_Data_Deletion_Policy.md`, "Guest deletion controls" | WL-407 |
+| "Delete guest data" option available in Settings for unlinked guests, independent of full account deletion — shipped as "Delete My Data", confirms first, itemises what goes, and starts a fresh guest | ✅ (applies to v1 — not deferred, this one is guest-only by design, not accounts-gated) | `WordLoop_Guest_Data_Deletion_Policy.md`, "Guest deletion controls" | WL-407 (done 2026-08-29) |
 | Apple's requirement to offer Sign in with Apple when other third-party logins are present, verified against **current** App Store guidelines | N/A for v1 ⚠️ (still needs legal/compliance sign-off before 1.1 ships auth providers) | `WordLoop_Architecture.md` §8.4 — already marked `[Unverified]` there | WL-703 (1.1) |
 
 ---
@@ -97,6 +97,8 @@ decision" anymore, since the decision is made; "N/A for v1" below means exactly 
 | Release signing configured for both platforms | ⬜ | Delivery Plan | WL-804 |
 | Crash reporting wired and symbolicating correctly from release builds | ⬜ | Delivery Plan | WL-003, WL-804 |
 | Bundle size within the budget set for dictionary + assets | ⬜ | Delivery Plan, WL-105 budgets (cold-start ≤400ms, lookup ≤5ms, bundle size increase ≤8MB) | WL-105, WL-804 |
+| Orientation policy shipped and verified: phones portrait-locked on both platforms, tablets unrestricted (WL-409) | ✅ | `WordLoop_User_Flows_and_Wireframe_Requirements.md` §19; README | WL-409 (done 2026-08-30) |
+| **Tablet landscape** actually looked at on a real tablet — WL-409 could rotate neither an iOS simulator nor an Android tablet AVD in that environment, so the tablet path is reasoned, not seen | ⬜ | **[Gap]** — §19 lists tablets and landscape | WL-805 |
 | Device/OS support matrix confirmed and tested on real hardware, including the smallest phone | ⬜ | `WordLoop_User_Flows_and_Wireframe_Requirements.md` §19 | WL-005, WL-805 |
 | CI builds both native platforms, so a broken release build can't merge silently | ⬜ | Delivery Plan | WL-004 |
 

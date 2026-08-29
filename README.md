@@ -42,9 +42,29 @@ configuration for this RN version, so there's no reason to target below it.
 | iOS | iOS 15.1 | iOS 26 (current) | iPhone SE (3rd gen) — small phone; iPhone 17 — baseline; iPhone 17 Pro Max — large phone |
 | Android | Android 7.0 (API 24) | API 36 (current) | A ~5.4" small-screen device (e.g. Pixel 4a class); a mid-size device (`Medium_Phone_API_36.1` covers this in the emulator); a large/tablet-class device |
 
-Tablets and landscape are acknowledged in Wireframe §19 but not treated as a
-first-class layout target for v1 — the design is portrait-phone-first. Revisit
-once WL-409 (responsive/orientation pass, Phase 4) runs.
+**Orientation (decided in WL-409, 2026-08-30): phones are portrait-only;
+tablets are not restricted.**
+
+Wireframe §19 makes portrait the primary target and sets a hard rule for the
+game screen — "the input and Submit button should not be hidden below the
+keyboard". On a phone in landscape they already are: the required-letter
+callout fills the short axis by itself, the input lands on the bottom edge
+before the keyboard opens, and Submit and Hint sit below the fold. Redrawing
+the core screen for a viewport it was never designed for is not v1 work, so
+the orientation is locked rather than half-supported.
+
+- **iOS** — already portrait-only on iPhone and all four orientations on iPad
+  (`Info.plist`: `UISupportedInterfaceOrientations` /
+  `UISupportedInterfaceOrientations~ipad`). Unchanged.
+- **Android** — was unrestricted on every device, which meant Android phones
+  could rotate into a layout iPhones were never allowed to reach. Now
+  `android:screenOrientation="@integer/screen_orientation"`, which resolves to
+  `portrait` by default and `fullSensor` under `values-sw600dp` (Android's own
+  tablet threshold).
+
+Content is laid out in a column capped at `CONTENT_MAX_WIDTH` (560pt) and
+centred, so tablets get a readable measure instead of a stretched phone
+layout. No phone is affected: the widest device in the matrix is 440pt.
 
 Physical-device coverage (as opposed to simulator/emulator) is a manual QA
 step — see WL-310 (M1 device pass) and WL-805 (pre-submission QA) — not a CI

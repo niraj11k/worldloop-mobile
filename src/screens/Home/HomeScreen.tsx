@@ -10,7 +10,7 @@ import { HOME_EMPTY_STATE, START_NEW_ROUND_CONFIRM } from '@constants/gameConsta
 import { abandonSession } from '@features/game/gameSession';
 import { useProfileStore } from '@store/useProfileStore';
 import { useSavedRoundStore } from '@store/useSavedRoundStore';
-import { palette, spacing, typeScale, displayTextProps } from '@theme/theme';
+import { palette, spacing, typeScale, displayTextProps, CONTENT_MAX_WIDTH } from '@theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -233,7 +233,16 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: palette.paper },
-  content: { padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.xxl },
+  content: {
+    padding: spacing.lg,
+    gap: spacing.xl,
+    paddingBottom: spacing.xxl,
+    // WL-409: tablets get a centred column rather than a stretched phone
+    // layout; no phone is affected (see CONTENT_MAX_WIDTH).
+    width: '100%',
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: 'center',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',

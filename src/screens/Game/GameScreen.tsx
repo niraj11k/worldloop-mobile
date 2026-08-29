@@ -51,7 +51,14 @@ import { useConfirmBeforeLeave } from '@hooks/useConfirmBeforeLeave';
 import { announceForAccessibility } from '@utils/accessibility';
 import { useProfileStore } from '@store/useProfileStore';
 import { useSavedRoundStore } from '@store/useSavedRoundStore';
-import { palette, spacing, shadow, typeScale, displayTextProps } from '@theme/theme';
+import {
+  palette,
+  spacing,
+  shadow,
+  typeScale,
+  displayTextProps,
+  CONTENT_MAX_WIDTH,
+} from '@theme/theme';
 import type { GameSessionState, InvalidReason } from '@app-types/game';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
@@ -896,11 +903,17 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: palette.paper },
+  // WL-409: the header and the scrolling content share one centred column on
+  // a tablet, so the back control does not end up a hand's width from the
+  // pause control. No phone is affected — see CONTENT_MAX_WIDTH.
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: spacing.lg,
+    width: '100%',
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: 'center',
   },
   keyboardAvoider: { flex: 1 },
   scroll: { flex: 1 },
@@ -908,6 +921,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xxl,
     gap: spacing.lg,
+    width: '100%',
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: 'center',
   },
   statsRow: { ...typeScale.body, color: palette.ink },
   currentWordRow: { alignItems: 'center', gap: spacing.xs },

@@ -4,7 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
 import { Button } from '@components/common/Button';
 import { Card } from '@components/common/Card';
-import { palette, spacing, typeScale, displayTextProps } from '@theme/theme';
+import { palette, spacing, typeScale, displayTextProps, CONTENT_MAX_WIDTH } from '@theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Welcome'>;
 
@@ -80,6 +80,11 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
     padding: spacing.lg,
+    // WL-409: tablets get a centred column rather than a stretched phone
+    // layout; no phone is affected (see CONTENT_MAX_WIDTH).
+    width: '100%',
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: 'center',
     // The intro sits centred in the space above; the controls stay at the
     // bottom, where a thumb is, rather than floating in the middle with it —
     // until the content outgrows the screen, at which point it scrolls.
