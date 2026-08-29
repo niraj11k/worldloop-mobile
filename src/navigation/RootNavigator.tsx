@@ -1,9 +1,12 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { RootStackParamList } from './types';
+
+import { useProfileStore } from '@store/useProfileStore';
+import { palette } from '@theme/theme';
 
 import { WelcomeScreen } from '@screens/Welcome/WelcomeScreen';
 import { HomeScreen } from '@screens/Home/HomeScreen';
@@ -44,8 +47,8 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
  *
  * | Screen | Back goes to | Notes |
  * |---|---|---|
- * | Welcome | exits the app | stack root on first launch |
- * | Home | exits the app | Welcome uses `replace`, so Home is the root |
+ * | Welcome | exits the app | stack root, first launch only (WL-406) |
+ * | Home | exits the app | the root on every later launch; Welcome `replace`s itself with it on the first |
  * | Difficulty | Home | |
  * | Game | Difficulty | **confirms first** while a round is in progress |
  * | HowToPlay | wherever it was opened from | Welcome or Home |
@@ -69,11 +72,31 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
  * Wireframe section 2 is only actually flat if it is unwound that way.
  */
 export function RootNavigator(): React.JSX.Element {
+  const profileStatus = useProfileStore(state => state.status);
+  const isFirstLaunch = useProfileStore(state => state.isFirstLaunch);
+
+  /*
+    WL-406: the stack waits for the profile before mounting, because
+    `initialRouteName` is read once and never again — deciding it late would
+    mean routing correctly only by remounting the whole navigator.
+
+    What is being waited for is a synchronous MMKV read behind an async
+    interface, so this is a frame or two, and it is `paper` rather than a
+    spinner: a loading indicator for something this fast is worse than a
+    still background, and Design System section 5 has no spinner in it
+    anyway. The alternative — start on Welcome and redirect — flashes the
+    welcome screen at every returning player, which is the exact thing
+    "first launch only" is meant to prevent.
+  */
+  if (profileStatus !== 'ready') {
+    return <View style={styles.launchBackdrop} />;
+  }
+
   return (
     <NavigationContainer>
       <SafeAreaView style={styles.safeArea}>
         <Stack.Navigator
-          initialRouteName="Welcome"
+          initialRouteName={isFirstLaunch ? 'Welcome' : 'Home'}
           screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Welcome" component={WelcomeScreen} />
           <Stack.Screen name="Home" component={HomeScreen} />
@@ -101,4 +124,5 @@ export function RootNavigator(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
+  launchBackdrop: { flex: 1, backgroundColor: palette.paper },
 });

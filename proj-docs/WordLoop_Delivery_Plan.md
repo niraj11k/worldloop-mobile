@@ -2179,10 +2179,69 @@ install.
 > end-to-end through real storage. Both halves meet for the first time on real hardware
 > at WL-310.
 
-**WL-406 · Welcome and How to Play** — S · 1d · WL-204
+**WL-406 · Welcome and How to Play** — S · 1d · WL-204 — **DONE 2026-08-29**
 Wireframe §4 and §7. Welcome shown on first launch only. How to Play uses the concrete
 apple→elephant→table example, not abstract rules.
 *Done when:* Welcome appears once, and How to Play covers exactly the six v1 rules from §7.
+
+> **DONE 2026-08-29.** Both screens rebuilt on the WL-204 component set; the last two
+> bare-primitive screens on the player-facing path are gone.
+>
+> **"First launch only" needed no new stored flag.** It is
+> `useProfileStore.isFirstLaunch`, set when `load` had to *create* the guest rather than
+> read one — "first launch" and "no profile existed yet" are the same fact, and
+> Architecture §8.1 already has the profile created on first use, so a `hasSeenWelcome`
+> field would be a second thing saying what the first one says. Consequences, both
+> deliberate: a reinstall shows the welcome again (that install genuinely is new), while
+> "Delete guest data" in Settings does not (it writes a replacement profile immediately,
+> and the app is not new to someone who just used its settings screen). The one edge it
+> gets wrong: quitting from the Welcome screen without tapping Play Now counts as seen,
+> because the profile was already written — a player who has read the screen.
+>
+> **`RootNavigator` now waits for the profile before mounting**, because
+> `initialRouteName` is read once and never again — deciding it late would mean routing
+> correctly only by remounting the whole navigator. The wait is a synchronous MMKV read
+> behind an async interface, so it is a frame or two of `paper`, not a spinner (Design
+> System §5 has no spinner in it, and an indicator for something this fast is worse than
+> a still background). The alternative — start on Welcome and redirect — flashes the
+> welcome screen at every returning player, which is the exact thing this task exists to
+> prevent. The WL-401 back-behaviour table is updated: Home is the stack root on every
+> launch after the first.
+>
+> **How to Play was missing half its rules.** §7 lists six; the old screen showed three
+> (names, repeats, minimum length) and omitted "start with the required letter" — the
+> rule the entire game turns on — plus "use a valid dictionary word" and hints. All six
+> now render from `HOW_TO_PLAY_RULES`, one countable list rather than lines scattered
+> through JSX. The hint rule interpolates `HINT_LIMIT_PER_ROUND` through the same
+> `{placeholder}` convention `INVALID_WORD_MESSAGES` uses, so WL-605 retuning the limit
+> cannot leave the rules screen quietly lying. Rule 2 is worded as "use a word from the
+> game's word list" rather than §7's "valid dictionary word" — deliberately matching the
+> rejection message the player will actually see, so both places speak the same
+> language.
+>
+> The example leads, per §7's "should include a real example rather than only abstract
+> instructions": the doc's own apple → elephant → table, one card per step, each naming
+> who played, the word, and the handoff letter — shown in the same `Badge` the game uses
+> for its difficulty tag, so the shape is familiar before the first round. The screen
+> scrolls; six rules plus three example cards exceed a small phone at large text sizes,
+> and unlike the game screen nothing here has to stay on screen.
+>
+> Welcome stays deliberately thin — §4.1's last requirement is that it "should not
+> contain a long explanation" — so it is the wordmark, the promise, one sentence in a
+> tilted `sunbeam` card, and the two controls. `Play Now` still `replace`s, so Home
+> becomes the root and back exits rather than returning to a dismissed welcome.
+>
+> **Verified on both platforms.** iPhone SE simulator: uninstalled and reinstalled for a
+> genuine fresh install — Welcome appeared; Play Now → Home; force-quit and relaunch →
+> straight to Home, no Welcome, which is the "appears once" criterion. Before that, a
+> returning profile launched directly to Home. How to Play renders all six rules with
+> the hint limit interpolated ("3 per round") and the three example cards. Android
+> emulator: uninstall/reinstall, same sequence, same result, no `FATAL`/`AndroidRuntime`
+> in `adb logcat`.
+>
+> Three store tests cover the derivation itself (created → first launch, read → not,
+> reinstall → first launch again), since that is the part with a rule rather than a
+> layout. 360 tests pass.
 
 **WL-407 · Settings screen** — M · 1.5d · WL-405, D-05
 Wireframe §16 minus whatever D-04 and D-05 remove: sound, haptics, text size, reset

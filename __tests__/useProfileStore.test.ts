@@ -33,7 +33,8 @@ const wonRound = (sessionId = 'session-1') => {
  * singleton, so resetting it is what makes the next `load` a genuine cold
  * start against whatever is actually in storage.
  */
-const coldStart = () => useProfileStore.setState({ profile: null, status: 'idle' });
+const coldStart = () =>
+  useProfileStore.setState({ profile: null, status: 'idle', isFirstLaunch: false });
 
 describe('useProfileStore', () => {
   beforeEach(async () => {
@@ -72,6 +73,32 @@ describe('useProfileStore', () => {
     await useProfileStore.getState().load();
 
     expect(useProfileStore.getState().profile!.guestId).not.toBe(firstId);
+  });
+
+  describe('first launch (WL-406)', () => {
+    it('reports a first launch when the guest had to be created', async () => {
+      await useProfileStore.getState().load();
+      expect(useProfileStore.getState().isFirstLaunch).toBe(true);
+    });
+
+    it('does not report one when a stored profile was read', async () => {
+      // What decides whether the Welcome screen is the stack's entry point,
+      // so a returning player must never come back as "first launch".
+      await useProfileStore.getState().load();
+      coldStart();
+      await useProfileStore.getState().load();
+
+      expect(useProfileStore.getState().isFirstLaunch).toBe(false);
+    });
+
+    it('reports one again after a reinstall', async () => {
+      await useProfileStore.getState().load();
+      coldStart();
+      await storage.removeItem(STORAGE_KEYS.GUEST_PROFILE);
+      await useProfileStore.getState().load();
+
+      expect(useProfileStore.getState().isFirstLaunch).toBe(true);
+    });
   });
 
   it('records a finished round and keeps it across a cold start', async () => {
