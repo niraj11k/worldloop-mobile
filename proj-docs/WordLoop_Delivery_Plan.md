@@ -2325,13 +2325,77 @@ confirm first.
 > in-app" row is now ✅, with new rows for the CI drift gate, the LDNOOBW creator
 > question, and the missing support contact.
 
-**WL-408 · Accessibility pass** — L · 2.5d · all Phase 3
+**WL-408 · Accessibility pass** — L · 2.5d · all Phase 3 — **ENGINEERING DONE 2026-08-30; screen-reader walkthrough outstanding**
 Wireframe §18: screen-reader labels on every control, error announcements via live region,
 large tap targets, no colour-only meaning, visible focus states, keyboard submission,
 reduced-motion honoured, and text-size scaling. **Highest risk here: a 64px display glyph
 at the largest OS text setting will overflow** — needs an explicit clamping strategy.
 *Done when:* a full VoiceOver and TalkBack walkthrough of the core loop succeeds, and the
 game screen stays usable at the largest system text size.
+
+> **The flagged risk, handled.** The 64px required letter takes two guards, because
+> either alone leaves a hole: `MAX_DISPLAY_FONT_SCALE` (1.5) caps how far the display
+> face grows, and `adjustsFontSizeToFit` shrinks whatever is left to fit its card.
+> Uncapped, iOS's largest accessibility size multiplies by ~3.1 — a ~200px glyph on a
+> 375pt phone. At the cap it reaches ~96px, still four times body size and by a distance
+> the largest thing on screen, which is what Design System §6 actually requires. **Only
+> the display face is capped**; body and UI copy scale without limit, since capping the
+> text a player reads at length would defeat the setting. `typography.test.ts` guards the
+> number against the narrowest screen in the WL-005 matrix.
+>
+> **Testing at the largest size found four failures that were not the flagged one**, all
+> of them "text scales, function doesn't":
+> - **Button labels truncated** — `numberOfLines={1}` is invisible at ordinary sizes and
+>   renders "START G…" at the largest. A button whose own name is unreadable is a WCAG
+>   1.4.4 failure. Labels now wrap and the button grows.
+> - **Home, Welcome and Difficulty could not scroll.** At the largest size their content
+>   is roughly twice a small phone's height, so Word Review, How to Play and *Continue*
+>   were simply unreachable. All three scroll now.
+> - **Submit and Hint ran off both edges of the game screen** — the two controls the turn
+>   depends on, half off-screen, because that one action row lacked the `flexWrap` every
+>   other row in the app already had.
+> - **Screen titles clipped** next to their back control ("Choose Difficulty" lost its
+>   last letters). They wrap now.
+>
+> **Tap targets: a 40pt bug at six call sites.** Every icon control was a bare
+> `Pressable` around a 24pt glyph with `hitSlop` 8 — 40pt, under WCAG 2.5.5's 44 and
+> Android's 48. `IconButton` (new, in the WL-204 set) enforces `MIN_TAP_TARGET` on both
+> axes and *requires* an accessibility label, so an unlabelled icon control can no longer
+> be written. Measured at 48×48dp in the Android node tree afterwards.
+>
+> **Announcements, on both platforms.** RN's two mechanisms do not overlap:
+> `accessibilityLiveRegion` is Android-only, so TalkBack heard the invalid-word message
+> and VoiceOver heard nothing. `utils/accessibility.ts` announces on iOS only, and
+> callers pair the two — a live region for Android, an announcement for iOS. Applied to
+> the input's error (Wireframe §18's "accessible error announcements") and, new, to
+> **whose turn it is**: the computer replies on its own, so without it a screen-reader
+> user submits a word and hears nothing until they go looking.
+>
+> **The settings toggles now announce as switches.** `Button` gained `role="switch"` +
+> `checked` (WL-407 built them as buttons because §4 defines no toggle). Confirmed in the
+> Android tree: `class="android.widget.Switch" checkable="true" checked="true"
+> content-desc="Sound"` — TalkBack says "Sound, switch, on", not "Sound ON, button".
+>
+> Also: labels and roles added to the WordReview skeleton's controls (WL-502 still owns
+> that screen) and the dev gallery link. Already correct and re-audited without change:
+> focus states and error styling (WL-204/304), keyboard submission (WL-303),
+> reduced-motion fallbacks on all five motion primitives (WL-205), contrast (WL-202, CI
+> gated), and no colour-only meaning anywhere.
+>
+> **Verified.** iOS at `accessibility-extra-extra-extra-large`: Home, Welcome,
+> Difficulty and the game screen all remain fully usable — every control reachable, the
+> required letter inside its card, Submit and Hint stacked and whole. Android at
+> `font_scale 2.0`, plus an `uiautomator dump` of Home, Difficulty, the game screen and
+> Settings — **zero unlabelled clickable nodes on any of them**, and every product
+> control ≥48dp. That dump is the tree TalkBack reads, which is the closest thing to a
+> TalkBack pass that can be run without the screen reader itself.
+>
+> **What is not done: the walkthrough itself.** The first "done when" asks for VoiceOver
+> and TalkBack *driven through the core loop*, listening — neither screen reader can be
+> operated from this environment. The tree is verified and every announcement is wired,
+> but nobody has yet heard the app. Held open like WL-310's physical-device pass, and
+> recorded in the Store Submission Checklist as its own row rather than folded into the
+> engineering rows it would otherwise hide behind.
 
 **WL-409 · Responsive and orientation pass** — M · 1.5d · WL-301
 Wireframe §19: small phones, large phones, tablets, landscape.

@@ -10,6 +10,7 @@ import {
   borderWidth,
   shadow,
   typeScale,
+  displayTextProps,
 } from '@theme/theme';
 import { SpringIn } from '@components/common/motion/SpringIn';
 
@@ -93,7 +94,7 @@ export function BottomSheet({
             style={[styles.sheet, style]}
             accessibilityViewIsModal
             accessibilityLabel={title}>
-            {title ? <Text style={styles.title}>{title}</Text> : null}
+            {title ? <Text {...displayTextProps} style={styles.title}>{title}</Text> : null}
             {children}
           </View>
         </SpringIn>

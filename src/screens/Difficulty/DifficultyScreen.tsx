@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList, Difficulty } from '@navigation/types';
 import { Button } from '@components/common/Button';
 import { Card } from '@components/common/Card';
-import { Icon } from '@components/common/icons/Icon';
-import { palette, spacing, shadow, typeScale } from '@theme/theme';
+import { IconButton } from '@components/common/IconButton';
+import { palette, spacing, shadow, typeScale, displayTextProps } from '@theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Difficulty'>;
 
@@ -36,16 +36,14 @@ export function DifficultyScreen({ navigation }: Props): React.JSX.Element {
   const [selected, setSelected] = useState<Difficulty>('easy');
 
   return (
-    <View style={styles.screen}>
+    // WL-408: three option cards plus Continue outgrow a small phone at the
+    // largest text size, and Continue is the only way forward.
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          hitSlop={spacing.sm}>
-          <Icon name="back" />
-        </Pressable>
-        <Text style={styles.title}>Choose Difficulty</Text>
+        <IconButton name="back" accessibilityLabel="Back" onPress={() => navigation.goBack()} />
+        <Text {...displayTextProps} style={styles.title}>Choose Difficulty</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -64,7 +62,7 @@ export function DifficultyScreen({ navigation }: Props): React.JSX.Element {
                 style={!isSelected ? styles.unselectedCard : undefined}>
                 <View style={styles.optionHeader}>
                   <Text style={styles.optionDot}>{isSelected ? '●' : '○'}</Text>
-                  <Text style={styles.optionLabel}>{d.label}</Text>
+                  <Text {...displayTextProps} style={styles.optionLabel}>{d.label}</Text>
                 </View>
                 <Text style={styles.optionDescription}>{d.description}</Text>
               </Card>
@@ -79,12 +77,13 @@ export function DifficultyScreen({ navigation }: Props): React.JSX.Element {
         onPress={() => navigation.navigate('Game', { difficulty: selected })}
         style={styles.continueButton}
       />
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, padding: spacing.lg, gap: spacing.lg },
+  screen: { flex: 1 },
+  content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -92,7 +91,9 @@ const styles = StyleSheet.create({
   },
   // Balances the back icon so the title stays visually centred.
   headerSpacer: { width: 24 },
-  title: { ...typeScale.screenTitle, color: palette.ink },
+  // `flexShrink` so the title wraps instead of running off the right edge at
+  // large text sizes (WL-408); `textAlign` keeps it centred once it does.
+  title: { ...typeScale.screenTitle, color: palette.ink, flexShrink: 1, textAlign: 'center' },
   options: { gap: spacing.md },
   unselectedCard: { boxShadow: shadow.control },
   optionHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

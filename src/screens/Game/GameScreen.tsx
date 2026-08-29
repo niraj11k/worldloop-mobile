@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
-  Pressable,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
@@ -42,16 +41,17 @@ import { Button } from '@components/common/Button';
 import { Card } from '@components/common/Card';
 import { ConfirmSheet } from '@components/common/ConfirmSheet';
 import { Input } from '@components/common/Input';
-import { Icon } from '@components/common/icons/Icon';
+import { IconButton } from '@components/common/IconButton';
 import { SpringIn } from '@components/common/motion/SpringIn';
 import { ThinkingDots } from '@components/common/motion/ThinkingDots';
 import { HintSheet } from '@components/game/HintSheet';
 import { GameOverPanel } from '@components/game/GameOverPanel';
 import { PauseSheet } from '@components/game/PauseSheet';
 import { useConfirmBeforeLeave } from '@hooks/useConfirmBeforeLeave';
+import { announceForAccessibility } from '@utils/accessibility';
 import { useProfileStore } from '@store/useProfileStore';
 import { useSavedRoundStore } from '@store/useSavedRoundStore';
-import { palette, spacing, shadow, typeScale } from '@theme/theme';
+import { palette, spacing, shadow, typeScale, displayTextProps } from '@theme/theme';
 import type { GameSessionState, InvalidReason } from '@app-types/game';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
@@ -253,6 +253,31 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
       setHintUsedThisTurn(false);
     }
   }, [session.phase]);
+
+  /**
+   * WL-408: says out loud whose turn it is, on iOS.
+   *
+   * The turn changes without the player doing anything — the computer
+   * answers by itself — and VoiceOver has no live region to notice that
+   * with (`accessibilityLiveRegion` is Android-only, and the turn row carries
+   * one for TalkBack). Without this, a screen-reader user submits a word and
+   * hears nothing until they hunt for what changed.
+   *
+   * Only the two phases that *are* a turn change: the computer starting to
+   * think, and the board coming back to the player. The transient phases in
+   * between are the same turn still resolving, and announcing them would talk
+   * over the player.
+   */
+  useEffect(() => {
+    if (roundOver) return;
+    if (session.phase === 'computer_thinking') {
+      announceForAccessibility('WordLoop is thinking');
+    } else if (session.phase === 'input_empty') {
+      announceForAccessibility(
+        `Your turn. Enter a word beginning with ${session.requiredLetter.toUpperCase()}.`,
+      );
+    }
+  }, [session.phase, session.requiredLetter, roundOver]);
 
   /**
    * WL-403: the round is written after every change — a turn resolving, a
@@ -553,13 +578,11 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          accessibilityRole="button"
+        <IconButton
+          name="back"
           accessibilityLabel="Back"
-          hitSlop={spacing.sm}>
-          <Icon name="back" />
-        </Pressable>
+          onPress={() => navigation.goBack()}
+        />
         <Badge label={difficulty.toUpperCase()} />
         {/*
           WL-404. Unavailable while a turn is resolving, and that is doing
@@ -572,21 +595,16 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
           later" — the only live timer is that turn.
 
           The window is one turn (a few hundred milliseconds), and the control
-          keeps its glyph while disabled: Design System section 4 rejects
-          opacity for disabled states, and an icon has no fill or shadow to
-          drop instead. `accessibilityState` carries it to assistive tech
-          regardless; a visual treatment for disabled icon controls is
-          WL-408's to design once, for all of them.
+          keeps its glyph while disabled — see `IconButton` for why that is a
+          Design System gap rather than an oversight, and what carries the
+          state instead (WL-408).
         */}
-        <Pressable
-          onPress={() => setPauseSheetVisible(true)}
-          disabled={busy || roundOver}
-          accessibilityRole="button"
+        <IconButton
+          name="pause"
           accessibilityLabel="Pause"
-          accessibilityState={{ disabled: busy || roundOver }}
-          hitSlop={spacing.sm}>
-          <Icon name="pause" />
-        </Pressable>
+          disabled={busy || roundOver}
+          onPress={() => setPauseSheetVisible(true)}
+        />
       </View>
 
       {/*
@@ -609,8 +627,21 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
             Chain: {session.chain.length} words · Score: {session.score}
           </Text>
 
-          {/* Whose word is on the board, rather than a hardcoded label. */}
-          <View style={styles.currentWordRow}>
+          {/*
+            Whose word is on the board, rather than a hardcoded label.
+
+            WL-408: a live region, because whose turn it is changes without
+            the player touching anything — the computer replies on its own,
+            and a screen-reader user would otherwise submit a word and hear
+            nothing until they went looking. `polite` rather than
+            `assertive`: a turn change should not interrupt the error message
+            the player may still be listening to. TalkBack reads this node on
+            change; VoiceOver has no equivalent, so the effect above announces
+            the same thing on iOS.
+          */}
+          <View
+            style={styles.currentWordRow}
+            accessibilityLiveRegion="polite">
             {computerTimedOut ? (
               // Wireframe section 17: "computer response timeout."
               <>
@@ -638,7 +669,7 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
                 <Text style={styles.turnLabel}>
                   {lastMove?.actor === 'player' ? 'You' : 'WordLoop'}
                 </Text>
-                <Text style={styles.currentWord}>{session.currentWord.toUpperCase()}</Text>
+                <Text {...displayTextProps} style={styles.currentWord}>{session.currentWord.toUpperCase()}</Text>
               </>
             )}
           </View>
@@ -672,7 +703,22 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
               */}
               <Card fill="bubblegum" style={styles.requiredLetterCard}>
                 <Text style={styles.requiredLetterLabel}>Required letter</Text>
-                <Text style={styles.requiredLetter}>
+                {/*
+                  WL-408, the risk the Delivery Plan flagged for this task:
+                  64px at iOS's largest accessibility size is a ~200px glyph
+                  on a 375pt phone. Two guards, because either alone leaves a
+                  hole — `displayTextProps` caps the growth at 1.5x (see
+                  `MAX_DISPLAY_FONT_SCALE` for why that number is still
+                  enormous), and `adjustsFontSizeToFit` shrinks whatever is
+                  left to fit the card rather than letting it clip. The letter
+                  stays by far the largest thing on the screen either way,
+                  which is Design System section 6's actual requirement.
+                */}
+                <Text
+                  {...displayTextProps}
+                  adjustsFontSizeToFit
+                  numberOfLines={1}
+                  style={styles.requiredLetter}>
                   {session.requiredLetter.toUpperCase()}
                 </Text>
               </Card>
@@ -697,10 +743,10 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
                     .map(move => move.normalizedWord)
                     .join(', ')}>
                   {chainToShow.map((move, index) => {
-                    const word = <Text style={styles.chainText}>{move.normalizedWord}</Text>;
+                    const word = <Text {...displayTextProps} style={styles.chainText}>{move.normalizedWord}</Text>;
                     return (
                       <React.Fragment key={move.moveId}>
-                        {index > 0 && <Text style={styles.chainText}> → </Text>}
+                        {index > 0 && <Text {...displayTextProps} style={styles.chainText}> → </Text>}
                         {move.moveId === latestMoveId ? <SpringIn>{word}</SpringIn> : word}
                       </React.Fragment>
                     );
@@ -893,5 +939,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: spacing.lg,
+    // WL-408: at the largest OS text size Submit and Hint no longer fit side
+    // by side, and without wrapping they ran off both edges of the screen —
+    // the two controls the turn depends on, half off-screen. Wrapping stacks
+    // them instead. Every other action row in the app already did this.
+    flexWrap: 'wrap',
   },
 });

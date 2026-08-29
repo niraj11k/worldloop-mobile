@@ -107,7 +107,9 @@ decision" anymore, since the decision is made; "N/A for v1" below means exactly 
 | Item | Status | Source | Delivery Plan task |
 |---|---|---|---|
 | Full screen/state matrix walked on both platforms, all devices in the support matrix | ⬜ | Delivery Plan | WL-805 |
-| Accessibility pass complete (VoiceOver + TalkBack, reduced motion, large text) | ⬜ | `WordLoop_User_Flows_and_Wireframe_Requirements.md` §18 | WL-408 |
+| Accessibility engineering complete: labels and roles on every control, 48dp tap targets, error and turn announcements on both platforms, reduced-motion fallbacks, display-face scaling capped so the 64px glyph fits | ✅ | `WordLoop_User_Flows_and_Wireframe_Requirements.md` §18 | WL-408 (done 2026-08-30) |
+| App usable at the largest system text size on both platforms — verified at iOS `accessibility-extra-extra-extra-large` and Android `font_scale 2.0` | ✅ | §18, §19 | WL-408 (done 2026-08-30) |
+| **A screen reader actually driven through the core loop** — VoiceOver on iOS and TalkBack on Android, listening. WL-408 verified the accessibility *tree* TalkBack reads (`uiautomator dump`: zero unlabelled clickable nodes) but ran neither screen reader | ⬜ | §18 | WL-408 / WL-805 (needs a device with a screen reader) |
 | Offline and failure states verified on-device, not just in code | ⬜ | `WordLoop_User_Flows_and_Wireframe_Requirements.md` §17 | WL-506 |
 
 ---

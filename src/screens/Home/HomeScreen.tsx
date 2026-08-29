@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
 import { Button } from '@components/common/Button';
 import { Card } from '@components/common/Card';
 import { ConfirmSheet } from '@components/common/ConfirmSheet';
-import { Icon } from '@components/common/icons/Icon';
+import { IconButton } from '@components/common/IconButton';
 import { HOME_EMPTY_STATE, START_NEW_ROUND_CONFIRM } from '@constants/gameConstants';
 import { abandonSession } from '@features/game/gameSession';
 import { useProfileStore } from '@store/useProfileStore';
 import { useSavedRoundStore } from '@store/useSavedRoundStore';
-import { palette, spacing, typeScale } from '@theme/theme';
+import { palette, spacing, typeScale, displayTextProps } from '@theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -92,9 +92,17 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
   };
 
   return (
-    <View style={styles.screen}>
+    /*
+      WL-408: the screen scrolls. At the largest OS text size its content is
+      about twice the height of a small phone, and without this the Word
+      Review and How to Play entries simply cannot be reached — text scaling
+      has to preserve function, not only legibility (WCAG 1.4.4).
+    */
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.wordmark} accessibilityRole="header">
+        <Text {...displayTextProps} style={styles.wordmark} accessibilityRole="header">
           WordLoop
         </Text>
         {/*
@@ -102,13 +110,11 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
           decorative and hidden from assistive tech (WL-207). A gear is only
           "Settings" in context.
         */}
-        <Pressable
-          onPress={() => navigation.navigate('Settings')}
-          accessibilityRole="button"
+        <IconButton
+          name="settings"
           accessibilityLabel="Settings"
-          hitSlop={spacing.sm}>
-          <Icon name="settings" />
-        </Pressable>
+          onPress={() => navigation.navigate('Settings')}
+        />
       </View>
 
       <Text style={styles.tagline}>Ready for a chain?</Text>
@@ -159,7 +165,7 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
             style={styles.statCard}
             accessibilityLabel={`Best score: ${profile.bests.score}`}>
             <Text style={styles.statLabel}>Best Score</Text>
-            <Text style={styles.statValue}>{profile.bests.score}</Text>
+            <Text {...displayTextProps} style={styles.statValue}>{profile.bests.score}</Text>
           </Card>
           <Card
             fill="sunbeam"
@@ -167,12 +173,12 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
             style={styles.statCard}
             accessibilityLabel={`Best streak: ${profile.localStreak.best}`}>
             <Text style={styles.statLabel}>Best Streak</Text>
-            <Text style={styles.statValue}>{profile.localStreak.best}</Text>
+            <Text {...displayTextProps} style={styles.statValue}>{profile.localStreak.best}</Text>
           </Card>
         </View>
       ) : (
         <Card rotation={-2} style={styles.emptyState}>
-          <Text style={styles.emptyStateHeadline}>{HOME_EMPTY_STATE.headline}</Text>
+          <Text {...displayTextProps} style={styles.emptyStateHeadline}>{HOME_EMPTY_STATE.headline}</Text>
           <Text style={styles.emptyStateBody}>{HOME_EMPTY_STATE.body}</Text>
         </Card>
       )}
@@ -204,7 +210,10 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
         this is not one of those things.
       */}
       {__DEV__ && (
-        <Pressable onPress={() => navigation.navigate('Gallery')}>
+        <Pressable
+          onPress={() => navigation.navigate('Gallery')}
+          accessibilityRole="button"
+          accessibilityLabel="Component gallery, developer builds only">
           <Text style={styles.devLink}>Component gallery (dev)</Text>
         </Pressable>
       )}
@@ -218,17 +227,13 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
         onConfirm={handleDiscardSavedRound}
         onCancel={() => setConfirmNewRound(false)}
       />
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: palette.paper,
-    padding: spacing.lg,
-    gap: spacing.xl,
-  },
+  screen: { flex: 1, backgroundColor: palette.paper },
+  content: { padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.xxl },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',

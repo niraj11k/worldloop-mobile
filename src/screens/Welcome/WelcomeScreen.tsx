@@ -1,10 +1,10 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
 import { Button } from '@components/common/Button';
 import { Card } from '@components/common/Card';
-import { palette, spacing, typeScale } from '@theme/theme';
+import { palette, spacing, typeScale, displayTextProps } from '@theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Welcome'>;
 
@@ -33,12 +33,16 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Welcome'>;
  */
 export function WelcomeScreen({ navigation }: Props): React.JSX.Element {
   return (
-    <View style={styles.screen}>
+    // WL-408: scrolls, so the two controls stay reachable when the intro
+    // takes the whole screen at the largest text size.
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}>
       <View style={styles.intro}>
-        <Text style={styles.wordmark} accessibilityRole="header">
+        <Text {...displayTextProps} style={styles.wordmark} accessibilityRole="header">
           WordLoop
         </Text>
-        <Text style={styles.tagline}>Build the word chain</Text>
+        <Text {...displayTextProps} style={styles.tagline}>Build the word chain</Text>
 
         {/*
           The one sentence of explanation, in a tilted card — informational,
@@ -67,17 +71,18 @@ export function WelcomeScreen({ navigation }: Props): React.JSX.Element {
           style={styles.fullWidthButton}
         />
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: palette.paper,
+  screen: { flex: 1, backgroundColor: palette.paper },
+  content: {
+    flexGrow: 1,
     padding: spacing.lg,
     // The intro sits centred in the space above; the controls stay at the
-    // bottom, where a thumb is, rather than floating in the middle with it.
+    // bottom, where a thumb is, rather than floating in the middle with it —
+    // until the content outgrows the screen, at which point it scrolls.
     justifyContent: 'space-between',
   },
   intro: { flex: 1, justifyContent: 'center', gap: spacing.lg },

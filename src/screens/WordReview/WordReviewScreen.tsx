@@ -11,6 +11,13 @@ type Props = NativeStackScreenProps<RootStackParamList, 'WordReview'>;
  * Shows words from the completed round with independently-loading
  * definitions/pronunciation (never blocks the list — Wireframe doc, PRD
  * section 12).
+ *
+ * Still the WL-002 skeleton: WL-502 builds the real screen on WL-501's
+ * definition overlay, and it has no data to show until WL-503 wires
+ * `discoveredWords` (which WL-402 is already recording) into it. WL-408 gave
+ * its controls roles and labels rather than leaving unlabelled buttons in the
+ * app — a screen reader reaching this screen today hears what each control
+ * is, even though two of them are still inert.
  */
 export function WordReviewScreen({ route, navigation }: Props): React.JSX.Element {
   const { sessionId } = route.params;
@@ -30,10 +37,20 @@ export function WordReviewScreen({ route, navigation }: Props): React.JSX.Elemen
           renderItem={({ item }) => (
             <View>
               <Text>{item.toUpperCase()}</Text>
-              <Pressable>
+              {/*
+                Labels name the *word* as well as the action, because a list
+                of a dozen entries otherwise announces "Definition, button"
+                twelve times with nothing to tell them apart. WL-501/502 own
+                what these open.
+              */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Definition of ${item}`}>
                 <Text>Definition</Text>
               </Pressable>
-              <Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Pronunciation of ${item}`}>
                 <Text>Pronunciation</Text>
               </Pressable>
             </View>
@@ -47,7 +64,10 @@ export function WordReviewScreen({ route, navigation }: Props): React.JSX.Elemen
         unwinds to the Home already there, from either entry point (Game Over
         or Home itself).
       */}
-      <Pressable onPress={() => navigation.popTo('Home')}>
+      <Pressable
+        onPress={() => navigation.popTo('Home')}
+        accessibilityRole="button"
+        accessibilityLabel="Back to Home">
         <Text>Back to Home</Text>
       </Pressable>
     </View>

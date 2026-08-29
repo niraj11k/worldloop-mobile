@@ -18,6 +18,8 @@ import {
   typeScale,
   DISPLAY_FACES,
   MIN_DISPLAY_SIZE,
+  MAX_DISPLAY_FONT_SCALE,
+  displayTextProps,
 } from '@theme/typography';
 
 describe('Design System §2 rules', () => {
@@ -59,5 +61,48 @@ describe('Design System §2 rules', () => {
     for (const style of Object.values(typeScale)) {
       expect(bundled.has(style.fontFamily)).toBe(true);
     }
+  });
+});
+
+describe('display text scaling (WL-408)', () => {
+  /**
+   * The narrowest screen in the WL-005 matrix is the iPhone SE (3rd gen) at
+   * 375pt, minus the screen's own `spacing.lg` padding on each side and the
+   * required-letter card's, which is what the glyph actually has to live in.
+   */
+  const SMALLEST_CARD_WIDTH = 375 - 16 * 2 - 16 * 2;
+
+  it('keeps the required letter inside the card it sits in, at the cap', () => {
+    // The Delivery Plan calls this task's highest risk by name: "a 64px
+    // display glyph at the largest OS text setting will overflow". Uncapped,
+    // iOS's largest accessibility size multiplies by roughly 3.1 — about
+    // 200px, which does not fit anything. This is the guard on the number
+    // that prevents it.
+    const cappedSize = typeScale.requiredLetter.fontSize * MAX_DISPLAY_FONT_SCALE;
+
+    expect(cappedSize).toBeLessThan(SMALLEST_CARD_WIDTH);
+    // And it must still be the dominant element, not merely a safe one.
+    expect(cappedSize).toBeGreaterThan(typeScale.chainWord.fontSize * 2);
+  });
+
+  it('still lets the display face grow by at least half again', () => {
+    // A cap that barely moves would satisfy the line above while making the
+    // OS text setting useless on exactly the text that most needs it.
+    expect(MAX_DISPLAY_FONT_SCALE).toBeGreaterThanOrEqual(1.5);
+  });
+
+  it('exposes the cap as props, since it is a prop and not a style', () => {
+    expect(displayTextProps).toEqual({ maxFontSizeMultiplier: MAX_DISPLAY_FONT_SCALE });
+  });
+
+  it('caps only the display face — body and UI copy scale freely', () => {
+    // Wireframe §18 asks for "large, readable text", and capping the roles a
+    // player actually reads at length would defeat the setting entirely.
+    const capped = new Set<string>(DISPLAY_FACES);
+    const mono = Object.entries(typeScale).filter(
+      ([, style]) => !capped.has(style.fontFamily),
+    );
+
+    expect(mono.map(([role]) => role).sort()).toEqual(['body', 'buttonLabel', 'caption']);
   });
 });
