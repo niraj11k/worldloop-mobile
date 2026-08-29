@@ -127,6 +127,48 @@ export const HOME_EMPTY_STATE = {
   body: 'Start your first chain to build your score.',
 } as const;
 
+/**
+ * Wireframe section 7's worked example (WL-406).
+ *
+ * The doc is emphatic that this screen "should include a real example rather
+ * than only abstract instructions", and its own mockup runs
+ * apple → elephant → table. Kept as data rather than three hardcoded rows
+ * because the whole point is the *pattern*: each entry names who played, the
+ * word, and the letter that word hands to the other side.
+ *
+ * `handoff` is the last letter of `word` — the screen renders it rather than
+ * deriving it, so the example reads identically to a player who is looking at
+ * the required-letter callout in a real round.
+ */
+export const HOW_TO_PLAY_EXAMPLE = [
+  { actor: 'WordLoop', word: 'apple', handoff: 'e' },
+  { actor: 'You', word: 'elephant', handoff: 't' },
+  { actor: 'WordLoop', word: 'table', handoff: 'e' },
+] as const;
+
+/**
+ * The six v1 rules, exactly as Wireframe section 7's "Requirements" list
+ * gives them — no more (the screen must not teach rules v1 doesn't enforce)
+ * and no fewer (the Delivery Plan's WL-406 criterion is "covers exactly the
+ * six v1 rules").
+ *
+ * The three the old skeleton screen showed were rules 3, 4 and 5; rules 1, 2
+ * and 6 were missing entirely, including the one the whole game turns on.
+ *
+ * `{hints}` is substituted with `HINT_LIMIT_PER_ROUND` at render, the same
+ * placeholder convention `INVALID_WORD_MESSAGES` uses for `{letter}` — the
+ * limit is a tunable (WL-605), and a rules screen that quietly disagrees with
+ * the game is worse than one that says nothing.
+ */
+export const HOW_TO_PLAY_RULES = [
+  'Start your word with the required letter.',
+  'Use a word from the game’s word list.',
+  'Names are not allowed.',
+  'You cannot repeat a word already played.',
+  'Words must be at least three letters.',
+  'Stuck? Use a hint — {hints} per round.',
+] as const;
+
 export const MIN_WORD_LENGTH = 3;
 export const HINT_LEVELS: readonly HintLevel[] = [
   'required_letter',

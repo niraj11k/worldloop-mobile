@@ -29,6 +29,26 @@ export type ProfileStatus = 'idle' | 'loading' | 'ready';
 interface ProfileState {
   profile: GuestProfile | null;
   status: ProfileStatus;
+  /**
+   * Whether `load` had to *create* the guest rather than read one — i.e.
+   * whether this is the app's first launch (WL-406).
+   *
+   * Derived rather than stored: "first launch" and "no profile existed yet"
+   * are the same fact, and Architecture section 8.1 has the profile created
+   * on first use, so a `hasSeenWelcome` flag would be a second field saying
+   * what this one already says. A reinstall therefore shows the welcome
+   * again, which is right — that install genuinely is new. Deleting guest
+   * data from Settings does *not*, because it writes a replacement profile
+   * immediately, and the app is not new to someone who just used its
+   * settings screen.
+   *
+   * The trade-off, deliberately accepted: someone who opens the app, reads
+   * the Welcome screen, and force-quits without tapping Play Now does not see
+   * it again, because their profile was already written. Recording "seen"
+   * only on Play Now would need that extra field, for an edge case where the
+   * player has already read the screen.
+   */
+  isFirstLaunch: boolean;
   /** Load the stored profile, or create one on first launch. */
   load: () => Promise<void>;
   /** Fold a finished round into the profile (WL-402). */
@@ -55,6 +75,7 @@ interface ProfileState {
 export const useProfileStore = create<ProfileState>((set, get) => ({
   profile: null,
   status: 'idle',
+  isFirstLaunch: false,
 
   load: async () => {
     if (get().status === 'loading') return;
@@ -71,7 +92,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     const profile = stored === null ? createGuestProfile({ now }) : markSeen(stored, now);
 
     await persist(profile);
-    set({ profile, status: 'ready' });
+    set({ profile, status: 'ready', isFirstLaunch: stored === null });
   },
 
   recordRound: async session => {
