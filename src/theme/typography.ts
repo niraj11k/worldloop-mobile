@@ -94,6 +94,37 @@ export const DISPLAY_FACES: readonly FontFamily[] = [
 export const MIN_DISPLAY_SIZE = 20;
 
 /**
+ * Sizes for decorative lettering — glyphs used as shape, not as text
+ * (Design System §7, "Decorative lettering").
+ *
+ * Deliberately *outside* `typeScale`, and the separation is the point. That
+ * scale governs text a player reads, and its top end is the 64px required
+ * letter, which §6 makes the largest thing anyone reads on any screen. An
+ * ornament that ran through the same scale would either break that rule or be
+ * too small to work as a shape.
+ *
+ * Anything using these sizes must also be hidden from assistive tech and opt
+ * out of font scaling — if it were readable content it would belong in
+ * `typeScale` instead. `HomeBackdrop` is the reference implementation.
+ *
+ * ## Fractions, not points
+ *
+ * These are multipliers on the screen's *shorter* side, because an ornament's
+ * job is to fill a proportion of the screen rather than to be a fixed size.
+ * Fixed points were tried first and failed exactly where you would expect: a
+ * 240pt letter is a bold shape on a 375pt phone and a stray mark on an 820pt
+ * tablet, which left a dead band between the content and the decoration.
+ *
+ * The shorter side rather than the width, so a tablet in landscape doesn't
+ * inflate them.
+ */
+export const ornamentScale = {
+  sm: 0.32,
+  md: 0.45,
+  lg: 0.64,
+} as const;
+
+/**
  * How far the display face is allowed to grow with the OS text setting
  * (WL-408).
  *

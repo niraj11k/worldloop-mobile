@@ -6,6 +6,7 @@ import { Button } from '@components/common/Button';
 import { Card } from '@components/common/Card';
 import { ConfirmSheet } from '@components/common/ConfirmSheet';
 import { IconButton } from '@components/common/IconButton';
+import { HomeBackdrop } from '@components/home/HomeBackdrop';
 import { HOME_EMPTY_STATE, START_NEW_ROUND_CONFIRM } from '@constants/gameConstants';
 import { abandonSession } from '@features/game/gameSession';
 import { useProfileStore } from '@store/useProfileStore';
@@ -92,62 +93,68 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
   };
 
   return (
-    /*
-      WL-408: the screen scrolls. At the largest OS text size its content is
-      about twice the height of a small phone, and without this the Word
-      Review and How to Play entries simply cannot be reached — text scaling
-      has to preserve function, not only legibility (WCAG 1.4.4).
-    */
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text {...displayTextProps} style={styles.wordmark} accessibilityRole="header">
-          WordLoop
-        </Text>
-        {/*
+    <View style={styles.screen}>
+      {/*
+        Behind the content and outside the ScrollView, so it stays put while
+        the content moves over it. See `HomeBackdrop` for what the letters are
+        and why they are decoration rather than type.
+      */}
+      <HomeBackdrop />
+
+      {/*
+        WL-408: the screen scrolls. At the largest OS text size its content is
+        about twice the height of a small phone, and without this the Word
+        Review and How to Play entries simply cannot be reached — text scaling
+        has to preserve function, not only legibility (WCAG 1.4.4).
+      */}
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.header}>
+          <Text {...displayTextProps} style={styles.wordmark} accessibilityRole="header">
+            WordLoop
+          </Text>
+          {/*
           Icon-only control, so the label lives on the Pressable — the glyph is
           decorative and hidden from assistive tech (WL-207). A gear is only
           "Settings" in context.
         */}
-        <IconButton
-          name="settings"
-          accessibilityLabel="Settings"
-          onPress={() => navigation.navigate('Settings')}
-        />
-      </View>
+          <IconButton
+            name="settings"
+            accessibilityLabel="Settings"
+            onPress={() => navigation.navigate('Settings')}
+          />
+        </View>
 
-      <Text style={styles.tagline}>Ready for a chain?</Text>
+        <Text style={styles.tagline}>Ready for a chain?</Text>
 
-      <View style={styles.primaryActions}>
-        <Button
-          label="Start Game"
-          tone="grape"
-          onPress={handleStartGame}
-          style={styles.fullWidthButton}
-        />
+        <View style={styles.primaryActions}>
+          <Button
+            label="Start Game"
+            tone="grape"
+            onPress={handleStartGame}
+            style={styles.fullWidthButton}
+          />
 
-        {/*
+          {/*
           WL-403: only rendered while a round is actually saved, so it is never
           a control that does nothing. The chain length tells the player which
           round is waiting without making them open it to find out.
         */}
-        {savedRound !== null && (
-          <Button
-            label={`Resume Game · ${savedRound.chain.length} words`}
-            variant="secondary"
-            onPress={() =>
-              navigation.navigate('Game', {
-                difficulty: savedRound.difficulty,
-                resume: true,
-              })
-            }
-            style={styles.fullWidthButton}
-          />
-        )}
-      </View>
+          {savedRound !== null && (
+            <Button
+              label={`Resume Game · ${savedRound.chain.length} words`}
+              variant="secondary"
+              onPress={() =>
+                navigation.navigate('Game', {
+                  difficulty: savedRound.difficulty,
+                  resume: true,
+                })
+              }
+              style={styles.fullWidthButton}
+            />
+          )}
+        </View>
 
-      {/*
+        {/*
         Wireframe section 17's "Home without statistics", verbatim, and
         Wireframe section 5's two stat readouts otherwise. Both are grouped
         for assistive tech so each card reads as one phrase ("Best score: 120")
@@ -157,46 +164,59 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
         why that reading of an under-specified field, and the WL-402 note in
         the Delivery Plan for the decision this task did not overrule.
       */}
-      {profile === null ? null : hasPlayed ? (
-        <View style={styles.stats}>
-          <Card
-            fill="tangerine"
-            rotation={-2}
-            style={styles.statCard}
-            accessibilityLabel={`Best score: ${profile.bests.score}`}>
-            <Text style={styles.statLabel}>Best Score</Text>
-            <Text {...displayTextProps} style={styles.statValue}>{profile.bests.score}</Text>
+        {profile === null ? null : hasPlayed ? (
+          <View style={styles.stats}>
+            <Card
+              fill="tangerine"
+              rotation={-2}
+              style={styles.statCard}
+              accessibilityLabel={`Best score: ${profile.bests.score}`}>
+              <Text style={styles.statLabel}>Best Score</Text>
+              <Text {...displayTextProps} style={styles.statValue}>
+                {profile.bests.score}
+              </Text>
+            </Card>
+            <Card
+              fill="sunbeam"
+              rotation={3}
+              style={styles.statCard}
+              accessibilityLabel={`Best streak: ${profile.localStreak.best}`}>
+              <Text style={styles.statLabel}>Best Streak</Text>
+              <Text {...displayTextProps} style={styles.statValue}>
+                {profile.localStreak.best}
+              </Text>
+            </Card>
+          </View>
+        ) : (
+          /*
+          `sunbeam`, not `paper`: on a fresh install this card is the whole
+          middle of the screen, and in paper it left Home reading as one
+          saturated button on an otherwise blank page. Same fill Welcome uses
+          for its explanation, so the two "here's the idea" moments match, and
+          `ink` on `sunbeam` is already in the WL-202 matrix.
+        */
+          <Card fill="sunbeam" rotation={-2} style={styles.emptyState}>
+            <Text {...displayTextProps} style={styles.emptyStateHeadline}>
+              {HOME_EMPTY_STATE.headline}
+            </Text>
+            <Text style={styles.emptyStateBody}>{HOME_EMPTY_STATE.body}</Text>
           </Card>
-          <Card
-            fill="sunbeam"
-            rotation={3}
-            style={styles.statCard}
-            accessibilityLabel={`Best streak: ${profile.localStreak.best}`}>
-            <Text style={styles.statLabel}>Best Streak</Text>
-            <Text {...displayTextProps} style={styles.statValue}>{profile.localStreak.best}</Text>
-          </Card>
+        )}
+
+        <View style={styles.secondaryActions}>
+          <Button
+            label="Word Review"
+            variant="secondary"
+            onPress={() => navigation.navigate('WordReview', { sessionId: 'latest' })}
+          />
+          <Button
+            label="How to Play"
+            variant="secondary"
+            onPress={() => navigation.navigate('HowToPlay')}
+          />
         </View>
-      ) : (
-        <Card rotation={-2} style={styles.emptyState}>
-          <Text {...displayTextProps} style={styles.emptyStateHeadline}>{HOME_EMPTY_STATE.headline}</Text>
-          <Text style={styles.emptyStateBody}>{HOME_EMPTY_STATE.body}</Text>
-        </Card>
-      )}
 
-      <View style={styles.secondaryActions}>
-        <Button
-          label="Word Review"
-          variant="secondary"
-          onPress={() => navigation.navigate('WordReview', { sessionId: 'latest' })}
-        />
-        <Button
-          label="How to Play"
-          variant="secondary"
-          onPress={() => navigation.navigate('HowToPlay')}
-        />
-      </View>
-
-      {/*
+        {/*
         WL-206: the only entry point to the component gallery, and the reason
         it is here rather than behind a gesture — a dev screen nobody can find
         is a dev screen nobody uses, which is the failure mode the previous
@@ -209,30 +229,34 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
         never reads as product — Wireframe §5 fixes what belongs on Home, and
         this is not one of those things.
       */}
-      {__DEV__ && (
-        <Pressable
-          onPress={() => navigation.navigate('Gallery')}
-          accessibilityRole="button"
-          accessibilityLabel="Component gallery, developer builds only">
-          <Text style={styles.devLink}>Component gallery (dev)</Text>
-        </Pressable>
-      )}
+        {__DEV__ && (
+          <Pressable
+            onPress={() => navigation.navigate('Gallery')}
+            accessibilityRole="button"
+            accessibilityLabel="Component gallery, developer builds only">
+            <Text style={styles.devLink}>Component gallery (dev)</Text>
+          </Pressable>
+        )}
 
-      <ConfirmSheet
-        visible={confirmNewRound}
-        title={START_NEW_ROUND_CONFIRM.title}
-        message={START_NEW_ROUND_CONFIRM.message}
-        confirmLabel={START_NEW_ROUND_CONFIRM.confirmLabel}
-        cancelLabel={START_NEW_ROUND_CONFIRM.cancelLabel}
-        onConfirm={handleDiscardSavedRound}
-        onCancel={() => setConfirmNewRound(false)}
-      />
-    </ScrollView>
+        <ConfirmSheet
+          visible={confirmNewRound}
+          title={START_NEW_ROUND_CONFIRM.title}
+          message={START_NEW_ROUND_CONFIRM.message}
+          confirmLabel={START_NEW_ROUND_CONFIRM.confirmLabel}
+          cancelLabel={START_NEW_ROUND_CONFIRM.cancelLabel}
+          onConfirm={handleDiscardSavedRound}
+          onCancel={() => setConfirmNewRound(false)}
+        />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.paper },
+  // `overflow: hidden` is what keeps the backdrop's oversized letters inside
+  // the screen instead of drawing past its edges on iOS, where views do not
+  // clip by default.
+  screen: { flex: 1, backgroundColor: palette.paper, overflow: 'hidden' },
   content: {
     padding: spacing.lg,
     gap: spacing.xl,

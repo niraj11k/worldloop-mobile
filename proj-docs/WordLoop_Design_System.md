@@ -256,6 +256,42 @@ In this system, that means:
 - No stock icon sets that read as generic (standard Material/Feather-style line icons will fight this aesthetic). If icons are needed, they should be hand-drawn or custom-illustrated in a chunky, single-weight style that matches the border weight used on components (3-4px strokes).
 - No photographic imagery. If illustration is used (empty states, welcome screen), it should be flat, bold-outlined, and use only palette colors from section 1.
 
+### Decorative lettering
+
+> **Added 2026-08-30 (design review, after Phase 4).** Home was paper on paper with a
+> large empty band below its content on every device. A photograph was ruled out by the
+> rule above, and fading anything is ruled out by section 1 — `ink` below full opacity
+> composites to a grey, and greys are excluded from this palette. What was left, and what
+> suits a word game, is the product's own material: **oversized display letters used as
+> shape rather than as text.** `HomeBackdrop` is the reference implementation.
+
+Letters used this way are **ornament, not type**, and the distinction is what keeps them
+legal:
+
+- **Sized from the screen, not from the type scale.** `ornamentScale` in
+  `theme/typography.ts` holds fractions of the screen's shorter side, deliberately
+  separate from `typeScale`. Running them through the reading scale would either break
+  section 6's rule that the 64px required letter is the largest thing anyone reads, or
+  make them too small to work as shapes. Fixed point sizes were tried first and failed
+  exactly where you would expect: a bold shape on a 375pt phone became a stray mark on an
+  820pt tablet.
+- **Hidden from assistive tech, and exempt from text scaling.** They say nothing, so they
+  must not be announced — and because they are not read, they must not grow with the OS
+  text setting either. Any lettering that fails this test is content, and belongs in
+  `typeScale` with everything else.
+- **Behind everything, and never a sliver.** Components carry their own fill and `ink`
+  border, so they sit on top cleanly — which is also what satisfies section 1's rule that
+  two accents never touch without an outline between them. But a letter mostly covered by
+  a card reads as a rendering fault, so each one is either substantially in the open or
+  clearly running off an edge, and never the same colour as whatever sits on it.
+- **It yields to content.** Past roughly 1.3× the OS text setting the content fills the
+  smallest supported phone on its own; the band being decorated no longer exists, so the
+  decoration hides rather than fragmenting between the cards.
+
+Rotation follows section 3's range for stickers, and colours come from section 1 like
+everything else — no new tokens, so `npm run contrast:verify` is unaffected (decoration
+carries no contrast obligation; only text and component boundaries do).
+
 ---
 
 ## 8. Do / Don't

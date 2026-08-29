@@ -2169,6 +2169,62 @@ install.
 > shadows, tilts, and both bundled faces — with no `FATAL`/`AndroidRuntime` in
 > `adb logcat`.
 >
+> **Design-review follow-up, 2026-08-30 (after the phase closed).** Home read as dull:
+> paper ground, paper card, paper secondary buttons and a single saturated control, with
+> a large empty band below the content on every device. Two changes, both inside the
+> existing palette and component language:
+>
+> - **The empty-state card is now `sunbeam` rather than `paper`.** On a fresh install
+>   that card is the whole middle of the screen, and in paper it left Home as one purple
+>   button on a blank page. It is the same fill Welcome uses for its explanation, so the
+>   two "here's the idea" moments match, and `ink` on `sunbeam` was already in the WL-202
+>   matrix — no new pairing.
+> - **`HomeBackdrop`**: three oversized display letters in palette colours, rotated and
+>   bleeding off the edges — **A, T, E**, the letters the How to Play chain hands over
+>   (apple → elephant → table). Ornament, not type: hidden from assistive tech, exempt
+>   from text scaling, sized as a fraction of the screen, and it hides entirely past ~1.3×
+>   OS text scale, where the band it fills no longer exists.
+>
+> **The rest of the review.** Every other screen was walked and signed off unchanged —
+> Welcome, Difficulty, the game screen, Pause, How to Play, Settings, Attributions. Two
+> things were looked at and deliberately left alone rather than missed:
+>
+> - **Home's empty lower band is reserved, not unfinished.** Word of the day (a word, its
+>   meaning, a usage sentence, and a count of how often you've used it that day) is
+>   planned for that space, so Home's spacing was not rebalanced around its absence. The
+>   backdrop letters occupy it in the meantime and are three positioned elements to move
+>   or drop when the feature lands.
+> - **Welcome keeps its gap.** Its intro is centred and its controls are pinned to the
+>   bottom, which leaves a hole between them on tall screens. Accepted as-is: the screen
+>   is shown once per install, so the cost is low, and nothing is planned to fill it.
+>
+> **Open, and blocking whenever word of the day gets scheduled:** the app ships no
+> definitions and no example sentences, and has no source for either. The bundled
+> dictionary carries only a commonness tier and two flags per word; WordNet is credited
+> for ESDB's part-of-speech work, not shipped as glosses; and D-08 deliberately leaves the
+> commercial-provider question open. The definitions half collides with WL-501's overlay,
+> which has to answer it anyway — the example sentences have no owner at all. Worth
+> settling before the feature is scheduled rather than during it.
+>
+> Options considered and rejected: a faded background image (Design System §7 bans
+> photography, and fading anything manufactures a grey the palette excludes); a dot-grid
+> pattern (needs a bundled asset or a drawing dependency — the only option that grows the
+> binary); a grape header band (strongest at a glance, but it puts a second large grape
+> shape directly above the grape *Start Game* button and the primary action stops being
+> the loudest thing on screen).
+>
+> **Design System §7 gained a "Decorative lettering" subsection** for the rules this
+> established, since it introduced type values outside §2's scale — per `CLAUDE.md`, the
+> doc goes first.
+>
+> Three things were caught only by looking at it on devices, and are recorded in the
+> component: a `sunbeam` letter behind the now-`sunbeam` card merged into one shape; fixed
+> point sizes stranded the letters on a tablet; and at the largest text size the letters
+> became fragments poking out between cards. **Not verified:** that the letters are
+> actually silent under a screen reader — `uiautomator dump` lists them, but it also lists
+> the inner label of every labelled button, so it cannot tell "in the hierarchy" from
+> "spoken". Rests on the API contract until WL-408's outstanding TalkBack pass runs.
+>
 > **How the populated stats were checked, precisely.** A settled round is still not
 > reachable by hand (WL-402's note explains why: the thinnest letter in the dictionary
 > still offers the computer 34 candidates), so the populated layout was rendered by a

@@ -28,7 +28,13 @@ import {
   textOn,
   TEXT_ON,
 } from './palette';
-import { fontFamily, typeScale, displayTextProps, MAX_DISPLAY_FONT_SCALE } from './typography';
+import {
+  fontFamily,
+  typeScale,
+  ornamentScale,
+  displayTextProps,
+  MAX_DISPLAY_FONT_SCALE,
+} from './typography';
 import type { FillToken } from './palette';
 
 export {
@@ -36,6 +42,7 @@ export {
   TEXT_ON,
   fontFamily,
   typeScale,
+  ornamentScale,
   displayTextProps,
   MAX_DISPLAY_FONT_SCALE,
   disabledFill,
