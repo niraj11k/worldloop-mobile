@@ -113,6 +113,20 @@ export const RESTART_ROUND_CONFIRM = {
   cancelLabel: 'Keep Playing',
 } as const;
 
+/**
+ * Wireframe section 17's "Home without statistics", verbatim — the only copy
+ * in this file the doc supplies word for word alongside the invalid-word
+ * messages. Shown on a fresh install and after Reset Statistics (WL-405).
+ *
+ * Split into two lines because they do different jobs: the first states the
+ * fact, the second is the invitation. The screen sizes them differently for
+ * exactly that reason.
+ */
+export const HOME_EMPTY_STATE = {
+  headline: 'No games completed yet.',
+  body: 'Start your first chain to build your score.',
+} as const;
+
 export const MIN_WORD_LENGTH = 3;
 export const HINT_LEVELS: readonly HintLevel[] = [
   'required_letter',
