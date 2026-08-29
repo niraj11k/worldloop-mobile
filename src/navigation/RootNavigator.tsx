@@ -15,6 +15,7 @@ import { GameScreen } from '@screens/Game/GameScreen';
 import { HowToPlayScreen } from '@screens/HowToPlay/HowToPlayScreen';
 import { WordReviewScreen } from '@screens/WordReview/WordReviewScreen';
 import { SettingsScreen } from '@screens/Settings/SettingsScreen';
+import { AttributionsScreen } from '@screens/Attributions/AttributionsScreen';
 import { AccountCreationScreen } from '@screens/AccountCreation/AccountCreationScreen';
 import { GalleryScreen } from '@screens/Gallery/GalleryScreen';
 
@@ -54,6 +55,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
  * | HowToPlay | wherever it was opened from | Welcome or Home |
  * | WordReview | Game Over, or Home | "Back to Home" unwinds with `popTo` |
  * | Settings | Home | |
+ * | Attributions | Settings | licence notices (WL-407) |
  * | AccountCreation | Settings | modal; dormant behind D-04 |
  * | Gallery | Home | dev builds only |
  *
@@ -105,6 +107,7 @@ export function RootNavigator(): React.JSX.Element {
           <Stack.Screen name="HowToPlay" component={HowToPlayScreen} />
           <Stack.Screen name="WordReview" component={WordReviewScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="Attributions" component={AttributionsScreen} />
           <Stack.Screen
             name="AccountCreation"
             component={AccountCreationScreen}

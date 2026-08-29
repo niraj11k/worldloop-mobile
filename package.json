@@ -15,6 +15,7 @@
     "dictionary:verify": "python3 scripts/verify-dictionary-fixtures.py",
     "contrast:verify": "node scripts/verify-contrast.js",
     "fonts:verify": "node scripts/verify-fonts.js",
+    "attributions:verify": "node scripts/verify-attributions.mjs",
     "simulate": "node scripts/simulate.js"
   },
   "dependencies": {

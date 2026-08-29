@@ -50,6 +50,22 @@ export interface ButtonProps {
   /** Defaults to `label`. Set when the visible text is not the whole story. */
   accessibilityLabel?: string;
   accessibilityHint?: string;
+  /**
+   * `switch` for a control that toggles a setting rather than performing an
+   * action, paired with `checked` (WL-407).
+   *
+   * The design system defines no toggle component — §4 has buttons, cards,
+   * modals, inputs and badges, and nothing else — so Settings expresses a
+   * setting as a button whose label *is* its state ("ON" / "OFF"), which is
+   * also how Wireframe §16's own sketch draws it. That is a fine control to
+   * look at and the wrong thing to *announce*: a screen reader saying
+   * "Sound, ON, button" leaves the listener to guess whether ON is the state
+   * or the outcome. This prop lets the caller say which it is without
+   * anything else about the button changing.
+   */
+  role?: 'button' | 'switch';
+  /** Only meaningful with `role="switch"`. */
+  checked?: boolean;
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }
@@ -82,6 +98,8 @@ export function Button({
   disabled = false,
   accessibilityLabel,
   accessibilityHint,
+  role = 'button',
+  checked,
   style,
   testID,
 }: ButtonProps): React.JSX.Element {
@@ -106,10 +124,10 @@ export function Button({
     <Pressable
       onPress={onPress}
       disabled={disabled}
-      accessibilityRole="button"
+      accessibilityRole={role}
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityHint={accessibilityHint}
-      accessibilityState={{ disabled }}
+      accessibilityState={role === 'switch' ? { disabled, checked } : { disabled }}
       testID={testID}
       style={({ pressed }) => [
         styles.base,
