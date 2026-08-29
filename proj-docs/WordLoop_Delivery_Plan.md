@@ -2119,12 +2119,65 @@ Wireframe §13: Resume, How to Play, Restart, Exit to Home. Confirm before resta
 > WL-308 shipped `GameOverPanel` and the screen has been rendering it since. Stale
 > comment, fixed.
 
-**WL-405 · Home screen** — M · 1.5d · WL-402, WL-204
+**WL-405 · Home screen** — M · 1.5d · WL-402, WL-204 — **DONE 2026-08-29**
 Wireframe §5: start game, best score, best streak, Word Review, How to Play, Settings.
 Empty state ("No games completed yet") per §17. Per §5, **no** shop, feed, leaderboard, or
 dashboard.
 *Done when:* stats read from the persisted profile and the empty state shows on a fresh
 install.
+
+> **DONE 2026-08-29.** Home was the last bare-primitive screen on the core path — the
+> same unstyled state WL-309 found `DifficultyScreen` in. It is now built from the
+> WL-204 component set: `Button`, `Card`, `Icon`, and the WL-203 tokens, with no raw
+> hex, size, or shadow at the call site.
+>
+> **Layout.** §5's purpose line is "give the user immediate access to gameplay", so the
+> screen is ordered by what matters: wordmark (40px display), the primary action, the
+> statistics that give it a reason, then the two secondary entries. **Start Game is the
+> only primary-tone control on the screen** — everything else is `secondary`, so nothing
+> competes with it, which is the same instinct behind §5's own "no shop, feed,
+> leaderboard, dashboard" decision. It is the one full-width control; the rest size to
+> their labels.
+>
+> The two stat cards are the screen's decoration as well as its content: `tangerine` and
+> `sunbeam` fills (both `ink` text, per the WL-202 contrast table), `ink` borders, hard
+> offset shadows, and **opposing tilts** (-2° / +3°) — Design System §0's "asymmetry is
+> a feature" and §3's rotation range. They are informational, which is what makes
+> rotating them legal; nothing else on the screen is tilted, because everything else is
+> a control (§3 forbids rotating those). The empty-state card carries the same tilt.
+>
+> **Three states, not two.** `gamesPlayed > 0` decides between statistics and §17's
+> empty state — *not* "a profile exists", since a fresh guest has a profile from its
+> first launch (Architecture §8.1). And while the profile is still loading the slot
+> renders nothing: flashing "No games completed yet" at a returning player for a frame,
+> then replacing it with their real score, is worse than a frame of nothing. §17's copy
+> is verbatim, in `gameConstants.ts` with the other reviewed strings.
+>
+> **The daily-challenge placeholder was removed.** §5 lists it as *optional*, v1 has no
+> daily challenge, and what was there was an empty `View` carrying a marker label — no
+> layout, nothing visible, one more node for a screen reader to walk past. Noted here
+> rather than done silently, since it is the one §5 element this screen no longer has.
+>
+> WL-403's Resume Game entry and its start-new confirmation were already here as
+> behaviour; this task gave them their form (a full-width secondary button directly
+> under Start Game, showing the waiting round's chain length).
+>
+> **Verified on both platforms.** iPhone SE simulator: the empty state renders with
+> §17's copy on a profile with no completed games; Resume Game appears under Start Game
+> after a force-quit mid-round and shows the right chain length; Start Game with a round
+> saved still raises the confirmation. Android emulator: identical rendering — hard
+> shadows, tilts, and both bundled faces — with no `FATAL`/`AndroidRuntime` in
+> `adb logcat`.
+>
+> **How the populated stats were checked, precisely.** A settled round is still not
+> reachable by hand (WL-402's note explains why: the thinnest letter in the dictionary
+> still offers the computer 34 candidates), so the populated layout was rendered by a
+> **temporary local edit forcing that branch with §5's own example numbers (120 / 14),
+> screenshotted, and reverted** — `git diff` and a grep for the marker confirm nothing
+> remains. That verifies the *layout*, not the binding; the binding is
+> `profile.bests.score` / `profile.localStreak.best`, which the WL-402 store tests cover
+> end-to-end through real storage. Both halves meet for the first time on real hardware
+> at WL-310.
 
 **WL-406 · Welcome and How to Play** — S · 1d · WL-204
 Wireframe §4 and §7. Welcome shown on first launch only. How to Play uses the concrete
