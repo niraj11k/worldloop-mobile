@@ -92,3 +92,33 @@ export const DISPLAY_FACES: readonly FontFamily[] = [
 
 /** Section 2: the display face loses its character below this size. */
 export const MIN_DISPLAY_SIZE = 20;
+
+/**
+ * How far the display face is allowed to grow with the OS text setting
+ * (WL-408).
+ *
+ * Body and UI copy scale without a cap — that is the entire point of the
+ * setting, and Wireframe §18 asks for "large, readable text". The display
+ * roles are the exception, for a reason the Delivery Plan flagged as this
+ * task's highest risk: at iOS's largest accessibility size the scale factor
+ * is about 3.1, which turns the 64px required letter into a ~200px glyph on a
+ * 375pt-wide phone. It cannot fit, and the *reason* it cannot is that it is
+ * already four times body size — it starts where other text is trying to get
+ * to.
+ *
+ * 1.5 lets it reach ~96px, which is still the largest thing on the screen by
+ * a distance, while leaving room for the card and the controls under it.
+ * WCAG 1.4.4 asks that text scale to 200% without loss of content or
+ * function; nothing here is lost — the letter grows, and the content that
+ * would otherwise be pushed off screen stays reachable.
+ *
+ * Spread onto the `Text` rather than living in the style object, because
+ * `maxFontSizeMultiplier` is a prop, not a style. `displayTextProps` is the
+ * one place the number is written down.
+ */
+export const MAX_DISPLAY_FONT_SCALE = 1.5;
+
+/** Spread onto any `Text` using a display-face role. */
+export const displayTextProps = {
+  maxFontSizeMultiplier: MAX_DISPLAY_FONT_SCALE,
+} as const;

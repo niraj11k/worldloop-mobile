@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import type { StyleProp, TextInputProps, ViewStyle } from 'react-native';
 
 import { Icon } from '@components/common/icons/Icon';
+import { announceForAccessibility } from '@utils/accessibility';
 import {
   palette,
   inkMuted,
@@ -57,6 +58,17 @@ export const Input = React.forwardRef<TextInput, InputProps>(function InputImpl(
   ref,
 ) {
   const [focused, setFocused] = useState(false);
+
+  /*
+    WL-408: the `accessibilityLiveRegion` below covers TalkBack, and nothing
+    covered VoiceOver — that prop is Android-only, so on iOS a rejected word
+    was shown and never spoken. Announced on the transition into an error
+    rather than on every render, so a re-render while the message is still up
+    does not repeat it.
+  */
+  useEffect(() => {
+    if (error !== null) announceForAccessibility(error);
+  }, [error]);
 
   const borderColor = error
     ? palette.redAlert

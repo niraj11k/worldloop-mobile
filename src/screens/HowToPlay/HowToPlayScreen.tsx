@@ -10,7 +10,7 @@ import {
   HOW_TO_PLAY_EXAMPLE,
   HOW_TO_PLAY_RULES,
 } from '@constants/gameConstants';
-import { palette, spacing, typeScale } from '@theme/theme';
+import { palette, spacing, typeScale, displayTextProps } from '@theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HowToPlay'>;
 
@@ -47,7 +47,7 @@ export function HowToPlayScreen({ navigation }: Props): React.JSX.Element {
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title} accessibilityRole="header">
+        <Text {...displayTextProps} style={styles.title} accessibilityRole="header">
           How to Play
         </Text>
 
@@ -60,7 +60,7 @@ export function HowToPlayScreen({ navigation }: Props): React.JSX.Element {
               accessibilityLabel={`${step.actor} played ${step.word}. Next word starts with ${step.handoff.toUpperCase()}.`}
               style={styles.exampleCard}>
               <Text style={styles.exampleActor}>{step.actor}</Text>
-              <Text style={styles.exampleWord}>{step.word.toUpperCase()}</Text>
+              <Text {...displayTextProps} style={styles.exampleWord}>{step.word.toUpperCase()}</Text>
               <View style={styles.handoff}>
                 <Text style={styles.exampleActor}>Next word starts with</Text>
                 <Badge label={step.handoff.toUpperCase()} />
@@ -99,7 +99,8 @@ export function HowToPlayScreen({ navigation }: Props): React.JSX.Element {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: palette.paper },
   content: { padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.xxl },
-  title: { ...typeScale.screenTitle, color: palette.ink },
+  // Wraps rather than clipping at large text sizes (WL-408).
+  title: { ...typeScale.screenTitle, color: palette.ink, flexShrink: 1 },
   example: { gap: spacing.md },
   exampleCard: { gap: spacing.xs },
   exampleActor: { ...typeScale.caption, color: palette.ink },

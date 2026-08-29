@@ -5,7 +5,7 @@ import { Button } from '@components/common/Button';
 import { Card } from '@components/common/Card';
 import { GAME_OVER_CONTENT } from '@constants/gameConstants';
 import { isSettledResult } from '@features/scoring/scoringEngine';
-import { palette, spacing, typeScale } from '@theme/theme';
+import { palette, spacing, typeScale, displayTextProps } from '@theme/theme';
 import type { GameSessionState, GameStatus } from '@app-types/game';
 
 interface GameOverPanelProps {
@@ -54,7 +54,7 @@ export function GameOverPanel({
   return (
     <Card style={styles.card}>
       <Text style={styles.label}>Round Complete</Text>
-      <Text style={styles.headline}>{content.headline}</Text>
+      <Text {...displayTextProps} style={styles.headline}>{content.headline}</Text>
       <Text style={styles.description}>{content.description}</Text>
 
       <View style={styles.stats}>

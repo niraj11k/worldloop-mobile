@@ -1,11 +1,11 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
 import { Card } from '@components/common/Card';
-import { Icon } from '@components/common/icons/Icon';
+import { IconButton } from '@components/common/IconButton';
 import { ATTRIBUTIONS } from '@constants/attributions';
-import { palette, spacing, typeScale } from '@theme/theme';
+import { palette, spacing, typeScale, displayTextProps } from '@theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Attributions'>;
 
@@ -51,14 +51,8 @@ export function AttributionsScreen({ navigation }: Props): React.JSX.Element {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          hitSlop={spacing.sm}>
-          <Icon name="back" />
-        </Pressable>
-        <Text style={styles.title} accessibilityRole="header">
+        <IconButton name="back" accessibilityLabel="Back" onPress={() => navigation.goBack()} />
+        <Text {...displayTextProps} style={styles.title} accessibilityRole="header">
           Attributions
         </Text>
       </View>
@@ -70,7 +64,7 @@ export function AttributionsScreen({ navigation }: Props): React.JSX.Element {
 
         {ATTRIBUTIONS.map(attribution => (
           <Card key={attribution.title} style={styles.card}>
-            <Text style={styles.cardTitle}>{attribution.title}</Text>
+            <Text {...displayTextProps} style={styles.cardTitle}>{attribution.title}</Text>
             <Text style={styles.usage}>{attribution.usage}</Text>
             {paragraphsOf(attribution.notice).map((paragraph, index) => (
               <Text key={index} style={styles.notice}>
@@ -92,7 +86,8 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.lg,
   },
-  title: { ...typeScale.screenTitle, color: palette.ink },
+  // Wraps rather than clipping at large text sizes (WL-408).
+  title: { ...typeScale.screenTitle, color: palette.ink, flexShrink: 1 },
   content: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xxl,

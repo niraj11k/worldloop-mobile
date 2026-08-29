@@ -153,7 +153,16 @@ export function Button({
         press transform above.
       */}
       <View style={styles.labelRow}>
-        <Text style={[styles.label, { color: textOn(fill) }]} numberOfLines={1}>
+        {/*
+          The label wraps rather than truncating (WL-408). It used to be
+          `numberOfLines={1}`, which is invisible at ordinary text sizes and
+          becomes "START G…" at the largest accessibility size — a button
+          whose own name is unreadable, and a WCAG 1.4.4 failure, since text
+          has to reach 200% without loss of content. The button grows
+          vertically instead; every screen lays these out in a column or a
+          wrapping row, so nothing else breaks when it does.
+        */}
+        <Text style={[styles.label, { color: textOn(fill) }]}>
           {label}
         </Text>
       </View>

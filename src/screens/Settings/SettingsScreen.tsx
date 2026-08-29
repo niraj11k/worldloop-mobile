@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
 import { Button } from '@components/common/Button';
 import { Card } from '@components/common/Card';
 import { ConfirmSheet } from '@components/common/ConfirmSheet';
-import { Icon } from '@components/common/icons/Icon';
+import { IconButton } from '@components/common/IconButton';
 import {
   ACCOUNTS_ENABLED_V1,
   DELETE_GUEST_DATA_CONFIRM,
@@ -13,7 +13,7 @@ import {
 } from '@constants/gameConstants';
 import { useProfileStore } from '@store/useProfileStore';
 import { useSettingsStore } from '@store/useSettingsStore';
-import { palette, spacing, typeScale } from '@theme/theme';
+import { palette, spacing, typeScale, displayTextProps } from '@theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
@@ -91,14 +91,8 @@ export function SettingsScreen({ navigation }: Props): React.JSX.Element {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          hitSlop={spacing.sm}>
-          <Icon name="back" />
-        </Pressable>
-        <Text style={styles.title} accessibilityRole="header">
+        <IconButton name="back" accessibilityLabel="Back" onPress={() => navigation.goBack()} />
+        <Text {...displayTextProps} style={styles.title} accessibilityRole="header">
           Settings
         </Text>
       </View>
@@ -216,7 +210,8 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.lg,
   },
-  title: { ...typeScale.screenTitle, color: palette.ink },
+  // Wraps rather than clipping at large text sizes (WL-408).
+  title: { ...typeScale.screenTitle, color: palette.ink, flexShrink: 1 },
   content: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xxl,

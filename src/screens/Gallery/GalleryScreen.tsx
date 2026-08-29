@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { RootStackParamList } from '@navigation/types';
-import { Icon } from '@components/common/icons/Icon';
+import { IconButton } from '@components/common/IconButton';
 import { gallery } from './galleryStyles';
 import { ComponentsSection } from './sections/ComponentsSection';
 import { FoundationsSection } from './sections/FoundationsSection';
@@ -80,13 +80,7 @@ export function GalleryScreen({ navigation }: Props): React.JSX.Element {
           one screen that can strand you.
         */}
         <View style={styles.titleRow}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-            hitSlop={spacing.sm}>
-            <Icon name="back" />
-          </Pressable>
+          <IconButton name="back" accessibilityLabel="Back" onPress={() => navigation.goBack()} />
           <Text style={styles.title}>Gallery</Text>
         </View>
 
