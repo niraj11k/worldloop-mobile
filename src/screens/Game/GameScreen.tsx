@@ -48,6 +48,7 @@ import { HintSheet } from '@components/game/HintSheet';
 import { GameOverPanel } from '@components/game/GameOverPanel';
 import { useConfirmBeforeLeave } from '@hooks/useConfirmBeforeLeave';
 import { useProfileStore } from '@store/useProfileStore';
+import { useSavedRoundStore } from '@store/useSavedRoundStore';
 import { palette, spacing, shadow, typeScale } from '@theme/theme';
 import type { GameSessionState, InvalidReason } from '@app-types/game';
 
@@ -139,31 +140,49 @@ const FALLBACK_STARTING_WORD = 'apple';
 export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   const { difficulty } = route.params;
   const recordRound = useProfileStore(state => state.recordRound);
+  const saveRound = useSavedRoundStore(state => state.save);
+  const clearSavedRound = useSavedRoundStore(state => state.clear);
 
-  const [session, setSession] = useState(() =>
-    createSession({
-      sessionId: `local-${Date.now()}`,
-      difficulty,
-      /*
-        WL-402's baseline for the round-end personal-best bonus, read once,
-        here, rather than subscribed to: `previousBestChainLength` is defined
-        as the value *at session creation* (WL-111), so a best recorded while
-        this round is in play must not move the bar mid-round. `getState()`
-        rather than the hook is what keeps it a snapshot.
+  /*
+    WL-403: Home's "Resume Game" arrives with `resume`, and the round it
+    refers to is whatever the launch load put in the store — already
+    phase-normalized by `restoreSession`, so a round killed mid-computer-turn
+    comes back as `computer_thinking` and the effect below finishes the turn
+    the dead process started.
 
-        `null` while the profile is still loading, which is the documented
-        "no baseline known" case and awards no milestone — distinct from a
-        real best of 0, which a first round beats.
-      */
-      previousBestChainLength: useProfileStore.getState().profile?.bests.chainLength ?? null,
-      // `null` means no letter in the dictionary could offer a usable
-      // opening word, which with the bundled asset means the asset itself is
-      // missing or corrupt. Falling back keeps the round playable rather
-      // than dead; surfacing it as the Wireframe section 17 "dictionary
-      // unavailable" state is WL-506's, and the game-over treatment
-      // WL-308's. `apple` is Wireframe section 7's own teaching word.
-      startingWord: nextStartingWord() ?? FALLBACK_STARTING_WORD,
-    }),
+    Read through `getState()` for the same reason as the profile baseline:
+    this decides what the round *is*, once, at mount. A `resume` that finds no
+    saved round (cleared on another screen, or unreadable) falls through to a
+    new round rather than failing — the player asked to play.
+  */
+  const resumed = route.params.resume === true ? useSavedRoundStore.getState().saved : null;
+
+  const [session, setSession] = useState(
+    () =>
+      resumed ??
+      createSession({
+        sessionId: `local-${Date.now()}`,
+        difficulty,
+        /*
+          WL-402's baseline for the round-end personal-best bonus, read once,
+          here, rather than subscribed to: `previousBestChainLength` is
+          defined as the value *at session creation* (WL-111), so a best
+          recorded while this round is in play must not move the bar
+          mid-round. `getState()` rather than the hook keeps it a snapshot.
+
+          `null` while the profile is still loading, which is the documented
+          "no baseline known" case and awards no milestone — distinct from a
+          real best of 0, which a first round beats.
+        */
+        previousBestChainLength: useProfileStore.getState().profile?.bests.chainLength ?? null,
+        // `null` means no letter in the dictionary could offer a usable
+        // opening word, which with the bundled asset means the asset itself
+        // is missing or corrupt. Falling back keeps the round playable rather
+        // than dead; surfacing it as the Wireframe section 17 "dictionary
+        // unavailable" state is WL-506's, and the game-over treatment
+        // WL-308's. `apple` is Wireframe section 7's own teaching word.
+        startingWord: nextStartingWord() ?? FALLBACK_STARTING_WORD,
+      }),
   );
   const [input, setInput] = useState('');
   const [errorReason, setErrorReason] = useState<InvalidReason | null>(null);
@@ -226,6 +245,41 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
       setHintUsedThisTurn(false);
     }
   }, [session.phase]);
+
+  /**
+   * WL-403: the round is written after every change — a turn resolving, a
+   * hint charged, a word rejected.
+   *
+   * "Save after every turn" is the requirement; saving on every state change
+   * is the same thing with fewer places to forget one, and the write is a
+   * synchronous MMKV set of a few hundred bytes. It has to be eager rather
+   * than on the way out, because the exits this protects against — a
+   * force-quit, an OS eviction, a crash — give the app no chance to run
+   * anything on the way out.
+   *
+   * A finished round clears the slot instead of saving; the store enforces
+   * that, so there is no ordering to get wrong between this and the recording
+   * effect below.
+   */
+  useEffect(() => {
+    saveRound(session);
+  }, [session, saveRound]);
+
+  /**
+   * WL-403: finish the computer's turn if the app was killed during it.
+   *
+   * `restoreSession` puts such a round back in `computer_thinking` — the
+   * player's word is already in the chain and a reply is owed. Without this
+   * the round would restore with the thinking indicator up and nothing ever
+   * arriving. Mount-only: any later `computer_thinking` is driven by
+   * `handleSubmit`, which runs the turn itself.
+   */
+  useEffect(() => {
+    if (resumed?.phase === 'computer_thinking') {
+      attemptComputerTurn(resumed);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /**
    * WL-402: the finished round goes into the profile — games played, bests,
@@ -407,6 +461,12 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
       roundRecordedRef.current = true;
       recordRound(abandonSession(session));
     }
+    // WL-403: and it is gone for good. Leaving deliberately is the player
+    // ending the round — the save slot exists for exits they did not choose
+    // (see the WL-403 note in the Delivery Plan), so it must not quietly
+    // offer this round back on Home afterwards, having just told the player
+    // it would be lost.
+    clearSavedRound();
     confirmLeave();
   };
 

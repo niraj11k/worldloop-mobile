@@ -11,7 +11,14 @@ export type RootStackParamList = {
   Welcome: undefined;
   Home: undefined;
   Difficulty: undefined;
-  Game: { difficulty: Difficulty };
+  /**
+   * `resume` asks the screen to pick up the saved round in progress (WL-403)
+   * instead of dealing a new one. Only Home's "Resume Game" sets it, and only
+   * when a round is actually saved; `difficulty` still comes along so the
+   * route is self-describing and the screen has a value if the save turns out
+   * to be gone.
+   */
+  Game: { difficulty: Difficulty; resume?: boolean };
   HowToPlay: undefined;
   WordReview: { sessionId: string };
   Settings: undefined;

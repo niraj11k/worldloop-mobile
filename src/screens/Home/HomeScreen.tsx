@@ -1,9 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
+import { ConfirmSheet } from '@components/common/ConfirmSheet';
 import { Icon } from '@components/common/icons/Icon';
+import { START_NEW_ROUND_CONFIRM } from '@constants/gameConstants';
+import { abandonSession } from '@features/game/gameSession';
 import { useProfileStore } from '@store/useProfileStore';
+import { useSavedRoundStore } from '@store/useSavedRoundStore';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -17,13 +21,56 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
  *
  * Explicit decision (PRD/Wireframe doc): do NOT add a shop, social feed,
  * leaderboard, or school dashboard here in v1.
+ *
+ * ## Resuming a saved round (WL-403)
+ *
+ * Wireframe section 13 requires a round to survive a temporary exit but never
+ * says where the player picks it back up, and section 5's element list
+ * predates there being anything to resume. Home is the answer by elimination:
+ * it is the first screen after launch, and the alternative — dropping the
+ * player straight into a half-played round on open — takes the decision away
+ * from them. So the entry appears only while a round is actually saved, and
+ * Start Game asks before replacing it. Behaviour is WL-403's; the styling and
+ * final layout are WL-405's, like the statistics above.
  */
 export function HomeScreen({ navigation }: Props): React.JSX.Element {
   const profile = useProfileStore(state => state.profile);
+  const recordRound = useProfileStore(state => state.recordRound);
+  const savedRound = useSavedRoundStore(state => state.saved);
+  const clearSavedRound = useSavedRoundStore(state => state.clear);
+  const [confirmNewRound, setConfirmNewRound] = useState(false);
+
   // `gamesPlayed`, not "a profile exists": a fresh guest has a profile from
   // its first launch (Architecture §8.1), so the profile's existence says
   // nothing about whether there are statistics to show.
   const hasPlayed = profile !== null && profile.gamesPlayed > 0;
+
+  /**
+   * Start Game, with WL-401's rule applied to a round that isn't on screen:
+   * nothing discards a round without asking. With nothing saved this is just
+   * a navigation.
+   */
+  const handleStartGame = () => {
+    if (savedRound === null) {
+      navigation.navigate('Difficulty');
+      return;
+    }
+    setConfirmNewRound(true);
+  };
+
+  /**
+   * The saved round is given up here rather than when the new round is dealt,
+   * so it is recorded as `abandoned` against the profile the same way a
+   * discarded round on the game screen is — one rule, both paths.
+   */
+  const handleDiscardSavedRound = () => {
+    if (savedRound !== null) {
+      recordRound(abandonSession(savedRound));
+    }
+    clearSavedRound();
+    setConfirmNewRound(false);
+    navigation.navigate('Difficulty');
+  };
 
   return (
     <View style={{ flex: 1 }}>
@@ -44,9 +91,26 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
 
       <Text>Ready for a chain?</Text>
 
-      <Pressable onPress={() => navigation.navigate('Difficulty')}>
+      <Pressable onPress={handleStartGame}>
         <Text>Start Game</Text>
       </Pressable>
+
+      {/*
+        WL-403: only rendered while a round is actually saved, so it is never
+        a control that does nothing. The chain length tells the player which
+        round is waiting without making them open it to find out.
+      */}
+      {savedRound !== null && (
+        <Pressable
+          onPress={() =>
+            navigation.navigate('Game', {
+              difficulty: savedRound.difficulty,
+              resume: true,
+            })
+          }>
+          <Text>Resume Game ({savedRound.chain.length} words)</Text>
+        </Pressable>
+      )}
 
       {/*
         Bound to the persisted guest profile (WL-402) — this is the screen the
@@ -98,6 +162,16 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
           <Text>Component gallery (dev)</Text>
         </Pressable>
       )}
+
+      <ConfirmSheet
+        visible={confirmNewRound}
+        title={START_NEW_ROUND_CONFIRM.title}
+        message={START_NEW_ROUND_CONFIRM.message}
+        confirmLabel={START_NEW_ROUND_CONFIRM.confirmLabel}
+        cancelLabel={START_NEW_ROUND_CONFIRM.cancelLabel}
+        onConfirm={handleDiscardSavedRound}
+        onCancel={() => setConfirmNewRound(false)}
+      />
     </View>
   );
 }
