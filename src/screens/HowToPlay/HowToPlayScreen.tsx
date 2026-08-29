@@ -10,7 +10,7 @@ import {
   HOW_TO_PLAY_EXAMPLE,
   HOW_TO_PLAY_RULES,
 } from '@constants/gameConstants';
-import { palette, spacing, typeScale, displayTextProps } from '@theme/theme';
+import { palette, spacing, typeScale, displayTextProps, CONTENT_MAX_WIDTH } from '@theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HowToPlay'>;
 
@@ -98,7 +98,16 @@ export function HowToPlayScreen({ navigation }: Props): React.JSX.Element {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: palette.paper },
-  content: { padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.xxl },
+  content: {
+    padding: spacing.lg,
+    gap: spacing.xl,
+    paddingBottom: spacing.xxl,
+    // WL-409: tablets get a centred column rather than a stretched phone
+    // layout; no phone is affected (see CONTENT_MAX_WIDTH).
+    width: '100%',
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: 'center',
+  },
   // Wraps rather than clipping at large text sizes (WL-408).
   title: { ...typeScale.screenTitle, color: palette.ink, flexShrink: 1 },
   example: { gap: spacing.md },

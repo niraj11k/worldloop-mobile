@@ -180,6 +180,27 @@ export const shadow = {
 export const pressTranslate = 4;
 
 /**
+ * The widest a column of content is allowed to get (WL-409).
+ *
+ * Wireframe section 19 asks for tablets to be considered, and the failure
+ * there is not that anything breaks — it is that a phone layout stretched to
+ * 820pt or 1180pt reads as a mistake: a one-line sentence in a card as wide
+ * as a laptop, buttons a foot long, and a measure far past what anyone reads
+ * comfortably.
+ *
+ * 560 is chosen so **no phone is affected**: the widest device in the WL-005
+ * matrix is the iPhone 17 Pro Max at 440pt, so every phone stays exactly as
+ * it was, and only tablets see the column centre itself. It also keeps text
+ * lines near the 45-75 character measure that typography convention treats as
+ * readable.
+ *
+ * Applied to each screen's content container rather than at the navigator, so
+ * a screen that genuinely wants full bleed (a future board, a splash) can
+ * simply not use it.
+ */
+export const CONTENT_MAX_WIDTH = 560;
+
+/**
  * Minimum tap target — Wireframe section 18, "large tap targets".
  *
  * 48 rather than 44: iOS HIG asks for 44pt and WCAG 2.5.5 for 44×44, but

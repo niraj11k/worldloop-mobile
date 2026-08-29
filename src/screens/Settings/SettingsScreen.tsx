@@ -13,7 +13,7 @@ import {
 } from '@constants/gameConstants';
 import { useProfileStore } from '@store/useProfileStore';
 import { useSettingsStore } from '@store/useSettingsStore';
-import { palette, spacing, typeScale, displayTextProps } from '@theme/theme';
+import { palette, spacing, typeScale, displayTextProps, CONTENT_MAX_WIDTH } from '@theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
@@ -216,6 +216,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xxl,
     gap: spacing.lg,
+    // WL-409: tablets get a centred column rather than a stretched phone
+    // layout; no phone is affected (see CONTENT_MAX_WIDTH).
+    width: '100%',
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: 'center',
   },
   section: { gap: spacing.md },
   sectionTitle: { ...typeScale.caption, color: palette.ink },
