@@ -349,7 +349,8 @@ describe('parseProfile', () => {
   it('reads a profile that predates the schema version field', () => {
     // The app-update path: a profile written before a field existed still
     // loads, which is what "survives an app update" has to mean.
-    const { schemaVersion: _omitted, ...withoutVersion } = newProfile();
+    const withoutVersion: Record<string, unknown> = { ...newProfile() };
+    delete withoutVersion.schemaVersion;
     const parsed = parseProfile(JSON.stringify(withoutVersion));
     expect(parsed?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(parsed?.guestId).toBe('guest-test');

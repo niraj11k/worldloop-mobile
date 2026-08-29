@@ -239,6 +239,17 @@ Notes:
   ownership/sync fields from `GameSession` (converging the two) or stay a distinct
   client-side view fed by a `GameSession` the server owns — that's a Phase 7 design
   decision, not one this doc should pre-empt now.
+- **Persisted as-is since WL-403** (2026-08-29), under `CURRENT_SESSION`, wrapped in a
+  `{ schemaVersion, session }` envelope — the whole round in one value, chain included,
+  which is only cheap because `chain` is embedded rather than related (see above). Two
+  fields of this shape are *not* restored verbatim, and both are deliberate:
+  `phase` is normalized on restore (a round killed mid-computer-turn comes back as
+  `computer_thinking` so the reply the player is owed still arrives; every other
+  transient phase settles to `input_empty`, since neither the typed word nor an error
+  message is part of the session), and a round whose `status` is anything but `active`
+  is discarded rather than restored. Unlike the profile, a saved round that doesn't read
+  back exactly is thrown away instead of repaired — see the WL-403 note in the Delivery
+  Plan.
 
 ---
 

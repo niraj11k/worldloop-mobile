@@ -1984,11 +1984,75 @@ guest.
 > `xmas`. Rare letters are where the word list is thinnest, so they are where its
 > misclassifications surface first.
 
-**WL-403 · In-progress game save and restore** — M · 1.5d · WL-402, WL-110
+**WL-403 · In-progress game save and restore** — M · 1.5d · WL-402, WL-110 — **DONE 2026-08-29**
 Wireframe §13 requires the chain to survive a temporary exit. Save after every turn;
 restore on launch.
 *Done when:* backgrounding, force-quitting, and OS-killing the app all restore the exact
 round state including chain, score, and hints used.
+
+> **DONE 2026-08-29.** Same three layers as WL-402:
+> `features/game/sessionPersistence.ts` (pure — serialize, parse, and the restore
+> rules), `services/game/sessionRepository.ts` (the `CURRENT_SESSION` key), and
+> `store/useSavedRoundStore.ts` (the only writer). Loaded at launch in `App.tsx`
+> alongside the profile, so "is there a round to resume" is a synchronous question by
+> the time any screen renders.
+>
+> **Saving is eager, not on the way out.** The round is written on every session change,
+> not just at turn boundaries — same requirement, fewer places to forget one, and the
+> write is a synchronous MMKV set of a few hundred bytes. It has to be eager because the
+> exits this actually protects against give the app no chance to run anything: a
+> force-quit, an OS eviction, a crash. Backgrounding was never the risk — the process
+> survives it.
+>
+> **Three decisions the doc didn't make.**
+>
+> - **Where the player picks the round back up.** §13 requires the round to survive but
+>   never says where it resurfaces, and §5's Home element list predates there being
+>   anything to resume. Home is the answer by elimination — it is the first screen after
+>   launch, and the alternative (dropping the player straight into a half-played round
+>   on open) takes the decision away from them. The entry renders only while a round is
+>   saved, and shows its chain length so the player knows which round is waiting.
+>   Behaviour is this task's; styling stays WL-405's.
+> - **A restored round can't always just be "your turn".** A round killed during the
+>   computer's turn has the player's word already in the chain and a reply owed; landing
+>   it on `input_empty` would leave the player needing a word starting with their own
+>   word's last letter, playing against themselves. Such a round restores as
+>   `computer_thinking` and the screen finishes the turn the dead process started. The
+>   other transient phases settle to `input_empty`: an in-flight submission's verdict is
+>   unknown (the player retypes rather than the app guessing), and a rejection's error
+>   text isn't part of the session.
+> - **A deliberate exit still discards.** Leaving via WL-401's confirmation clears the
+>   save slot and records the round as `abandoned` — the dialog says the round will be
+>   lost, and it must not then be quietly offered back on Home. The save slot covers
+>   exits the player *didn't* choose. **Flagged for WL-404:** its Pause screen could
+>   reasonably add an "Exit and save for later" that keeps the round instead, at which
+>   point this rule is worth revisiting.
+>
+> Starting a new round while one is saved confirms first (`START_NEW_ROUND_CONFIRM`,
+> reusing WL-401's `ConfirmSheet`) — the same "nothing discards a round without asking"
+> rule, applied to a round that isn't on screen. The message names Resume Game, since a
+> dialog offering only "lose it" or "cancel" leaves the player to work out the third
+> option themselves.
+>
+> **Parsing is strict here, unlike the profile's.** `parseProfile` repairs what it can
+> because a player's whole history is at stake. A saved round is worth minutes, and a
+> half-repaired one is a *playable object* — a chain missing entries, a required letter
+> that no longer follows from the last word. So anything that doesn't read back exactly
+> is discarded, including a round whose chain disagrees with the word on the board, one
+> from a different schema version, and any round that is already finished.
+>
+> **Verified on both platforms, by playing and by reading the stored bytes.** iPhone SE
+> simulator: played a round with a hint used (chain 5, score 25, `hintsUsed` 1),
+> force-quit, and read the app's MMKV file back — status `active`, the exact chain,
+> score, and hint count. Relaunched: Home offered "Resume Game (5 words)", Start Game
+> raised the confirmation instead of silently replacing it, and resuming restored the
+> chain, score, difficulty badge, current word, and required letter exactly. Playing on
+> after the resume wrote the round again. Backgrounding and returning kept the screen
+> untouched, typed input included. Android emulator: same flow — force-stop mid-round,
+> relaunch, "Resume Game (3 words)", resumed identically, no `FATAL`/`AndroidRuntime` in
+> `adb logcat`. 26 unit tests cover the pure rules and the store, including the
+> mid-computer-turn restore, which is the one case too fast to trigger by hand (the
+> window is one 350ms think delay).
 
 **WL-404 · Pause screen** — S · 1d · WL-401
 Wireframe §13: Resume, How to Play, Restart, Exit to Home. Confirm before restart or exit.

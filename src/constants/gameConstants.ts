@@ -79,6 +79,23 @@ export const DISCARD_ROUND_CONFIRM = {
   cancelLabel: 'Keep Playing',
 } as const;
 
+/**
+ * WL-403: shown when the player starts a new round while one is saved.
+ *
+ * Same rule as `DISCARD_ROUND_CONFIRM` — nothing discards a round without
+ * being asked (Wireframe section 13) — but a different situation, so a
+ * different message: the round at risk is not the one on screen, and the way
+ * to keep it is the Resume entry the player just walked past. The message
+ * says so, since a dialog that only offers "lose it" or "cancel" leaves the
+ * player to work out the third option themselves.
+ */
+export const START_NEW_ROUND_CONFIRM = {
+  title: 'Start a new round?',
+  message: 'Your saved round will be lost. Resume Game keeps it.',
+  confirmLabel: 'Start New',
+  cancelLabel: 'Cancel',
+} as const;
+
 export const MIN_WORD_LENGTH = 3;
 export const HINT_LEVELS: readonly HintLevel[] = [
   'required_letter',
