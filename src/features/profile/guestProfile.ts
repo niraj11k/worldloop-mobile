@@ -48,6 +48,19 @@ export const CURRENT_SCHEMA_VERSION = 1;
  */
 export const MAX_RETAINED_ROUNDS = 100;
 
+/**
+ * How many discovered words count as "several" for the trigger policy's
+ * repeated-engagement prompt (WL-503). See `newWordsMilestoneReached`.
+ *
+ * Note the contrast with `localScores` above: discovered words are **not**
+ * capped. They are the one thing `resetStatistics` deliberately keeps, and
+ * WL-502's review screen and the 1.1 vocabulary-history feature both read the
+ * whole list — a cap here would silently delete the player's vocabulary. The
+ * list grows by at most a handful of *new* words per round and stores a short
+ * record each, so it stays small in practice.
+ */
+const NEW_WORDS_MILESTONE = 25;
+
 const DEFAULT_SETTINGS: GuestSettings = {
   soundEnabled: true,
   hapticsEnabled: true,
@@ -167,6 +180,77 @@ function newDiscoveredWords(
       pronunciationViewed: false,
       firstSeenAt: now.toISOString(),
     }));
+}
+
+/**
+ * The words this round was the first to surface (WL-503).
+ *
+ * Read back off the profile by `sessionId` rather than recomputed from the
+ * session, and that is what makes it trustworthy: `newDiscoveredWords` has
+ * already applied the "genuinely new" rule against the whole profile, so
+ * anything carrying this round's id is by construction a word the player had
+ * never played before. Recomputing it at the call site would be a second
+ * implementation of that rule, free to disagree with the stored one.
+ *
+ * Feeds Wireframe §14's "new words discovered" line and WL-502's review
+ * screen, which needs the same list rather than a count of it.
+ */
+export function discoveredWordsForSession(
+  profile: GuestProfile,
+  sessionId: string,
+): DiscoveredWord[] {
+  return profile.discoveredWords.filter(entry => entry.sessionId === sessionId);
+}
+
+/**
+ * Records that the player opened a definition for `word` (WL-501/WL-502).
+ *
+ * `definitionViewed` is a Data Model §7 field that every record has written as
+ * `false` since WL-402, whose own comment reserved it for "the definition
+ * overlay (Phase 5)" — this is that. It exists so PRD §12's learning features
+ * can tell a word the player merely played from one they stopped to look up,
+ * and so WL-602's `definition opened` event has a durable counterpart that
+ * survives a reinstall of the analytics layer.
+ *
+ * Returns the profile unchanged when the word is not on it or was already
+ * viewed, so callers can fire this on every open without checking — a word
+ * played but never *discovered* (because an earlier round found it) still has
+ * a record to mark, and a word the player has never played has nothing to say.
+ */
+export function markDefinitionViewed(profile: GuestProfile, word: string): GuestProfile {
+  const normalizedWord = word.trim().toLowerCase();
+  const needsUpdate = profile.discoveredWords.some(
+    entry => entry.word === normalizedWord && !entry.definitionViewed,
+  );
+  if (!needsUpdate) return profile;
+
+  return {
+    ...profile,
+    discoveredWords: profile.discoveredWords.map(entry =>
+      entry.word === normalizedWord ? { ...entry, definitionViewed: true } : entry,
+    ),
+  };
+}
+
+/**
+ * Trigger-policy doc, "After repeated engagement": "discovering several new
+ * words." Dormant under D-04 like the rest of the account surface — this is
+ * the predicate `promptPolicy`'s existing `new_words_milestone` trigger needs,
+ * not a prompt.
+ *
+ * "Several" is left as one explicit number here rather than scattered through
+ * callers; no doc gives one, the same posture `HINT_LIMIT_PER_ROUND` takes.
+ * Every multiple counts, so a player who keeps finding words keeps qualifying
+ * — the 30-day cooldown and per-cycle cap in `promptPolicy` are what stop that
+ * becoming nagging, which is the layer that already owns that job.
+ */
+export function newWordsMilestoneReached(
+  profile: GuestProfile,
+  wordsBefore: number,
+): boolean {
+  const before = Math.floor(wordsBefore / NEW_WORDS_MILESTONE);
+  const after = Math.floor(profile.discoveredWords.length / NEW_WORDS_MILESTONE);
+  return after > before;
 }
 
 /**

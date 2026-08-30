@@ -46,7 +46,13 @@
  * a human could still have continued (`player_win`). Only when the wider
  * player set is empty too has the dictionary genuinely run out.
  */
-import type { GameSessionState, GameStatus, Move, TurnPhase } from '@app-types/game';
+import type {
+  GameSessionState,
+  GameStatus,
+  HintLevel,
+  Move,
+  TurnPhase,
+} from '@app-types/game';
 import type { ValidationResult } from '@features/game/ruleEngine';
 import { getRequiredLetter, normalizeWord } from '@features/game/ruleEngine';
 import { roundEndBonus } from '@features/scoring/scoringEngine';
@@ -202,6 +208,11 @@ export const applyValidation = ignoreIfOver(
       scoreAwarded?: number;
       /** WL-307: true if the player used the hint sheet this turn. */
       hintUsed?: boolean;
+      /**
+       * WL-504: the deepest level the sheet actually showed. Defaults to
+       * `example_word`, the deepest level that existed before level 4.
+       */
+      hintLevel?: HintLevel;
     },
   ): GameSessionState => {
     const { submittedWord, result } = params;
@@ -226,9 +237,14 @@ export const applyValidation = ignoreIfOver(
       isValid: true,
       invalidReason: null,
       hintUsed,
-      // The sheet always reveals levels 1-3 together (WL-307) — recorded at
-      // the deepest level given, since there is no partial-reveal path yet.
-      hintLevel: hintUsed ? 'example_word' : null,
+      // The sheet reveals every level it has together as one hint (WL-307),
+      // so this records the deepest one given rather than a tier the player
+      // chose — there is no partial-reveal path. `definition_clue` since
+      // WL-504 added level 4; the caller passes what the sheet actually
+      // showed, because levels 3 and 4 are omitted on a letter with nothing
+      // to offer and recording a level that never appeared would misreport
+      // what the -5 bought.
+      hintLevel: hintUsed ? params.hintLevel ?? 'example_word' : null,
       scoreAwarded,
     };
 

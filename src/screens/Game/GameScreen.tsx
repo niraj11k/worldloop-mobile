@@ -5,6 +5,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   StyleSheet,
 } from 'react-native';
 import type { TextInput } from 'react-native';
@@ -28,10 +29,20 @@ import {
 import { nextStartingWord } from '@features/game/startingWord';
 import { generateCandidates, selectComputerWord } from '@features/difficulty/difficultyEngine';
 import { rarityForEntry, scoreWord } from '@features/scoring/scoringEngine';
-import { replyCountForLetter, exampleWordForHint } from '@features/dictionary/dictionaryService';
+import {
+  replyCountForLetter,
+  exampleWordForHint,
+  isDictionaryAvailable,
+} from '@features/dictionary/dictionaryService';
+import {
+  definitionClueForHint,
+  lookupDefinition,
+} from '@features/dictionary/definitionService';
 import {
   INVALID_WORD_MESSAGES,
   COMPUTER_TIMEOUT_MESSAGE,
+  DICTIONARY_UNAVAILABLE_MESSAGE,
+  OFFLINE_NOTICE,
   DISCARD_ROUND_CONFIRM,
   HINT_LIMIT_PER_ROUND,
   RESTART_ROUND_CONFIRM,
@@ -44,12 +55,17 @@ import { Input } from '@components/common/Input';
 import { IconButton } from '@components/common/IconButton';
 import { SpringIn } from '@components/common/motion/SpringIn';
 import { ThinkingDots } from '@components/common/motion/ThinkingDots';
+import { DefinitionSheet } from '@components/game/DefinitionSheet';
+import { ReportWordSheet } from '@components/game/ReportWordSheet';
 import { HintSheet } from '@components/game/HintSheet';
 import { GameOverPanel } from '@components/game/GameOverPanel';
 import { PauseSheet } from '@components/game/PauseSheet';
+import { discoveredWordsForSession } from '@features/profile/guestProfile';
 import { useConfirmBeforeLeave } from '@hooks/useConfirmBeforeLeave';
 import { announceForAccessibility } from '@utils/accessibility';
+import { useConnectivityStore } from '@store/useConnectivityStore';
 import { useProfileStore } from '@store/useProfileStore';
+import { useReportStore } from '@store/useReportStore';
 import { useSavedRoundStore } from '@store/useSavedRoundStore';
 import {
   palette,
@@ -139,17 +155,31 @@ const FALLBACK_STARTING_WORD = 'apple';
  * Wireframe section 17's timeout/retry path (WL-306, see
  * `COMPUTER_TURN_TIMEOUT_MS`); the hint sheet is wired (WL-307); and the
  * round-over branch is `GameOverPanel`, covering all five Wireframe section
- * 14 result states (WL-308).
+ * 14 result states (WL-308); and the word on the board opens Wireframe
+ * section 12's definition overlay without touching the turn (WL-501).
  *
  * The round both reads from and writes to the guest profile (WL-402) — the
  * personal-best baseline comes in at session creation and a finished round is
  * folded back in once — and is saved after every change so it survives the
  * app being killed (WL-403). Pause is wired to the four Wireframe section 13
- * actions (WL-404). Not yet wired: the definition overlay (Phase 5).
+ * actions (WL-404).
  */
 export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   const { difficulty } = route.params;
   const recordRound = useProfileStore(state => state.recordRound);
+  const markDefinitionSeen = useProfileStore(state => state.markDefinitionSeen);
+  const submitReport = useReportStore(state => state.submit);
+  /**
+   * WL-506. `null` (not yet known) renders no banner — see the store.
+   */
+  const isOnline = useConnectivityStore(state => state.isOnline);
+  /**
+   * WL-506, Wireframe §17's "dictionary unavailable". Read on every render
+   * rather than once: the copy the player sees says "try again shortly", so a
+   * transient failure must be allowed to clear itself. The call is a no-op
+   * once the index is built.
+   */
+  const dictionaryAvailable = isDictionaryAvailable();
   const saveRound = useSavedRoundStore(state => state.save);
   const clearSavedRound = useSavedRoundStore(state => state.clear);
 
@@ -199,6 +229,28 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   const [showFullChain, setShowFullChain] = useState(false);
   const [computerTimedOut, setComputerTimedOut] = useState(false);
   const [hintSheetVisible, setHintSheetVisible] = useState(false);
+  /**
+   * WL-501: which word the definition overlay is showing, or `null` when it is
+   * closed.
+   *
+   * Deliberately a screen-local string and *not* part of `GameSessionState`:
+   * the WL-110 machine's whole contract is that a transition changes the turn,
+   * and opening a definition must not. PRD §12 and Wireframe §12 both require
+   * the overlay to leave the turn untouched, so the safest way to guarantee it
+   * is to give it no way to reach the session at all. It also means the phase
+   * behind the sheet — `input_empty`, `invalid_word`, even `computer_thinking`
+   * — keeps running exactly as it would have.
+   */
+  const [definitionWord, setDefinitionWord] = useState<string | null>(null);
+  /** WL-505: which word the report sheet is about, or `null` when closed. */
+  const [reportWord, setReportWord] = useState<string | null>(null);
+  /**
+   * WL-505: the word the last rejection was actually about.
+   *
+   * Separate from `latestInputRef` because the field can change after the
+   * judgement it is being reported for — see `handleSubmit`.
+   */
+  const [rejectedWord, setRejectedWord] = useState('');
   /** WL-404: Wireframe section 13's pause sheet, and Restart's confirmation. */
   const [pauseSheetVisible, setPauseSheetVisible] = useState(false);
   const [confirmRestart, setConfirmRestart] = useState(false);
@@ -348,6 +400,13 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
     () => exampleWordForHint(session.requiredLetter, usedWords(session)),
     [session],
   );
+  // WL-504's level 4. Excludes level 3's example so the two lines describe
+  // different words — see `definitionClueForHint`.
+  const hintDefinitionClue = useMemo(
+    () =>
+      definitionClueForHint(session.requiredLetter, usedWords(session), hintExampleWord),
+    [session, hintExampleWord],
+  );
 
   /**
    * The computer's actual turn: the think delay, candidate generation, and
@@ -434,6 +493,9 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
       submittedWord: submitted,
       result,
       hintUsed: hintUsedThisTurn,
+      // WL-504: what the sheet actually showed, not what it could show. On a
+      // letter with no usable clue the hint stopped at level 3.
+      hintLevel: hintDefinitionClue !== null ? 'definition_clue' : 'example_word',
       scoreAwarded:
         result.entry === null
           ? 0
@@ -451,6 +513,15 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
     });
     if (!result.isValid) {
       setErrorReason(result.reason);
+      // WL-505: the word that was actually judged, captured here rather than
+      // read from the field when the player taps Report.
+      //
+      // Found on device: iOS autocorrect can rewrite the field *after* submit
+      // — "yaffle" was rejected and the field then held "Raffle", so a report
+      // sourced from `latestInputRef` would have named a word the game never
+      // rejected, and one that is in the word list. The report has to describe
+      // the judgement it is disputing.
+      setRejectedWord(submitted);
       setSession(afterPlayer);
       return;
     }
@@ -570,6 +641,22 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
           session.requiredLetter.toUpperCase(),
         );
 
+  /**
+   * WL-503: how many of this round's words the player had never played before.
+   *
+   * Subscribed to the store rather than computed here, and read *after* the
+   * recording effect above has folded the round in — which is why it is a
+   * count off `discoveredWords` and not off `session.chain`. The profile is
+   * the only thing that knows what the player has played before; the chain
+   * only knows this round. Before the round is recorded this is 0, which is
+   * also what the panel would want to show for a round that found nothing.
+   */
+  const newWordsDiscovered = useProfileStore(state =>
+    state.profile === null
+      ? 0
+      : discoveredWordsForSession(state.profile, session.sessionId).length,
+  );
+
   const submitDisabled = busy || normalizeWord(input).length === 0;
   // Wireframe section 9: "Hint: enabled if available." Reusing the app's
   // existing disabled-control language for "unavailable" (Submit, Try Again)
@@ -613,6 +700,29 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
           onPress={() => setPauseSheetVisible(true)}
         />
       </View>
+
+      {/*
+        WL-506, Wireframe section 17's two remaining failure states. Both sit
+        above the scroll view rather than inside it, so neither can be scrolled
+        past unseen — and neither blocks play, which is this task's actual
+        criterion: the offline notice is reassurance about a round that is
+        working fine, and the dictionary notice appears alongside a board the
+        player can still leave.
+      */}
+      {isOnline === false && (
+        <View style={styles.noticeRow}>
+          <Text style={styles.notice} accessibilityLiveRegion="polite">
+            {OFFLINE_NOTICE}
+          </Text>
+        </View>
+      )}
+      {!dictionaryAvailable && (
+        <View style={styles.noticeRow}>
+          <Text style={styles.notice} accessibilityLiveRegion="polite">
+            {DICTIONARY_UNAVAILABLE_MESSAGE}
+          </Text>
+        </View>
+      )}
 
       {/*
         Wireframe section 19: input and Submit must stay visible above the
@@ -676,7 +786,37 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
                 <Text style={styles.turnLabel}>
                   {lastMove?.actor === 'player' ? 'You' : 'WordLoop'}
                 </Text>
-                <Text {...displayTextProps} style={styles.currentWord}>{session.currentWord.toUpperCase()}</Text>
+                {/*
+                  WL-501, and PRD section 12's "optional word definition after
+                  a move" quite literally: the word just played is the one the
+                  overlay is about, whoever played it.
+
+                  This is the game screen's only definition entry point. The
+                  chain row below is deliberately left alone — WL-305/WL-408
+                  made it a single grouped accessibility node so a screen
+                  reader hears the chain as one phrase, and turning its entries
+                  into buttons would fragment that back into N announcements to
+                  duplicate an affordance the Word Review screen (WL-502)
+                  already gives for every word in the round.
+
+                  `hitSlop` because the tap target is a text node sized by the
+                  type scale rather than a control: at the smallest supported
+                  text size the glyphs alone are under the 44pt minimum.
+                */}
+                <Pressable
+                  onPress={() => {
+                    setDefinitionWord(session.currentWord);
+                    // Data Model §7's `definition_viewed`, from this surface
+                    // as well as WL-502's. A no-op for a word the player has
+                    // not discovered (the computer's, or one found in an
+                    // earlier round) — see `markDefinitionViewed`.
+                    markDefinitionSeen(session.currentWord);
+                  }}
+                  hitSlop={spacing.sm}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${session.currentWord}. Show definition`}>
+                  <Text {...displayTextProps} style={styles.currentWord}>{session.currentWord.toUpperCase()}</Text>
+                </Pressable>
               </>
             )}
           </View>
@@ -684,6 +824,7 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
           {roundOver ? (
             <GameOverPanel
               session={session}
+              newWordsDiscovered={newWordsDiscovered}
               /*
                 `popTo`, not `navigate` (WL-401). In React Navigation 7 a
                 `navigate` to a route that is not the current one *pushes*
@@ -795,6 +936,28 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
                 style={styles.input}
               />
 
+              {/*
+                WL-505's in-round entry point (PRD §26). Only on the
+                invalid-word state, which is the moment the player actually
+                disagrees with the dictionary — offering it permanently would
+                invite reports of words the game just accepted.
+
+                A plain pressable rather than a Button: Design System §4 keeps
+                the loud controls for the turn itself, and this must not
+                compete with Submit. It reports the word as the player typed
+                it, not the normalized form, so a rejection caused by
+                normalization is still reportable in the shape they saw.
+              */}
+              {session.phase === 'invalid_word' && (
+                <Pressable
+                  onPress={() => setReportWord(rejectedWord)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Report ${rejectedWord}`}
+                  accessibilityHint="Tells us this word was judged wrongly">
+                  <Text style={styles.reportLink}>Report this word</Text>
+                </Pressable>
+              )}
+
               {session.phase === 'validating' && (
                 <Text style={styles.statusMessage}>Checking word…</Text>
               )}
@@ -870,11 +1033,46 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
         }}
       />
 
+      {/*
+        WL-501. Nothing here touches `session`, which is the point: the
+        definition is read from a bundled asset with a synchronous lookup, and
+        the sheet's only state is which word it is showing. A round in
+        `computer_thinking` behind it keeps thinking; a round in
+        `invalid_word` keeps its error message.
+      */}
+      <DefinitionSheet
+        visible={definitionWord !== null}
+        word={definitionWord ?? ''}
+        definition={definitionWord === null ? null : lookupDefinition(definitionWord)}
+        onClose={() => setDefinitionWord(null)}
+      />
+
+      {/*
+        WL-505. Like the definition overlay, it holds no session state and
+        cannot reach the WL-110 machine — the round behind it is untouched, so
+        the player can report a word and carry straight on typing another.
+      */}
+      <ReportWordSheet
+        visible={reportWord !== null}
+        word={reportWord ?? ''}
+        onSubmit={report => {
+          submitReport({
+            word: report.word,
+            reportType: report.reportType,
+            playerComment: report.comment,
+            gameId: session.sessionId,
+          });
+          setReportWord(null);
+        }}
+        onCancel={() => setReportWord(null)}
+      />
+
       <HintSheet
         visible={hintSheetVisible}
         requiredLetter={session.requiredLetter}
         wordCount={hintWordCount}
         exampleWord={hintExampleWord}
+        definitionClue={hintDefinitionClue}
         onUseHint={handleUseHint}
         onCancel={() => setHintSheetVisible(false)}
       />
@@ -951,6 +1149,21 @@ const styles = StyleSheet.create({
   chainText: { ...typeScale.chainWord, color: palette.ink },
   input: { width: '100%' },
   statusMessage: { ...typeScale.body, color: palette.ink, textAlign: 'center' },
+  // WL-506: a quiet full-width strip, not a Card and not `tomato`. Neither of
+  // these states is an error the player caused or can fix, and dressing them
+  // as alarms would contradict the reassurance they exist to give.
+  noticeRow: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+    width: '100%',
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: 'center',
+  },
+  notice: { ...typeScale.caption, color: palette.ink },
+  // WL-505: a quiet secondary affordance, deliberately not a Button — it must
+  // not compete with Submit for the player's attention on a turn they are
+  // still trying to take.
+  reportLink: { ...typeScale.body, color: palette.grape, textAlign: 'center' },
   actionsRow: {
     flexDirection: 'row',
     justifyContent: 'center',

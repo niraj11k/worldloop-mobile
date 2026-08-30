@@ -48,15 +48,19 @@ coverage/
 # Project docs
 docs/
 
-# Dictionary generation pipeline (WL-102/WL-105).
+# Dictionary generation pipeline (WL-102/WL-105/WL-501).
 #
-# Ignored: the ESDB source checkout + build (~150MB) and the intermediate
-# JSON (~36MB), both reproducible via `npm run dictionary:generate`.
+# Ignored: the ESDB source checkout + build (~150MB), the WordNet database
+# download (~16MB) and the intermediate JSON (~36MB), all reproducible via
+# `npm run dictionary:generate`.
 #
-# NOT ignored: src/assets/dictionary/dictionary.pack.json (~1.7MB), the
-# packed asset the app actually imports. Metro needs it to bundle, so a
-# fresh checkout and CI's native build jobs must have it without running
-# the generator (which needs Python, SQLite and a network fetch).
+# NOT ignored: src/assets/dictionary/dictionary.pack.json (~1.7MB) and
+# definitions.pack.json (~3.0MB), the packed assets the app actually
+# imports. Metro needs them to bundle, so a fresh checkout and CI's native
+# build jobs must have them without running the generators (which need
+# Python, SQLite and a network fetch).
 .cache/
 src/assets/dictionary/dictionary.json
 src/assets/dictionary/manifest.json
+# Python bytecode from the dictionary/definition generators.
+__pycache__/

@@ -23,6 +23,8 @@ export const STORAGE_KEYS = {
   SETTINGS: 'wordloop:settings',
   CURRENT_SESSION: 'wordloop:current_session',
   ACCOUNT_PROMPT_STATE: 'wordloop:account_prompt_state',
+  /** WL-505's locally-queued word reports, exported from Settings (D-03). */
+  WORD_REPORTS: 'wordloop:word_reports',
 } as const;
 
 const mmkv = createMMKV({ id: 'wordloop-storage' });

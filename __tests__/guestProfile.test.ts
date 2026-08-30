@@ -2,8 +2,10 @@ import {
   CURRENT_SCHEMA_VERSION,
   MAX_RETAINED_ROUNDS,
   createGuestProfile,
+  discoveredWordsForSession,
   markSeen,
   newGuestId,
+  newWordsMilestoneReached,
   parseProfile,
   recordRoundCompleted,
   resetStatistics,
@@ -258,7 +260,63 @@ describe('recordRoundCompleted', () => {
       expect(recordRoundCompleted(newProfile(), abandoned, LATER).discoveredWords).toHaveLength(1);
     });
   });
+
+  describe('per-round discovery (WL-503)', () => {
+    it('reports only the words a round was the first to surface', () => {
+      // The count Wireframe §14's "new words discovered" line shows. The
+      // second round replays 'eagle' and adds 'edge', so it discovered one
+      // word, not two — which is the whole point of the line.
+      const first = recordRoundCompleted(newProfile(), playerWin(['eagle']), LATER);
+      const second = recordRoundCompleted(first, playerWin(['eagle', 'edge']), LATER);
+
+      expect(discoveredWordsForSession(second, 'session-1').map(e => e.word)).toEqual([
+        'eagle',
+        'edge',
+      ]);
+    });
+
+    it('is empty for a session that discovered nothing new', () => {
+      const first = recordRoundCompleted(newProfile(), playerWin(['eagle']), LATER);
+      const replayed = recordRoundCompleted(first, {
+        ...playerWin(['eagle']),
+        sessionId: 'session-2',
+      }, LATER);
+
+      expect(discoveredWordsForSession(replayed, 'session-2')).toEqual([]);
+    });
+
+    it('crosses the milestone only on the round that passes it', () => {
+      // Dormant under D-04, but the predicate has to be right before the
+      // prompt is switched on, not after.
+      const below = { ...newProfile(), discoveredWords: wordEntries(24) };
+      const crossing = { ...newProfile(), discoveredWords: wordEntries(25) };
+      const past = { ...newProfile(), discoveredWords: wordEntries(26) };
+
+      expect(newWordsMilestoneReached(crossing, 24)).toBe(true);
+      expect(newWordsMilestoneReached(past, 25)).toBe(false);
+      expect(newWordsMilestoneReached(below, 23)).toBe(false);
+      // Every multiple qualifies, not just the first — a player who keeps
+      // finding words keeps engaging. The cooldown in `promptPolicy` is what
+      // stops that becoming nagging.
+      expect(newWordsMilestoneReached({ ...newProfile(), discoveredWords: wordEntries(50) }, 49)).toBe(
+        true,
+      );
+    });
+  });
 });
+
+/** `count` distinct DiscoveredWord records, for milestone arithmetic. */
+function wordEntries(count: number) {
+  return Array.from({ length: count }, (_, i) => ({
+    ownerType: 'guest' as const,
+    ownerId: 'guest-test',
+    word: `word${i}`,
+    sessionId: 'session-old',
+    definitionViewed: false,
+    pronunciationViewed: false,
+    firstSeenAt: LATER.toISOString(),
+  }));
+}
 
 describe('resetStatistics (Wireframe §16)', () => {
   it('clears the statistics', () => {

@@ -1,13 +1,28 @@
 /**
  * Attribution notices shipped in Settings → Attributions (WL-407).
  *
- * Every one of these is a licence obligation, not a courtesy. Three of the
- * four notices are copied from a source file rather than retyped, so they can
+ * Every one of these is a licence obligation, not a courtesy. Four of the
+ * five notices are copied from a source file rather than retyped, so they can
  * be diffed against it:
  *
  * - **ESDB** and **WordNet** — `WordLoop_Word_List_Licence_Review.md`
  *   section 7, the text WL-101 established as "required attribution text, to
  *   ship", character for character.
+ * - **WordNet 3.1 database** — the licence header carried inside the WordNet
+ *   data files themselves, saved verbatim to
+ *   `licenses/wordnet/WordNet-3.1-LICENSE.txt` by WL-501.
+ *
+ * **Why WordNet appears twice, which looks like a duplicate and is not.** The
+ * first entry is inherited: ESDB used WordNet for its part-of-speech work, so
+ * the licence review recommended carrying WordNet's notice as insurance
+ * against POS-derived data counting as "results from the database". That entry
+ * reproduces the WordNet **1.6** notice ESDB itself publishes. WL-501 then
+ * bundled the WordNet **3.1** database directly for definitions — a different
+ * version, a materially different licence text (a fuller disclaimer and a
+ * title-to-copyright clause the 1.6 excerpt omits), and no longer insurance
+ * but a direct obligation, since that licence requires its notice on "ALL
+ * copies of the software, database and documentation". Collapsing the two
+ * would mean shipping the 3.1 database under the 1.6 notice. Both stay.
  * - **Baloo 2 / JetBrains Mono** — the OFL 1.1 body is copied from
  *   `licenses/fonts/Baloo2-OFL.txt`. OFL 1.1 requires the licence text itself
  *   to travel with the software, and both fonts ship byte-identical licence
@@ -73,6 +88,40 @@ IMPLIED.
 The name of Princeton University or Princeton may not be used in
 advertising or publicity pertaining to distribution of the software
 and/or database.`,
+  },
+  {
+    title: 'WordNet 3.1 database',
+    usage:
+      'WordLoop’s word definitions are built from the WordNet 3.1 database, which it bundles and reads on your device.',
+    notice: `This software and database is being provided to you, the LICENSEE, by
+Princeton University under the following license.  By obtaining, using
+and/or copying this software and database, you agree that you have
+read, understood, and will comply with these terms and conditions.:
+
+Permission to use, copy, modify and distribute this software and
+database and its documentation for any purpose and without fee or
+royalty is hereby granted, provided that you agree to comply with
+the following copyright notice and statements, including the disclaimer,
+and that the same appear on ALL copies of the software, database and
+documentation, including modifications that you make for internal
+use or for distribution.
+
+WordNet 3.1 Copyright 2011 by Princeton University.  All rights reserved.
+
+THIS SOFTWARE AND DATABASE IS PROVIDED "AS IS" AND PRINCETON
+UNIVERSITY MAKES NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR
+IMPLIED.  BY WAY OF EXAMPLE, BUT NOT LIMITATION, PRINCETON
+UNIVERSITY MAKES NO REPRESENTATIONS OR WARRANTIES OF MERCHANT-
+ABILITY OR FITNESS FOR ANY PARTICULAR PURPOSE OR THAT THE USE
+OF THE LICENSED SOFTWARE, DATABASE OR DOCUMENTATION WILL NOT
+INFRINGE ANY THIRD PARTY PATENTS, COPYRIGHTS, TRADEMARKS OR
+OTHER RIGHTS.
+
+The name of Princeton University or Princeton may not be used in
+advertising or publicity pertaining to distribution of the software
+and/or database.  Title to copyright in this software, database and
+any associated documentation shall at all times remain with
+Princeton University and LICENSEE agrees to preserve same.`,
   },
   {
     title: 'List of Dirty, Naughty, Obscene, and Otherwise Bad Words',

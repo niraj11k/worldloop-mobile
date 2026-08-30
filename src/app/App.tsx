@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootNavigator } from '@navigation/RootNavigator';
+import { useConnectivityStore } from '@store/useConnectivityStore';
 import { useProfileStore } from '@store/useProfileStore';
 import { useSavedRoundStore } from '@store/useSavedRoundStore';
 
@@ -24,19 +25,29 @@ import { useSavedRoundStore } from '@store/useSavedRoundStore';
  * screen renders, whether there is a round to resume is a synchronous
  * question.
  *
+ * Connectivity is watched here too (WL-506), for the same reason: it is a fact
+ * about the device rather than about a screen. Nothing is gated on it — D-03
+ * leaves v1 with no backend and every source of truth on the device, so it
+ * drives one reassuring notice and nothing else. Architecture §3's
+ * offline/online *reconciliation* strategy is a post-v1 concern and is still
+ * unbuilt; this is not that.
+ *
  * TODO (see Architecture doc, open items):
  * - Wrap with a guest/account session provider once the Account Service exists.
- * - Wrap with a connectivity provider to drive the offline/online reconciliation
- *   strategy described in Architecture doc section 3.
  */
 export function App(): React.JSX.Element {
   const loadProfile = useProfileStore(state => state.load);
   const loadSavedRound = useSavedRoundStore(state => state.load);
+  const subscribeConnectivity = useConnectivityStore(state => state.subscribe);
 
   useEffect(() => {
     loadProfile();
     loadSavedRound();
   }, [loadProfile, loadSavedRound]);
+
+  // Separate effect with its own cleanup: the loads above run once and are
+  // done, while this holds a native listener for the life of the app.
+  useEffect(() => subscribeConnectivity(), [subscribeConnectivity]);
 
   return (
     <SafeAreaProvider>

@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "audit:ci": "node scripts/audit-gate.mjs",
-    "dictionary:generate": "python3 scripts/generate-dictionary.py",
+    "dictionary:generate": "python3 scripts/generate-dictionary.py && python3 scripts/generate-definitions.py",
+    "definitions:generate": "python3 scripts/generate-definitions.py",
     "dictionary:verify": "python3 scripts/verify-dictionary-fixtures.py",
     "contrast:verify": "node scripts/verify-contrast.js",
     "fonts:verify": "node scripts/verify-fonts.js",
@@ -19,6 +20,7 @@
     "simulate": "node scripts/simulate.js"
   },
   "dependencies": {
+    "@react-native-community/netinfo": "^12.0.1",
     "@react-native-firebase/app": "^26.3.2",
     "@react-native-firebase/crashlytics": "^26.3.2",
     "@react-navigation/native": "^7.3.16",

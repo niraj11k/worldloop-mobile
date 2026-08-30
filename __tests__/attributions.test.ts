@@ -15,12 +15,14 @@ const noticeFor = (fragment: string) =>
 
 describe('shipped attributions', () => {
   it('carries every notice the project has taken on', () => {
-    // ESDB and WordNet (WL-101), LDNOOBW (WL-104), and the two OFL fonts
-    // (Design System §2). A fifth dependency with a notice means a fifth
-    // entry here, not a footnote somewhere else.
+    // ESDB and WordNet (WL-101), the WordNet 3.1 database WL-501 bundles for
+    // definitions, LDNOOBW (WL-104), and the two OFL fonts (Design System §2).
+    // A further dependency with a notice means a further entry here, not a
+    // footnote somewhere else.
     expect(ATTRIBUTIONS.map(entry => entry.title)).toEqual([
       'English Speller Database (ESDB)',
       'WordNet',
+      'WordNet 3.1 database',
       'List of Dirty, Naughty, Obscene, and Otherwise Bad Words',
       'Baloo 2 and JetBrains Mono',
     ]);

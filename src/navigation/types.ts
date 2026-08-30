@@ -20,7 +20,13 @@ export type RootStackParamList = {
    */
   Game: { difficulty: Difficulty; resume?: boolean };
   HowToPlay: undefined;
-  WordReview: { sessionId: string };
+  /**
+   * `sessionId` names the round whose new words lead the list (arriving from
+   * Game Over). Omitted from Home, where there is no round behind the screen
+   * and it shows the whole vocabulary — before WL-502 that entry point passed
+   * a `'latest'` sentinel no screen ever read.
+   */
+  WordReview: { sessionId?: string } | undefined;
   Settings: undefined;
   /**
    * The licence notices WordLoop is obliged to display (WL-407). A route of

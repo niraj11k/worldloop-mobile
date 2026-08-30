@@ -603,9 +603,19 @@ Play a game to discover new vocabulary.
 
 ```text
 You are offline.
-You can continue playing with the downloaded word list.
-Definitions and statistics sync later.
+You can keep playing — the word list and definitions are already on your device.
 ```
+
+> **Updated 2026-08-30 (WL-506).** The original third line — "Definitions and
+> statistics sync later" — was cut because it became false, and would have
+> promised the player something v1 does not do. Definitions are **bundled on
+> the device** (WL-501, closing D-08 on WordNet glosses rather than an
+> enrichment API), so they were never going to sync; and statistics never sync
+> either, because D-03 leaves no backend and D-04 ships v1 guest-only with no
+> account to sync them to. The first two lines survive, merged into one, since
+> they are the actual point: a word game that keeps working offline is
+> reassurance the player has no other way to discover. Restore the sync line
+> only alongside whatever release actually builds syncing.
 
 ### Dictionary unavailable
 
