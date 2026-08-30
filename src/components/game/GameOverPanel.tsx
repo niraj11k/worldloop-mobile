@@ -10,6 +10,12 @@ import type { GameSessionState, GameStatus } from '@app-types/game';
 
 interface GameOverPanelProps {
   session: GameSessionState;
+  /**
+   * How many words in this round the player had never played before (WL-503).
+   * The line is omitted at 0 — "New words discovered: 0" is a scoreboard for
+   * something the player did not fail at.
+   */
+  newWordsDiscovered: number;
   onReviewWords: () => void;
   onPlayAgain: () => void;
   onHome: () => void;
@@ -36,6 +42,7 @@ interface GameOverPanelProps {
  */
 export function GameOverPanel({
   session,
+  newWordsDiscovered,
   onReviewWords,
   onPlayAgain,
   onHome,
@@ -62,6 +69,17 @@ export function GameOverPanel({
         <Text style={styles.statLine}>Words played: {wordsPlayed}</Text>
         <Text style={styles.statLine}>Longest chain: {wordsPlayed}</Text>
         <Text style={styles.statLine}>Hints used: {session.hintsUsed}</Text>
+        {/*
+          Wireframe section 14's "new words discovered", deferred at WL-308
+          because nothing computed it then and wired here by WL-503. Counted
+          off the profile rather than the chain — the profile is what knows
+          whether the player had ever played the word before.
+        */}
+        {newWordsDiscovered > 0 && (
+          <Text style={styles.statLine}>
+            New words discovered: {newWordsDiscovered}
+          </Text>
+        )}
         {isPersonalBest && (
           <Text style={styles.statLine}>New personal best!</Text>
         )}

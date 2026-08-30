@@ -207,7 +207,7 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
           <Button
             label="Word Review"
             variant="secondary"
-            onPress={() => navigation.navigate('WordReview', { sessionId: 'latest' })}
+            onPress={() => navigation.navigate('WordReview')}
           />
           <Button
             label="How to Play"

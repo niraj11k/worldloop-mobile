@@ -1,17 +1,21 @@
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Share, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
 import { Button } from '@components/common/Button';
 import { Card } from '@components/common/Card';
 import { ConfirmSheet } from '@components/common/ConfirmSheet';
 import { IconButton } from '@components/common/IconButton';
+import { ReportWordSheet } from '@components/game/ReportWordSheet';
 import {
   ACCOUNTS_ENABLED_V1,
   DELETE_GUEST_DATA_CONFIRM,
   RESET_STATISTICS_CONFIRM,
 } from '@constants/gameConstants';
+import { serializeReportsForExport } from '@features/report/wordReports';
+import { reportError } from '@services/crashReporting/crashReporting';
 import { useProfileStore } from '@store/useProfileStore';
+import { useReportStore } from '@store/useReportStore';
 import { useSettingsStore } from '@store/useSettingsStore';
 import { palette, spacing, typeScale, displayTextProps, CONTENT_MAX_WIDTH } from '@theme/theme';
 
@@ -58,8 +62,6 @@ type PendingAction = 'reset' | 'delete' | null;
  * that opens nothing is worse than a row that is not there, and each is
  * tracked so it cannot be quietly forgotten:
  *
- * - **Report a word** — WL-505, which depends on this task and owns both of
- *   its entry points.
  * - **Privacy policy** and **Terms of use** — WL-801, whose "done when" is
  *   that both documents are live *and linked in-app*. Nothing exists to link
  *   to yet.
@@ -69,12 +71,50 @@ type PendingAction = 'reset' | 'delete' | null;
  * Text size is here as a statement rather than a control: the app scales with
  * the OS setting, so a second in-app scale would be a competing source of
  * truth. WL-408 owns making that scaling *usable* at the extremes.
+ *
+ * ## Report a word (WL-505)
+ *
+ * Two controls, both added here: **Report a Word** opens the same sheet the
+ * game screen uses, in the mode that asks which word (there is no round behind
+ * this entry point). **Export Reports** appears only once the queue is
+ * non-empty and hands it to the OS share sheet — under D-03 there is no server
+ * to send a report to, so that export is the only route out, and a queue with
+ * no visible way out is a suggestion box nailed shut.
  */
 export function SettingsScreen({ navigation }: Props): React.JSX.Element {
   const { soundEnabled, hapticsEnabled, toggleSound, toggleHaptics } = useSettingsStore();
   const resetStats = useProfileStore(state => state.resetStats);
   const deleteGuestData = useProfileStore(state => state.deleteGuestData);
   const [pending, setPending] = useState<PendingAction>(null);
+  const [reportVisible, setReportVisible] = useState(false);
+
+  // WL-505: the queue is read here rather than at launch — reporting a word
+  // is rare and the queue has no bearing on a round, so nothing else in the
+  // app needs it loaded.
+  const reports = useReportStore(state => state.reports);
+  const loadReports = useReportStore(state => state.load);
+  const submitReport = useReportStore(state => state.submit);
+  const clearReports = useReportStore(state => state.clear);
+  useEffect(() => {
+    loadReports();
+  }, [loadReports]);
+
+  /**
+   * D-03 leaves no server to send reports to, so "send" is the OS share sheet
+   * and the player chooses where it goes (mail, notes, anywhere).
+   *
+   * The queue is deliberately **not** cleared afterwards: `Share` resolves the
+   * same way whether the player sent the message or abandoned the draft, so
+   * clearing on resolve would throw away reports that never left the device.
+   * Re-exporting a report costs nothing; losing one costs the feature.
+   */
+  const handleExportReports = async () => {
+    try {
+      await Share.share({ message: serializeReportsForExport(reports) });
+    } catch (error) {
+      reportError(error, { scope: 'SettingsScreen.exportReports' });
+    }
+  };
 
   // TODO: read from auth/session store once Account Service exists (1.1).
   const isSignedIn = false;
@@ -84,7 +124,15 @@ export function SettingsScreen({ navigation }: Props): React.JSX.Element {
 
   const handleConfirm = () => {
     if (pending === 'reset') resetStats();
-    if (pending === 'delete') deleteGuestData();
+    if (pending === 'delete') {
+      deleteGuestData();
+      // WL-505: a report carries free text the player wrote, so it is their
+      // data and goes with the rest of it (Guest Deletion doc). `resetStats`
+      // deliberately does not — that clears statistics, and a pending report
+      // is a message in flight, not a score. The confirmation copy already
+      // draws exactly this line between the two actions.
+      clearReports();
+    }
     setPending(null);
   };
 
@@ -161,6 +209,32 @@ export function SettingsScreen({ navigation }: Props): React.JSX.Element {
         </Card>
 
         <View style={styles.actions}>
+          {/*
+            WL-505's second entry point (PRD §26). The game screen's is on the
+            invalid-word state and is about the word in front of the player;
+            this one is for a word they remember, so the sheet asks which.
+
+            Export sits beside it rather than behind a submenu because under
+            D-03 it is the *only* way a report reaches anyone — a queue with no
+            visible way out is a suggestion box nailed shut. It is hidden until
+            there is something to send, so it never offers to share nothing.
+          */}
+          <Button
+            label="Report a Word"
+            variant="secondary"
+            onPress={() => setReportVisible(true)}
+            accessibilityHint="Tell us a word was judged wrongly"
+            style={styles.fullWidthButton}
+          />
+          {reports.length > 0 && (
+            <Button
+              label={`Export Reports (${reports.length})`}
+              variant="secondary"
+              onPress={handleExportReports}
+              accessibilityHint="Opens the share sheet with your reports"
+              style={styles.fullWidthButton}
+            />
+          )}
           <Button
             label="Reset Statistics"
             variant="secondary"
@@ -189,6 +263,24 @@ export function SettingsScreen({ navigation }: Props): React.JSX.Element {
         same time, and two near-identical `ConfirmSheet`s would be two places
         to keep the same behaviour correct.
       */}
+      <ReportWordSheet
+        visible={reportVisible}
+        word=""
+        // No round behind this entry point, so the player types the word —
+        // and `gameId` stays null rather than being invented (Data Model §8).
+        askForWord
+        onSubmit={report => {
+          submitReport({
+            word: report.word,
+            reportType: report.reportType,
+            playerComment: report.comment,
+            gameId: null,
+          });
+          setReportVisible(false);
+        }}
+        onCancel={() => setReportVisible(false)}
+      />
+
       <ConfirmSheet
         visible={pending !== null}
         title={confirmCopy.title}

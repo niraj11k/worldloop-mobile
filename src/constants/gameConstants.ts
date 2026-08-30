@@ -20,6 +20,45 @@ export const INVALID_WORD_MESSAGES: Record<InvalidReason, string> = {
 export const COMPUTER_TIMEOUT_MESSAGE = 'WordLoop is taking longer than expected.';
 
 /**
+ * Wireframe doc section 12's unavailable state, copied exactly — including
+ * the line break, which the doc's own block sets between the two sentences.
+ *
+ * Deliberately not phrased or styled as an error (WL-501). About 30% of the
+ * playable word list has no bundled gloss, so this is an ordinary outcome a
+ * player will meet in normal play, not a failure — the second sentence is
+ * what makes that clear, and is why it is copy rather than an `Error:` line.
+ */
+export const DEFINITION_UNAVAILABLE_MESSAGE =
+  'Definition unavailable for this word.\nYou can continue playing.';
+
+/**
+ * Wireframe doc section 17's "Network unavailable" state (WL-506).
+ *
+ * **Not the doc's copy verbatim, and deliberately so** — the doc's third line
+ * ("Definitions and statistics sync later") became false and would promise the
+ * player something v1 does not do. Definitions are bundled on the device
+ * (WL-501, closing D-08), and statistics never sync because there is no
+ * backend (D-03) and no account to sync them to (D-04). Wireframe section 17
+ * has been updated to match; this is recorded here as well because a
+ * divergence from a spec'd string is exactly the thing WL-304 established
+ * should never be silent.
+ *
+ * The first two lines survive intact, because they are the point: an
+ * offline-native word game that keeps working is reassurance the player has no
+ * other way to discover.
+ */
+export const OFFLINE_NOTICE =
+  'You are offline.\nYou can keep playing — the word list and definitions are already on your device.';
+
+/** Wireframe doc section 17's "Dictionary unavailable" state, verbatim. */
+export const DICTIONARY_UNAVAILABLE_MESSAGE =
+  'Word checking is temporarily unavailable.\nPlease try again shortly.';
+
+/** Wireframe doc section 17's "Word review empty state", both lines. */
+export const WORD_REVIEW_EMPTY_STATE =
+  'No reviewed words yet.\nPlay a game to discover new vocabulary.';
+
+/**
  * Wireframe doc section 14's game-over content, one entry per `GameStatus`
  * result. Only "You Win!" is literal copy from the doc — the other four
  * headlines, and all five descriptions, are this task's own writing (WL-308),
@@ -192,7 +231,10 @@ export const RESET_STATISTICS_CONFIRM = {
 export const DELETE_GUEST_DATA_CONFIRM = {
   title: 'Delete your data?',
   message:
-    'This deletes your scores, game history, discovered words, and settings from this device, and starts a new guest. It cannot be undone.',
+    // WL-505 added word reports to the list. They carry free text the player
+    // wrote, so leaving them behind after "delete my data" would be the one
+    // kind of data this dialog should least be wrong about.
+    'This deletes your scores, game history, discovered words, word reports, and settings from this device, and starts a new guest. It cannot be undone.',
   confirmLabel: 'Delete',
   cancelLabel: 'Cancel',
 } as const;

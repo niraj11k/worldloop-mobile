@@ -27,6 +27,7 @@
  * only the ~17 candidate words each search actually visits.
  */
 import packedAsset from '@assets/dictionary/dictionary.pack.json';
+import { MIN_WORD_LENGTH } from '@constants/gameConstants';
 
 export interface DictionaryWord {
   word: string;
@@ -212,6 +213,29 @@ export function isDictionaryReady(): boolean {
   return index !== null;
 }
 
+/**
+ * Whether the bundled word list can actually be used (WL-506).
+ *
+ * `initDictionary` throws on a corrupt or half-written asset — the integrity
+ * check in `buildIndex` — and that throw is the only way Wireframe §17's
+ * "dictionary unavailable" state becomes reachable, since the asset is bundled
+ * rather than fetched. Callers need the question answered, not the exception:
+ * a screen cannot render a reassuring notice from inside a crash.
+ *
+ * Deliberately not cached as `false`. The asset does not change at runtime, so
+ * a genuine corruption stays corrupt — but a transient read failure would be
+ * pinned permanently by caching, and the copy the player is shown says "try
+ * again shortly", which must be true.
+ */
+export function isDictionaryAvailable(): boolean {
+  try {
+    initDictionary();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Total bundled words, for diagnostics and the WL-105 measurements. */
 export function dictionarySize(): number {
   return packedAsset.wordCount;
@@ -223,13 +247,15 @@ export function dictionarySource(): { name: string; version: string } {
 }
 
 /**
- * Looks up a normalized word in the local (bundled) dictionary.
+ * Position of `normalizedWord` in the packed record order, or -1.
  *
- * Stays async even though the lookup is synchronous: callers already await
- * it (the rule engine's `validating` phase), and keeping the boundary async
- * means moving to a different backing store later is not a signature change.
+ * Exported because the WL-501 definitions asset is *aligned* to this order —
+ * it carries one gloss id per record rather than its own copy of the word
+ * list, which is what keeps it near 3MB instead of 4MB. That makes the record
+ * position, not the word, the key into it. See `definitionService.ts`, which
+ * also verifies the alignment before trusting it.
  */
-export async function lookupWord(normalizedWord: string): Promise<DictionaryLookupResult> {
+export function recordIndexOf(normalizedWord: string): number {
   if (index === null) {
     index = buildIndex();
   }
@@ -241,7 +267,7 @@ export async function lookupWord(normalizedWord: string): Promise<DictionaryLook
     const mid = Math.floor((lo + hi) / 2);
     const candidate = wordAt(idx, mid);
     if (candidate === normalizedWord) {
-      return { found: true, entry: decodeAt(idx, mid) };
+      return mid;
     }
     if (candidate < normalizedWord) {
       lo = mid + 1;
@@ -249,7 +275,43 @@ export async function lookupWord(normalizedWord: string): Promise<DictionaryLook
       hi = mid - 1;
     }
   }
-  return { found: false, entry: null };
+  return -1;
+}
+
+/**
+ * Whether the player could submit `normalizedWord` (PRD section 8.5/8.7).
+ *
+ * The synchronous counterpart to `lookupWord` for callers that only need the
+ * yes/no — WL-504's hint guard checks a handful of words per candidate clue
+ * and has nothing to do with the entry itself.
+ */
+export function isAllowedWord(normalizedWord: string): boolean {
+  const at = recordIndexOf(normalizedWord);
+  return at !== -1 && decodeAt(index as DictionaryIndex, at).isAllowed;
+}
+
+/** The word at a packed record position, or `null` if out of range. */
+export function wordAtRecord(i: number): string | null {
+  if (index === null) {
+    index = buildIndex();
+  }
+  return i >= 0 && i < index.count ? wordAt(index, i) : null;
+}
+
+/**
+ * Looks up a normalized word in the local (bundled) dictionary.
+ *
+ * Stays async even though the lookup is synchronous: callers already await
+ * it (the rule engine's `validating` phase), and keeping the boundary async
+ * means moving to a different backing store later is not a signature change.
+ */
+export async function lookupWord(normalizedWord: string): Promise<DictionaryLookupResult> {
+  const at = recordIndexOf(normalizedWord);
+  if (at === -1) {
+    return { found: false, entry: null };
+  }
+  // `recordIndexOf` built the index if it was missing, so this is non-null.
+  return { found: true, entry: decodeAt(index as DictionaryIndex, at) };
 }
 
 const LETTER_A = 97; // 'a'
@@ -395,6 +457,15 @@ export function allowedEntriesStartingWith(letter: string): DictionaryWord[] {
  * when the letter has no remaining candidate at all — a near-dead-letter
  * edge case the caller (the hint sheet) handles by omitting the line rather
  * than showing an empty example.
+ *
+ * **`MIN_WORD_LENGTH` is filtered here, and has to be** (fixed at WL-504). The
+ * dictionary holds 240 computer-playable words under three letters, and the
+ * most *common* word starting with most letters is one of them — this hint
+ * offered "Example: A" for the letter A, a word `validateMove` then rejects as
+ * `too_short`. WL-108 hit the same gap from the other side and fixed it in
+ * `generateCandidates`; the rule engine has always enforced the floor on the
+ * player's input, so a suggestion that ignores it costs the player a hint to
+ * be told to play something illegal.
  */
 export function exampleWordForHint(
   letter: string,
@@ -402,7 +473,7 @@ export function exampleWordForHint(
 ): string | null {
   const used = usedWords instanceof Set ? usedWords : new Set(usedWords);
   const candidates = computerPlayableEntriesStartingWith(letter).filter(
-    entry => !used.has(entry.normalizedWord),
+    entry => !used.has(entry.normalizedWord) && entry.normalizedWord.length >= MIN_WORD_LENGTH,
   );
   if (candidates.length === 0) {
     return null;
@@ -415,18 +486,11 @@ export function exampleWordForHint(
   ).normalizedWord;
 }
 
-export interface DefinitionResult {
-  word: string;
-  partOfSpeech: string;
-  definition: string;
-}
-
-/**
- * Fetches an optional definition from the enrichment API.
- * STUB: no provider wired up yet (Delivery Plan D-08). Must fail gracefully —
- * callers should treat a null result as "definition unavailable, continue
- * playing" (Wireframe doc section 12).
+/*
+ * Definitions used to stub out here. They now live in `definitionService.ts`,
+ * which WL-501 built on a second bundled asset (WordNet glosses) once D-08
+ * closed on "no commercial provider". The split is deliberate rather than
+ * cosmetic: nothing in the rule engine, the difficulty engine or the round
+ * simulator needs definitions, so keeping them out of this module means none
+ * of those paths pull a 3MB asset into scope.
  */
-export async function fetchDefinition(_word: string): Promise<DefinitionResult | null> {
-  return null;
-}

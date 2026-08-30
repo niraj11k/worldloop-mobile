@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 import {
   createGuestProfile,
+  markDefinitionViewed,
   markSeen,
   recordRoundCompleted,
   resetStatistics,
@@ -53,6 +54,8 @@ interface ProfileState {
   load: () => Promise<void>;
   /** Fold a finished round into the profile (WL-402). */
   recordRound: (session: GameSessionState) => Promise<void>;
+  /** Mark that the player opened a definition for a word (WL-501/WL-502). */
+  markDefinitionSeen: (word: string) => Promise<void>;
   setSettings: (patch: Partial<GuestSettings>) => Promise<void>;
   /** Wireframe section 16, "Reset statistics" — keeps discovered words. */
   resetStats: () => Promise<void>;
@@ -97,6 +100,10 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
 
   recordRound: async session => {
     await mutate(set, get, profile => recordRoundCompleted(profile, session, new Date()));
+  },
+
+  markDefinitionSeen: async word => {
+    await mutate(set, get, profile => markDefinitionViewed(profile, word));
   },
 
   setSettings: async patch => {

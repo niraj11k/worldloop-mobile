@@ -96,7 +96,7 @@ reference doc currently says, that's marked **[changes a doc]**.
 | **D-05** | Dark mode in v1 **[changes a doc]** | Phase 2 | **CLOSED 2026-08-26 — cut from v1, option (b) adopted as recommended.** Wireframe §16 originally listed dark mode as a v1 setting; Design System §9 open item 3 flagged that no dark palette had been designed. Designing one in Phase 2 would have added ~3 days design + ~2 days implementation, with every one of the 8 accent colours needing re-contrast-checking. Both docs updated: Wireframe §16 strikes the toggle, Design System §9 item 3 marks it resolved. `WL-203`'s token layer only needs to produce light-mode values. Revisit as a post-v1 release once a real dark palette is designed |
 | **D-06** | Display + monospace font selection and mobile licence | Phase 2 | **CLOSED 2026-08-26 — `Baloo 2` (display) + `JetBrains Mono` (monospace).** Both are Google Fonts; the SIL OFL text was checked directly and explicitly permits bundling/embedding inside app software at no cost, with only a requirement to ship the licence text (covered by the WL-407 Attributions screen). Baloo 2 chosen over Fredoka (too close to "kids app") and Lilita One (single weight only, no light cut for the 40px wordmark). JetBrains Mono chosen over IBM Plex Mono (more corporate) and Space Mono (weaker legibility at 12px captions). See Design System §2 |
 | **D-07** | Local storage library | Phase 0 | **CLOSED — MMKV.** Corrected from the original framing: this decision only governs the small key-value `StorageAdapter` (`GUEST_PROFILE`, `SETTINGS`, `CURRENT_SESSION`, `ACCOUNT_PROMPT_STATE`), not the dictionary — that has its own format decision in WL-105, unrelated to this one. The real case: settings need synchronous reads to feel instant on toggle, not async-round-trip loading states; `zustand` (already the project's state library) has first-class MMKV persist-middleware support; and `react-native-nitro-modules` was already a dependency before this review, which only makes sense as MMKV v4 support — meaning `@react-native-async-storage/async-storage` was leftover template weight, not a live second candidate. Removed from `package.json`. Trade-off unchanged: MMKV needs native linking, so `WL-002` (the actual implementation) is gated on `WL-001` regardless |
-| **D-08** | Definition/enrichment provider | Phase 5 | Do not select one for v1. Ship the definition overlay reading from bundled short glosses (if the chosen word list carries them) or showing "Definition unavailable — you can continue playing," which Wireframe §12 already specifies as a required state. A £5k/yr Oxford licence before knowing whether anyone taps "Definition" is the wrong order. **Phase 6 must instrument definition-open rate** so this decision has data behind it |
+| **D-08** | Definition/enrichment provider | Phase 5 | **CLOSED 2026-08-30 — no commercial provider; bundled Princeton WordNet 3.1 glosses.** The original guidance ("bundled short glosses *if the chosen word list carries them*") had no path, because ESDB carries none — only a commonness tier and two flags per word — which WL-405 had already flagged as blocking. WordNet supplies them, and was the right answer rather than a convenient one: ESDB already uses WordNet for its part-of-speech work, so **the notice was already shipping** in Settings → Attributions and the app takes on no new licensor and no fee. Coverage is **70.1%** of the playable list (98,963 of 141,217) with Morphy lemmatisation; the remaining 30% take Wireframe §12's "Definition unavailable" state, which that doc already specifies as a first-class outcome. Cost is **~3.1MB** (deduplicated by sense — 45,094 distinct glosses cover all 98,963 words), keeping the bundle near 4.8MB against WL-105's 8MB budget. Built by `scripts/generate-definitions.py`; see WL-501. One obligation *did* change — see §7.1 of the licence review: the app now redistributes the WordNet **database** directly, so it must carry the full **3.1** notice, not the abbreviated 1.6 excerpt ESDB publishes. **Phase 6 must still instrument definition-open rate** — that was never about which provider, and a bundled source makes the question cheaper to answer, not moot |
 | **D-09** | v1 success metrics and targets | Phase 6 | Ratify or amend the table in section 2 before the playtest build, so M2 has a pass/fail bar rather than a vibe |
 | **D-10** | Product name clearance | Phase 8 | PRD §30 requires App Store / Play name availability, domain, social handles, and trademark checks. Start this in Phase 3 — it has external lead time and a rename late in the project touches the wordmark, the bundle IDs, the store listings, and the design system |
 
@@ -2514,30 +2514,289 @@ landscape either works or is deliberately locked out with that decision recorded
 
 Per PRD §12, none of this may block a round.
 
-**WL-501 · Word definition overlay** — M · 1.5d · WL-204, D-08
+**WL-501 · Word definition overlay** — M · 1.5d · WL-204, D-08 — **DONE 2026-08-30**
 Wireframe §12, including the unavailable state ("Definition unavailable for this word. You
 can continue playing.") as a first-class outcome, not an error.
 *Done when:* the overlay opens mid-round without disturbing turn state, and the
 unavailable path is verified by disabling the source.
 
-**WL-502 · Word review screen** — M · 2d · WL-402, WL-501
+> **DONE 2026-08-30.** This task's real work was closing D-08, which had no
+> answer as written — see the decision log. Three layers:
+>
+> - **Pipeline.** `scripts/generate-definitions.py` (`npm run definitions:generate`,
+>   and `dictionary:generate` now runs both) downloads Princeton WordNet 3.1 into
+>   `.cache/wordnet/` and emits `src/assets/dictionary/definitions.pack.json`
+>   (~3.1MB, **committed** for exactly the reason `dictionary.pack.json` is —
+>   Metro needs it to bundle, so a fresh checkout and WL-004's CI build jobs
+>   must have it without a Python run and a network fetch).
+> - **Runtime.** `definitionService.ts`, mirroring WL-105's technique: glosses
+>   newline-separated with an offset table built in one pass, one fixed-width
+>   base-90 id per dictionary record. The stub `fetchDefinition` moved out of
+>   `dictionaryService.ts` so the rule engine, difficulty engine and round
+>   simulator never pull a 3MB asset into scope.
+> - **UI.** `DefinitionSheet.tsx` on the existing `BottomSheet`, opened by
+>   tapping the word on the board.
+>
+> **Morphy lemmatisation is load-bearing, not a nicety.** Coverage is 39%
+> without it and 70.1% with it: `dragons`, `envied`, `mice`, `emitted` are what
+> a real chain is made of, and none of them is a WordNet lemma. The generator
+> implements WordNet's exception lists plus its suffix-detachment rules.
+>
+> **A real sense-selection bug, found by looking at the screen rather than the
+> tests.** Ranking senses on WordNet's tag counts alone defined **ROSE as "move
+> upward"** — the count belongs to `rise`, which `rose` also morphs to (26 tags
+> vs the flower's 5). Comparing tag counts *across lemmas* asks the wrong
+> question; the player is looking at the word in front of them. Fixed by
+> ranking an exact lemma above a morphed one, then tag count, then sense
+> number. `rose` is PRD §8.5's own worked example, so this was the case a
+> player would have hit first. Pinned by test.
+> - **What the fix costs, stated rather than hidden:** it changes 2,985 of the
+>   98,963 covered words. Most are participles resolving to their adjective
+>   sense ("shredded" → "prepared by cutting"), which is fine either way. The
+>   genuine losses are surface forms whose morphed reading is commoner English
+>   — **FOUND** now gets "set up or found" rather than the past tense of
+>   "find". Accepted rather than tuned, because no threshold separating `rose`
+>   from `found` follows from anything in WordNet's data, and both are real
+>   definitions of a real word.
+> - **Separate known limitation:** where every sense of a word is untagged,
+>   WordNet's index order is effectively arbitrary and there is nothing to rank
+>   on — `replicate` comes out as "bend or turn backward". Needs a frequency
+>   source WordNet does not ship. Also worth knowing: `table` resolves to "a
+>   set of data arranged in rows and columns", not Wireframe §12's furniture —
+>   that one is genuinely WordNet's most-tagged sense (52 vs 25), so it is the
+>   mockup that is unrepresentative, not the code.
+>
+> **The two assets are coupled, and the coupling is checked.** The definitions
+> pack carries one id per *dictionary* record in the dictionary's order rather
+> than its own copy of the word list — ~0.9MB cheaper, but regenerating
+> `dictionary.pack.json` alone would shift every gloss after the first inserted
+> word onto the wrong word, and confidently define "eagle" as something else. A
+> word-count check alone misses that (a list can change without changing
+> length), so the pack carries 16 (position, word) probes spread across the
+> alphabet and the runtime serves *no* definitions unless all of them still
+> resolve. Probes rather than a digest because it runs on device: hashing 1.6MB
+> at startup would cost more than the feature it protects.
+>
+> **Licence consequence, handled and recorded.** WordLoop now redistributes the
+> WordNet database directly rather than inheriting it through ESDB's POS work,
+> so the notice moved from "cheap insurance" to a direct obligation *and* the
+> version changed: the shipped 1.6 excerpt is not the 3.1 licence text (fuller
+> disclaimer, plus a title-to-copyright clause). The app now ships **both**
+> entries — the inherited 1.6 one exactly as the licence review specifies, and
+> a new "WordNet 3.1 database" entry with the full text saved verbatim at
+> `licenses/wordnet/WordNet-3.1-LICENSE.txt` and pinned by `npm run
+> attributions:verify`. `WordLoop_Word_List_Licence_Review.md` §7.1 records
+> why, since §7's own "not something WordLoop redistributes directly as data"
+> had become false. This is **not** a third item for §8's legal read: the
+> WordNet grant is self-contained, unlike the COCA pass-through.
+>
+> *Verified on the iPhone SE (3rd gen) simulator*, both halves of the criterion:
+> - **Opens without disturbing turn state** — `overhung` → Verb "Project over.",
+>   `yogurt`, `replicate`, `emitted` → "Expel (gases or odors)." all rendered
+>   correct real data (note three of the four are inflected forms, so Morphy is
+>   exercised on screen and not only in tests). Closing returned to a round with
+>   its chain, score, required letter, input and placeholder untouched, and play
+>   continued normally. The overlay holds no session state by construction — it
+>   is a screen-local word string and a synchronous lookup, with no route to
+>   the WL-110 machine at all.
+> - **Unavailable path verified by disabling the source**, exactly as the
+>   criterion asks: the alignment guard was tripped by hand (`dictionaryWordCount`
+>   → 1), the app was reloaded, and the *same* word that had just shown a
+>   definition (`yogurt`) rendered Wireframe §12's copy verbatim, both lines, in
+>   the same sheet with the same Close and no error styling. The app did not
+>   crash on the broken asset, and a full turn was played with definitions
+>   disabled to confirm nothing blocks. Asset regenerated and re-verified
+>   afterwards.
+>
+> **Not done here:** the chain row is deliberately still one grouped
+> accessibility node (WL-305/WL-408) rather than N buttons, so the board's only
+> definition entry point is the current word — per-word access for the whole
+> round is WL-502's screen, which is the right place for it. The definition
+> *clue* hint is WL-504.
+
+**WL-502 · Word review screen** — M · 2d · WL-402, WL-501 — **DONE 2026-08-30**
 Wireframe §15: words from the completed round, player vs. computer distinction, per-word
 independent definition loading with per-word loading and unavailable states, and the §17
 empty state.
 *Done when:* one word's definition failing to load leaves every other row functional.
 
-**WL-503 · Discovered-words tracking** — S · 1d · WL-402
+> **DONE 2026-08-30.** Replaced the WL-002 skeleton with a real screen.
+>
+> **Where the words come from — a deliberate reading of §15, not a shortcut.**
+> §15 says "show words from the completed round"; this shows the round's
+> **discovered** words, read off the guest profile by session id. By the time
+> the screen is reachable the round is over — WL-403 clears the save slot on
+> the last transition and this is a route, so `GameScreen`'s state is gone. The
+> only durable record of a round's words is `DiscoveredWord` (Data Model §7),
+> which is exactly the entity PRD §12 names for its "learned words" list.
+> Passing the chain through route params would have worked from Game Over and
+> then shown nothing from Home, where Wireframe §2 also puts this screen with
+> no round behind it, and nothing at all after a restart.
+> - **Consequence, stated not hidden:** §15's "distinguish player and computer
+>   words *if useful*" no longer applies — discovered words are the player's by
+>   construction. That requirement is conditional in the doc, and this is the
+>   condition failing, not a dropped requirement.
+> - **Second consequence, designed around:** a round where the player replayed
+>   only familiar words discovers nothing. Rather than show an empty screen
+>   after a real round, the screen carries two sections — "New in this round"
+>   and the player's whole vocabulary below — so there is always something to
+>   review. From Home there is no round, so only the vocabulary renders.
+>
+> **`WordReview`'s route params changed:** `sessionId` is now optional. Home
+> previously passed `{ sessionId: 'latest' }`, a sentinel no screen ever read
+> and no screen could have honoured.
+>
+> **Pronunciation removed rather than shipped dead.** §15's mockup shows a
+> `[Pronunciation]` button beside each word and the skeleton carried an inert
+> one. PRD §12 lists pronunciation under *future* learning features and no task
+> in this plan builds it. A control that does nothing teaches the player the
+> app is broken, so it is gone until something implements it.
+>
+> **The loading state is real, not theatre.** D-08 closed on a bundled source,
+> so a definition resolves from memory and the loading frame is usually
+> imperceptible. Each row still goes through the async `fetchDefinition` seam
+> Architecture §4 describes rather than reading synchronously, because that is
+> what keeps the row honest if a provider is ever added; the alternative was a
+> synchronous read plus a fake spinner. A rejection is treated identically to a
+> miss — the player asked what a word means, and "unavailable" answers that
+> where a red error does not.
+>
+> Also wired `DiscoveredWord.definition_viewed`, a Data Model §7 field every
+> record has written as `false` since WL-402, whose own comment reserved it for
+> "the definition overlay (Phase 5)". Both surfaces set it — this screen and
+> WL-501's in-game overlay. It is a no-op for a word the player never
+> discovered (the computer's words, or one found in an earlier round), which is
+> the common case from the game screen, so callers fire it unconditionally.
+>
+> *Verified on the iPhone SE (3rd gen) simulator*, including the acceptance
+> criterion directly rather than by reasoning: with EAGLE / THUNDER / GAMEPLAY
+> listed, GAMEPLAY has no bundled gloss and rendered the unavailable copy
+> **while EAGLE's definition stayed on screen above it and THUNDER's button
+> stayed live below — and THUNDER was then opened successfully *after* the
+> failed row**, which is the part that would break if the rows shared state.
+> Each row owns its own `useState` for exactly that reason. Also verified: §17's
+> empty state verbatim on a profile with no words, both entry points (Home →
+> vocabulary only; Game Over → "New in this round" leading, "Words you found
+> earlier" below), and Back to Home from both.
+
+**WL-503 · Discovered-words tracking** — S · 1d · WL-402 — **DONE 2026-08-30**
 Track first-time-seen words into the guest profile — this feeds the "new words
 discovered" line on game over (Wireframe §14) and a soft-prompt trigger.
 *Done when:* discovered count increments only on genuinely new words and survives restart.
 
-**WL-504 · Hint level 4** — S · 1d · WL-307, WL-501
+> **DONE 2026-08-30.** Most of the tracking already existed: WL-402 built
+> `newDiscoveredWords` with the "genuinely new" rule (player's words only, never
+> re-recorded, kept even from an abandoned round) and `useProfileStore`
+> persists it through real MMKV — the existing store test already proves a
+> discovered word survives a cold start, so that half of the criterion was met
+> before this task and is not re-tested here. Flagged rather than re-implemented.
+>
+> What this task added:
+> - **`discoveredWordsForSession(profile, sessionId)`** — the round's own
+>   discoveries, read back off the profile rather than recomputed from the
+>   chain. That matters: `newDiscoveredWords` has already applied the
+>   "genuinely new" rule against the whole profile, so anything carrying this
+>   round's id is by construction a first. Recomputing at the call site would
+>   be a second implementation of that rule, free to disagree with the stored
+>   one. Feeds both the game-over line and WL-502's screen.
+> - **Wireframe §14's "new words discovered" line**, which WL-308 explicitly
+>   deferred because nothing computed it then. Omitted at 0 rather than shown
+>   as "New words discovered: 0" — a scoreboard for something the player did
+>   not fail at.
+> - **`newWordsMilestoneReached`** for the trigger policy's "discovering
+>   several new words" prompt. Dormant under D-04 like the rest of the account
+>   surface — `promptPolicy` already had a `new_words_milestone` trigger type
+>   with no predicate behind it. "Several" is `NEW_WORDS_MILESTONE = 25`, an
+>   explicit inference (no doc gives a number, same posture as
+>   `HINT_LIMIT_PER_ROUND`); every multiple qualifies, with `promptPolicy`'s
+>   existing cooldown and per-cycle cap doing the job of not nagging.
+>
+> **Noted while there:** `discoveredWords` is deliberately **not** capped, unlike
+> `localScores` (`MAX_RETAINED_ROUNDS`). It is the one thing `resetStatistics`
+> keeps, and both WL-502 and the 1.1 vocabulary-history feature read the whole
+> list — a cap would silently delete the player's vocabulary. Recorded in the
+> constant's docblock so the asymmetry does not look like an oversight.
+>
+> *Verified on the iPhone SE (3rd gen) simulator* by playing a round to Game
+> Over (via the forced-timeout technique WL-306/WL-308 established —
+> `COMPUTER_TURN_TIMEOUT_MS` → 1, reverted to 5000 and confirmed by `git diff`):
+> "New words discovered: 1" for a two-word chain, correctly counting the
+> player's `splendid` and not the computer's opener. Unit tests cover the
+> arithmetic that manual play cannot reach — a round that discovers nothing new,
+> and the milestone crossing on exactly the round that passes it.
+
+**WL-504 · Hint level 4** — S · 1d · WL-307, WL-501 — **DONE 2026-08-30**
 The definition-based clue from Wireframe §11, which reveals meaning without revealing the
 word.
 *Done when:* level 4 never contains the target word as a substring, and applies the −5
 penalty (not −10, since the word isn't revealed).
 
-**WL-505 · Report a word** — M · 1.5d · WL-407
+> **DONE 2026-08-30.** `definitionClueForHint(letter, usedWords, excludeWord)` +
+> a fourth line on the existing sheet, reading "Another word here means: …".
+>
+> **What level 4 describes.** A *different* playable word from level 3's
+> example, which is why `excludeWord` exists — a clue explaining the word
+> already printed two lines above is not a fourth level of help. The function
+> deliberately never returns the word, not even privately, so no caller can
+> render it by accident. Phrasing is "another word here means" rather than
+> "definition:" so it reads as a second word to find.
+>
+> **The leak guard is the substance of this task, and the doc's criterion was
+> not enough on its own.** Two distinct leaks, the second found only by looking
+> at real output:
+> 1. *Its own word, inflected.* WordNet glosses the lemma an inflected form
+>    resolves to, so a candidate can be described in terms of itself in a way a
+>    plain substring test misses. Guarded by comparing a 5-character stem.
+> 2. *A different playable word sharing the synset.* This is the one a
+>    per-candidate check structurally cannot see. The clue chosen for `w` was
+>    `wadded`'s gloss — **"compress into a wad"** — which passes every possible
+>    test about `wadded` while handing the player `wad`, a perfectly playable
+>    `w` word, in plain text. Fixed by checking the clue *as a whole* against
+>    what the player could submit: tokenise, and reject if any token starting
+>    with the required letter is an allowed word (`isAllowedWord`, a new
+>    synchronous membership check). Over-rejecting is free — there is always
+>    another candidate — while under-rejecting spends the player's hint on the
+>    answer. Pinned by a test that recovers the possible source words for every
+>    letter's clue and asserts none appears in it, plus a named regression test
+>    for the `wad` case.
+>
+> **A real pre-existing bug surfaced and fixed here (WL-307/WL-108 gap).** The
+> sheet offered **"Example: A"** for the letter A. `exampleWordForHint` had no
+> `MIN_WORD_LENGTH` filter, and the dictionary holds 240 computer-playable
+> words under three letters — so for most letters the *most common* candidate
+> is one the rule engine then rejects as `too_short`. WL-108 hit the identical
+> gap from the computer's side and fixed it in `generateCandidates` only. Both
+> the example and the clue now filter on the same floor, with a test across all
+> 26 letters. This cost the player a hint to be told to play an illegal word,
+> so it is a genuine defect, not a cosmetic one.
+>
+> **−5, not −10, holds structurally rather than by assertion:** `GameScreen`
+> passes `hintRevealedWord: false` and nothing in levels 1-4 hands over the
+> answer, so `scoringEngine`'s −10 tier stays unreachable from the sheet — it
+> remains reserved for PRD §13's separate one-time skip, which no task builds.
+> `Move.hintLevel` now records `definition_clue` when level 4 actually
+> appeared and `example_word` when it did not, rather than assuming the deepest
+> level was always shown.
+>
+> **A third leak, found on Android after the task was otherwise finished.** The
+> sheet showed "Example: RABBI" and then clued *"spiritual leader of a Jewish
+> congregation…"* — the gloss of `rabbin`/`rabboni`, which WordNet puts in one
+> synset with `rabbi`. Excluding level 3's *word* was not enough, because words
+> sharing a sense share the definition verbatim, so a synonym came back
+> carrying the identical meaning and level 4 collapsed into a restatement of
+> level 3. Fixed by excluding the example's **definition** as well as its word —
+> which is what "a different word" has to mean when words share senses. Now
+> clues "a disorderly crowd of people" for the same letter. Pinned by a test
+> across all 26 letters.
+>
+> *Verified on the iPhone SE (3rd gen) simulator:* on `a`, the clue rendered
+> aardvark's gloss with the word absent; on `n`, "Example: NAB" (three letters,
+> post-fix) alongside "Another word here means: tag the base runner to get him
+> out (verb)". Using the hint and submitting a 9-letter word scored 17 where an
+> unhinted submission scores 22 — the −5, not −10. *Re-verified on the Android
+> emulator* after the synonym fix.
+
+**WL-505 · Report a word** — M · 1.5d · WL-407 — **DONE 2026-08-30**
 PRD §26: the five report types, storing word, game_id, report_type, player_comment,
 dictionary_source, created_at. D-03 is closed (no backend for v1) — queue locally and
 export via Settings; a lightweight endpoint is not an option here without a scoped
@@ -2545,16 +2804,148 @@ exception to D-03, which isn't warranted for this one feature.
 *Done when:* a report is capturable from both the invalid-word state and Settings, and
 persists.
 
-**WL-506 · Offline and failure states** — S · 1d · WL-302
+> **DONE 2026-08-30.** Four layers, mirroring the profile stack exactly:
+> `types/report.ts` (Data Model §8 in camelCase), `features/report/wordReports.ts`
+> (pure), `services/report/reportRepository.ts` (MMKV under a new
+> `WORD_REPORTS` key), `store/useReportStore.ts`, plus `ReportWordSheet.tsx`.
+> The five types are exported as data and read by the sheet rather than
+> restated in it, so the screen cannot drift from PRD §26.
+>
+> **Both entry points, and why they differ.** From the game screen the control
+> appears *only* on the invalid-word state — that is the moment the player
+> actually disagrees with the dictionary, and a permanent control would invite
+> reports of words the game just accepted. From Settings the sheet asks which
+> word, and `gameId` stays **null** rather than being invented (Data Model §8).
+>
+> **A real bug found on device, and fixed.** The in-round report originally
+> read the word from `latestInputRef`. iOS autocorrect rewrote the field *after*
+> submission — "yaffle" was rejected and the field then held "Raffle" — so the
+> report would have named a word the game never rejected, and one that *is* in
+> the word list. The rejected word is now captured when the rejection happens.
+> This is a close cousin of the WL-303 desync the plan already tracks, but a
+> distinct mechanism: the field changing after the judgement, not before it.
+>
+> **Export is the whole feature under D-03.** No server exists, so the queue
+> lives on device until the player sends it via the OS share sheet as
+> pretty-printed JSON (the recipient curates the word list and pastes it into a
+> script). The button is hidden until the queue is non-empty, and the queue is
+> deliberately **not** cleared afterwards: `Share` resolves identically whether
+> the player sent the message or abandoned the draft, so clearing on resolve
+> would silently discard reports that never left the device. Re-exporting costs
+> nothing; losing a report costs the feature. `dictionaryService.setRuntimeExclusions`
+> (WL-104) remains the hook a future review pass writes back into.
+>
+> Smaller calls worth recording: duplicates of the same word are **kept** (two
+> types are different information, two identical ones are a signal, and
+> deduplicating would look like a broken button); the queue is capped at 200
+> oldest-first, unlike `discoveredWords` which is never capped; a malformed
+> stored entry is dropped without losing the other 199; and **"Delete My Data"
+> now clears reports** — they carry free text the player wrote, so they are
+> their data — with `DELETE_GUEST_DATA_CONFIRM`'s copy updated to say so.
+> `resetStatistics` deliberately does not: a pending report is a message in
+> flight, not a score.
+>
+> *Verified on the iPhone SE (3rd gen) simulator:* the in-round control appeared
+> exactly on a real rejection and opened the sheet with all five types in PRD
+> order and Send Report disabled until one was chosen; the Settings entry
+> submitted a report, "Export Reports (1)" appeared, and the OS share sheet
+> opened carrying the JSON. The stored record was then read straight out of the
+> simulator's MMKV file — every Data Model §8 field present, `gameId` null from
+> the Settings path, `reviewStatus` `pending`, and the ESDB version stamped.
+
+**WL-506 · Offline and failure states** — S · 1d · WL-302 — **DONE 2026-08-30**
 Wireframe §17: offline notice, dictionary unavailable, computer timeout. Under D-03 the
 app is offline-native, so these are mostly reassurance rather than degradation — worth
 stating plainly to the player.
 *Done when:* each state is reachable in a test build and none of them blocks play.
 
+> **DONE 2026-08-30.** Two states built, one re-verified.
+>
+> **The offline copy in Wireframe §17 was wrong, and the doc has been changed
+> rather than the code bent to match it.** Its third line — "Definitions and
+> statistics sync later" — promised the player something v1 does not do:
+> definitions are *bundled on the device* (WL-501 closed D-08 on WordNet
+> glosses, not an API), and statistics never sync because there is no backend
+> (D-03) and no account to sync to (D-04). The shipped copy keeps the first two
+> lines merged into one and drops the promise. §17 now carries the corrected
+> block and a note saying to restore the sync line only alongside a release
+> that actually builds syncing.
+>
+> **A new dependency, flagged rather than slipped in:**
+> `@react-native-community/netinfo`. React Native's core exposes no
+> connectivity API, so the alternative was a store flag nothing ever set —
+> exactly the dead-code shape WL-502 removed a Pronunciation button to avoid.
+> `useConnectivityStore` watches it from `App.tsx` (a fact about the device,
+> not about a screen) and **gates nothing**: it drives one banner. `isOnline`
+> is tri-state, with `null` meaning "not yet known", so a cold start never
+> flashes a false alarm; a connected-but-unprobed device counts as online,
+> since a wrong "offline" banner costs more than a missing one when nothing
+> degrades either way.
+>
+> **Dictionary unavailable is genuinely reachable**, not decorative:
+> `initDictionary` throws on a corrupt or half-written asset, and WL-501's
+> alignment guard added a second way for a bundled asset to be untrustworthy.
+> `isDictionaryAvailable()` answers the question instead of propagating the
+> exception — a screen cannot render a reassuring notice from inside a crash —
+> and deliberately does not cache `false`, because the copy the player is shown
+> says "try again shortly" and that has to be true.
+>
+> Both notices sit above the scroll view so neither can be scrolled past
+> unseen, and both are a quiet caption strip rather than a `tomato` alert:
+> neither is an error the player caused or can fix, and dressing them as alarms
+> would contradict the reassurance they exist to give.
+>
+> *Verified on the iPhone SE (3rd gen) simulator, all three states:*
+> - **Offline** — first attempted for real by powering down the host's Wi-Fi,
+>   which turned out **not** to take the machine offline (another interface
+>   still held the default route) and the app correctly showed nothing. Verified
+>   instead by forcing the listener's value, reloading, screenshotting, and
+>   reverting — and a **full turn was played with the notice up** (submitted a
+>   word, computer replied, chain and score advanced), which is the half of the
+>   criterion that matters. Real airplane-mode behaviour on a device is
+>   therefore *not* exercised — one for WL-310's device pass.
+> - **Dictionary unavailable** — forced by making `isDictionaryAvailable` throw,
+>   reloaded, §17's copy rendered verbatim above a board the player could still
+>   leave, reverted afterwards (`grep` for the marker confirms nothing remains).
+> - **Computer timeout** — already built at WL-306 and re-verified this session
+>   while confirming WL-503's game-over line: forced timeout, "WordLoop is
+>   taking longer than expected." with Try Again / End Round, End Round reaching
+>   the game-over panel cleanly. Not rebuilt, exactly as the WL-306 note asked.
+
 > **Note (flagged at WL-306, 2026-08-28):** the computer-timeout state is already built
 > as of WL-306 — `GameScreen`'s `computerTimedOut`/`attemptComputerTurn`, Try Again/End
 > Round both working. This task re-verifies it alongside offline notice and dictionary
 > unavailable (which are still unbuilt), not a second build.
+
+> **Android pass over all of Phase 5, 2026-08-30.** Every prior Phase 5
+> verification in this plan was iOS Simulator only; this is the cross-platform
+> check, on the `Medium_Phone_API_36.1` emulator with a fresh Debug APK
+> (`JAVA_HOME` = Android Studio's bundled JBR). It is **not** WL-310 — that
+> still requires physical hardware — but it closes the platform gap within
+> Phase 5.
+>
+> **It earned its keep: it is what caught WL-504's synonym leak** (see that
+> task's note), which had survived a full iOS pass and the whole unit suite.
+> Worth remembering as evidence for running both platforms per phase rather
+> than batching Android into the device pass.
+>
+> Confirmed working on Android: the 3.1MB definitions asset bundles, links and
+> decodes (BONEYER → "Having bones especially many or prominent bones.", so
+> Morphy runs on-device); `@react-native-community/netinfo` autolinks with no
+> manual Gradle work; hint levels 1-4; a full turn (rainbow → warnings); the
+> invalid-word state with its Report affordance naming the correct rejected
+> word; the report persisting to Android MMKV with every Data Model §8 field
+> and a **real `gameId`** from the in-round entry point (the iOS check had
+> exercised the Settings path, which correctly stores `null` — so the two paths
+> are now each verified on one platform); WL-401's leave-confirmation on the
+> hardware back button; and WL-502's review screen with a definition expanding
+> in place. No `FATAL` or `AndroidRuntime` exception in `adb logcat` across the
+> session.
+>
+> **Not exercised on Android:** the offline and dictionary-unavailable notices
+> (WL-506 — same forced-state technique would apply, but the code path is
+> platform-independent and netinfo's own linkage was confirmed by the app
+> running at all), and the game-over panel.
 
 ---
 

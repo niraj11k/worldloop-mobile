@@ -78,6 +78,19 @@ for (const holder of [
   check(`font copyright line missing: ${holder}`, shipped.includes(holder));
 }
 
+// WL-501 bundles the WordNet 3.1 database itself for definitions, and that
+// licence requires its notice on "ALL copies of the software, database and
+// documentation". This is a stricter check than the WordNet entry above: that
+// one is ESDB's abbreviated 1.6 excerpt carried as insurance, while this is
+// the full 3.1 text for data the app actually ships, saved verbatim from the
+// header WordNet carries inside its own data files.
+const wordnet31 = read('licenses/wordnet/WordNet-3.1-LICENSE.txt').trimEnd();
+check('WordNet 3.1 database licence is missing or altered', shipped.includes(wordnet31));
+check(
+  'WordNet 3.1 copyright line missing — the app would ship the 3.1 database under the 1.6 notice',
+  shipped.includes('WordNet 3.1 Copyright 2011 by Princeton University.'),
+);
+
 // CC-BY-4.0 supplies no notice text; it requires the work, the source, and
 // the licence to be named, and modifications to be indicated (WL-104 cut the
 // list down by hand).

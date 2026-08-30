@@ -182,6 +182,18 @@ and/or database.
 
 Both notices go in the Settings → Attributions screen (already scoped as part of WL-407 in the Delivery Plan).
 
+### 7.1 Update — WordNet is now bundled directly (WL-501, 2026-08-30)
+
+**This section's WordNet reasoning no longer describes what WordLoop ships.** It was written when WordNet reached us only indirectly, through ESDB's internal POS assignment — hence "MIGHT apply" and "cheap insurance". WL-501 closed D-08 by bundling the **WordNet 3.1 database itself** as the source of the app's word definitions (`src/assets/dictionary/definitions.pack.json`, built by `scripts/generate-definitions.py`). We now redistribute WordNet data directly, so the notice is a **direct obligation**, not insurance.
+
+Three consequences, all handled:
+
+1. **A different notice text.** The excerpt above is the **WordNet 1.6** notice, which is what ESDB itself publishes. The bundled database is **3.1**, whose licence header — carried inside the WordNet data files — differs materially: a fuller disclaimer, and a "Title to copyright ... shall at all times remain with Princeton University" clause the 1.6 excerpt omits. Shipping 3.1 data under the 1.6 notice would not satisfy "the same appear on ALL copies of the software, database and documentation".
+2. **So the app ships both, and that is not a duplicate.** The existing "WordNet" entry stays exactly as this section specifies (inherited via ESDB, 1.6 text). A separate "WordNet 3.1 database" entry carries the full 3.1 text, saved verbatim at `licenses/wordnet/WordNet-3.1-LICENSE.txt` and pinned by `npm run attributions:verify`.
+3. **No new licensor, and no fee.** WordNet's grant is "for any purpose and without fee or royalty", with the notice requirement as its only real condition. It adds no party beyond Princeton, who this review already named.
+
+**Nothing here changes section 8's two open legal items**, and this is not a third: the WordNet grant is self-contained and verifiable, unlike the COCA pass-through. It is recorded here because section 7's own framing ("not something WordLoop redistributes directly as data") became false, and a reader trusting that sentence would draw the wrong conclusion about what the app ships.
+
 **Do not** include the UKACD or Australian/Benjamin Titze notices — including them would be harmless but implies we used size 80+ or the Australian dialect data, which we're deliberately not doing. Keeping the attribution screen matched to actual usage is cleaner and avoids a false compliance signal if the size cap is ever revisited.
 
 ---

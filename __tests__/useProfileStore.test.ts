@@ -114,6 +114,31 @@ describe('useProfileStore', () => {
     expect(profile.discoveredWords.map(word => word.word)).toEqual(['eagle']);
   });
 
+  it('records a viewed definition and keeps it across a cold start (WL-502)', async () => {
+    await useProfileStore.getState().load();
+    await useProfileStore.getState().recordRound(wonRound());
+    await useProfileStore.getState().markDefinitionSeen('eagle');
+
+    coldStart();
+    await useProfileStore.getState().load();
+
+    expect(useProfileStore.getState().profile!.discoveredWords[0]?.definitionViewed).toBe(
+      true,
+    );
+  });
+
+  it('ignores a definition viewed for a word the player never discovered', async () => {
+    // The in-game overlay opens on the computer's words too, and fires this
+    // for all of them — so the no-op path is the common one, not an edge case.
+    await useProfileStore.getState().load();
+    await useProfileStore.getState().recordRound(wonRound());
+    const before = useProfileStore.getState().profile;
+
+    await useProfileStore.getState().markDefinitionSeen('apple');
+
+    expect(useProfileStore.getState().profile).toBe(before);
+  });
+
   it('persists a settings toggle immediately (Wireframe §16)', async () => {
     await useProfileStore.getState().load();
     await useProfileStore.getState().setSettings({ soundEnabled: false });

@@ -11,6 +11,7 @@ import {
   setRuntimeExclusions,
   getRuntimeExclusions,
 } from '@features/dictionary/dictionaryService';
+import { MIN_WORD_LENGTH } from '@constants/gameConstants';
 
 /**
  * Runs against the REAL bundled asset (WL-105), not a fixture.
@@ -22,6 +23,21 @@ import {
  * independently, so without this they could drift silently and the app would
  * disagree with `npm run dictionary:verify`.
  */
+describe('exampleWordForHint minimum length (WL-504)', () => {
+  it('never suggests a word the rule engine would reject as too short', () => {
+    // Found on screen, not in a test: the hint offered "Example: A" for the
+    // letter A. The dictionary holds 240 computer-playable words under three
+    // letters and the most common word for most letters is one of them, so
+    // this is the common case rather than an edge one.
+    for (const letter of 'abcdefghijklmnopqrstuvwxyz') {
+      const example = exampleWordForHint(letter, []);
+      if (example !== null) {
+        expect(example.length).toBeGreaterThanOrEqual(MIN_WORD_LENGTH);
+      }
+    }
+  });
+});
+
 describe('dictionaryService', () => {
   it('reports a plausible bundled word count', () => {
     expect(dictionarySize()).toBeGreaterThan(100_000);
