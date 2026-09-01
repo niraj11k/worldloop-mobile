@@ -127,7 +127,13 @@ const styles = StyleSheet.create({
   word: { ...typeScale.chainWord, color: palette.ink, textAlign: 'center' },
   // Five options plus an input and two buttons overflow a small phone at the
   // largest OS text size, and Send Report has to stay reachable.
-  optionsScroll: { maxHeight: 220, flexGrow: 0 },
+  //
+  // `flexShrink` added under WL-312: the 220 cap handles large text, and the
+  // keyboard is the other way this sheet runs out of room — it takes roughly
+  // 260pt on the smallest phone, which the cap alone knows nothing about. This
+  // list is the right part to give up that space, because it is already
+  // scrollable and the comment field the player is typing into is not.
+  optionsScroll: { maxHeight: 220, flexGrow: 0, flexShrink: 1 },
   options: { gap: spacing.sm },
   option: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   optionDot: { ...typeScale.body, color: palette.ink },

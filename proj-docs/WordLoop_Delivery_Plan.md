@@ -99,6 +99,7 @@ reference doc currently says, that's marked **[changes a doc]**.
 | **D-08** | Definition/enrichment provider | Phase 5 | **CLOSED 2026-08-30 — no commercial provider; bundled Princeton WordNet 3.1 glosses.** The original guidance ("bundled short glosses *if the chosen word list carries them*") had no path, because ESDB carries none — only a commonness tier and two flags per word — which WL-405 had already flagged as blocking. WordNet supplies them, and was the right answer rather than a convenient one: ESDB already uses WordNet for its part-of-speech work, so **the notice was already shipping** in Settings → Attributions and the app takes on no new licensor and no fee. Coverage is **70.1%** of the playable list (98,963 of 141,217) with Morphy lemmatisation; the remaining 30% take Wireframe §12's "Definition unavailable" state, which that doc already specifies as a first-class outcome. Cost is **~3.1MB** (deduplicated by sense — 45,094 distinct glosses cover all 98,963 words), keeping the bundle near 4.8MB against WL-105's 8MB budget. Built by `scripts/generate-definitions.py`; see WL-501. One obligation *did* change — see §7.1 of the licence review: the app now redistributes the WordNet **database** directly, so it must carry the full **3.1** notice, not the abbreviated 1.6 excerpt ESDB publishes. **Phase 6 must still instrument definition-open rate** — that was never about which provider, and a bundled source makes the question cheaper to answer, not moot |
 | **D-09** | v1 success metrics and targets | Phase 6 | Ratify or amend the table in section 2 before the playtest build, so M2 has a pass/fail bar rather than a vibe |
 | **D-10** | Product name clearance | Phase 8 | PRD §30 requires App Store / Play name availability, domain, social handles, and trademark checks. Start this in Phase 3 — it has external lead time and a rename late in the project touches the wordmark, the bundle IDs, the store listings, and the design system |
+| **D-11** | Game screen input method **[changes a doc]** | Phase 3 rework | **CLOSED 2026-08-31 — the game screen types on an in-app A-Z keyboard; the OS keyboard stays as the accessibility fallback.** Raised by physical-device testing (iPhone 14 Pro), which found the OS keyboard covering the input field and then the Submit/Hint row — WL-303 claimed keyboard avoidance that the layout never actually delivered, because the input and the actions were scroll content sitting ~600pt down a single `ScrollView`. The fix could have been layout alone, and three things argued for replacing the keyboard instead. **(1) Autocorrect is hostile to this product.** WL-505 already documents a real device incident: the field held "Raffle" after "yaffle" was rejected, so a word report would have named a word the game never judged — in a game whose entire premise is "is this a real word?", predictive text is an adversary, not a convenience. **(2) The OS keyboard's height is unknowable.** QuickType, the globe/mic row, and third-party keyboards vary it by ~90pt, so any layout that has to fit around it is tuned against a number that changes per device and per user. **(3) Wrong-language keyboards.** `autoFocus` fires every turn and iOS restores the last-used keyboard, so a player who was just texting in Hindi gets Devanagari on their turn, against an English-only word list, with nothing the app can do about it. Implemented as `LetterKeyboard` (`src/components/game/LetterKeyboard.tsx`) with the key component added to Design System §4; the real `TextInput` is kept underneath with `showSoftInputOnFocus={false}` so hardware keyboards, the caret, and the WL-303 `latestInputRef` desync fix all keep working. **The fallback is part of the decision, not a nicety:** `usePrefersSystemKeyboard` returns the screen to the OS keyboard when a screen reader is running (VoiceOver/TalkBack users keep dictation, the rotor, and braille input, which 26 custom buttons cannot replace) or when the OS text scale exceeds 1.6x (fixed-width keys cannot grow with their labels). **Cost:** ~32pt-wide keys on a 375pt phone, below the 48pt `MIN_TAP_TARGET` — see the scoped exception in Design System §4. Haptics are *not* wired to keys: the `hapticsEnabled` setting exists but nothing in the app fires haptic feedback yet, and keys should not be the one exception |
 
 ---
 
@@ -1493,6 +1494,25 @@ phone.
 > per the pattern already established for the WL-105/106/108 budgets and the WL-001/WL-005
 > device matrix.
 
+> **SUPERSEDED IN PART BY WL-311 (2026-08-31). This task's keyboard-avoidance claim was
+> wrong, and it was marked DONE anyway.** Physical-device testing found the keyboard
+> covering the input field, and scrolling to the field then putting Submit and Hint
+> underneath it. The `KeyboardAvoidingView` this task added was real, but it was applied
+> around a `ScrollView` that *contained* the input and the actions — so Wireframe §19's
+> "should not be hidden below the keyboard" was never actually satisfied for either
+> control, on either platform. WL-311 moves them out of the scroll content entirely.
+>
+> Two things here should be read with that in mind. The Android note directly above was
+> watching the same broken arrangement, so it is not independent confirmation of anything.
+> And the autocorrect nuance recorded earlier in this entry stopped being a live risk for a
+> different reason than better handling: `autoCorrect` is now off outright (WL-311), and the
+> in-app keyboard has no autocorrect to begin with.
+>
+> **What this task got right and WL-311 kept:** the `latestInputRef` fix for the
+> native-field-ahead-of-state desync, which every input path now routes through, and
+> Wireframe §8's return-key submission, still live for hardware keyboards and the fallback.
+> The fast-typing-then-return check it asked WL-310 to run is still worth running.
+
 **WL-304 · Invalid-word feedback** — M · 1.5d · WL-302, WL-107 — **DONE 2026-08-28**
 All 7 rows of the Wireframe §10 message table, with the exact copy. Input retains the
 submitted word so the player can edit rather than retype. No internal dictionary detail
@@ -1766,6 +1786,95 @@ session.
 > (14 suites, 276 tests) all pass. No test file added — the screen is composition only
 > (`CLAUDE.md`'s "screens stay thin" rule); the logic it drives already has its own
 > coverage in `difficultyEngine.test.ts` and `gameSession.test.ts`.
+
+> **WL-311..313 are Phase 3 rework raised late, during Phase 5's device testing (2026-08-31),
+> and are filed here rather than in a later phase because what they change is the game
+> screen — WL-301's layout and WL-303's input behaviour. They sit above the M1 gate on
+> purpose: WL-310 asks for 20 complete rounds on real hardware, and the bug that prompted
+> these made the game screen unusable on one, so the gate cannot be met without them.**
+
+**WL-311 · In-app letter keyboard and pinned input dock** — L · 2d · WL-303, D-11 — **DONE 2026-08-31**
+Replace the OS keyboard on the game screen with an in-app A-Z keyboard, and move the input,
+its error, and the actions out of the scroll content into a pinned dock. Wireframe §19's
+"the input and Submit button should not be hidden below the keyboard", met structurally
+rather than by keyboard avoidance. Keep the OS keyboard reachable as the accessibility
+fallback per D-11.
+*Done when:* the field and the actions are visible without scrolling at every point in a
+turn, on the smallest device in the WL-005 matrix, and the fallback path is reachable.
+
+> **DONE, and the reason this task exists is that WL-303 was wrong.** That task recorded
+> keyboard avoidance as complete; physical-device testing on an iPhone 14 Pro found the
+> keyboard covering the field, and scrolling to the field then put Submit and Hint
+> underneath it. The cause was structural and not a tuning problem: the input sat roughly
+> 600pt down a single `ScrollView`, past the required-letter card, so "must never be hidden"
+> and "has to be scrolled to" were in direct conflict. WL-303's Android claim in WL-310's
+> note above — that `adjustResize` kept Submit above the keyboard — was measuring the same
+> broken arrangement and should not be read as independent confirmation.
+>
+> D-11 covers why the keyboard was replaced rather than the layout merely fixed. The real
+> `TextInput` is kept underneath with `showSoftInputOnFocus={false}`, so hardware keyboards,
+> the caret, and WL-303's `latestInputRef` desync fix are all untouched — the fallback is
+> one prop. `usePrefersSystemKeyboard` returns the screen to the OS keyboard for screen
+> readers and past 1.6x OS text scale. `autoCorrect`/`autoCapitalize`/`spellCheck` are now
+> off on *both* paths, which closes the WL-505 autocorrect incident ("yaffle" rejected, the
+> field then holding "Raffle") rather than only routing around it.
+>
+> Design System §4 gained a Keys component to carry this, with three scoped deviations
+> measured on device: the 2px badge border weight, a new `radius.key` (16px is half the
+> width of a 32pt key and produces capsules), and a tap-target exception — ten columns
+> cannot be 48pt wide on a 375pt phone, and keys clear WCAG 2.5.8's 24x24 floor instead.
+>
+> **Verified on the iPhone SE (3rd gen) simulator:** turn start, typing, a full
+> submit-and-reply cycle, delete including hold-to-repeat, the invalid-word state with the
+> dock growing, independent board scrolling, and the fallback at `accessibility-extra-large`
+> (which exposed and fixed a second defect — the pinned dock compressing its own error text,
+> now scrollable within its share). **Not exercised:** the game-over panel with the dock
+> hidden, Android, landscape, and the VoiceOver path. The physical-device recheck belongs to
+> WL-310.
+
+**WL-312 · Bottom-sheet keyboard avoidance** — S · 0.5d · WL-505, WL-204 — **DONE 2026-08-31**
+`ReportWordSheet`'s comment field sits in a `Modal` with no keyboard avoidance, so the
+keyboard covers both the field being typed into and the sheet's own Send/Cancel buttons.
+*Done when:* a sheet carrying a field stays fully usable with the keyboard open.
+
+> **DONE, applied at `BottomSheet` rather than in `ReportWordSheet`,** so any sheet that
+> later gains a field is covered rather than reproducing the bug. Uses `padding` behaviour
+> on Android too, unlike the game screen: a `Modal` is a separate window, so the activity's
+> `adjustResize` never reaches it and there is nothing to double up with — leaving it
+> `undefined` there would mean no avoidance at all. The sheet and its `SpringIn` wrapper
+> shrink rather than overflow, because a bottom-anchored child that cannot shrink grows off
+> the *top* of the screen instead of being clipped at the bottom; `ReportWordSheet`'s
+> options list absorbs the squeeze, being the part that already scrolls.
+>
+> **Verification is incomplete and this task should not be read as closed on device.** The
+> report and hint sheets were confirmed to render correctly with the change, so nothing is
+> regressed — but the simulator available here has a hardware keyboard attached and never
+> shows the software keyboard, so the lift itself is unverified. Owner is checking on
+> physical hardware; fold the result into WL-310.
+
+**WL-313 · Collapsible keyboard** — S · 0.5d · WL-311 — **DONE 2026-09-01**
+Give the player a way to dismiss the in-app keyboard and see the whole board.
+*Done when:* the keyboard can be collapsed and restored without losing typed input or
+access to Submit.
+
+> **DONE.** The in-app keyboard is permanent furniture in a way the OS keyboard was not —
+> there is no "done" to dismiss it — so it otherwise covers the lower half of the board for
+> the entire round, including the required-letter callout Design System §6 calls the
+> dominant element on screen.
+>
+> A `HIDE` key sits where a phone keyboard puts shift, with `DEL` opposite it at backspace;
+> `1.5 + 7 + 1.5` is exactly 10 columns, so the bottom row matches the top row's width
+> rather than leaving a ragged gap. Hide blurs the field as well as collapsing, and the blur
+> is load-bearing: focus is the single route back, covering both the player tapping the
+> field and the turn-start effect focusing it, so a collapsed keyboard lasts exactly as long
+> as the player is not typing. Submit and Hint move out of the keyboard into their own row
+> while collapsed — they live inside it and would otherwise leave with it, making a glance
+> at the chain cost a reopen. `HIDE` is the one key that stays live while a turn resolves,
+> since it changes what is on screen rather than what is in the field.
+>
+> **Verified on the iPhone SE (3rd gen) simulator:** collapse reveals the full card and
+> chain, typed input survives it, Submit works from the collapsed state, and the keyboard
+> returns by itself on the next turn with the new required letter highlighted.
 
 **WL-310 · M1 device pass** — M · 1d · all Phase 3
 Play 20 complete rounds across all three difficulties on physical iOS and Android.

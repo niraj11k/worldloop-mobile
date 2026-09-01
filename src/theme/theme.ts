@@ -70,15 +70,24 @@ export const spacing = {
 } as const;
 
 /**
- * Corner radius — Design System section 3. These three values are exhaustive;
- * the doc calls the scale "generous and consistent", so a fourth radius is a
- * doc change, not a local decision.
+ * Corner radius — Design System section 3. The scale is exhaustive; the doc
+ * calls it "generous and consistent", so a new radius is a doc change, not a
+ * local decision. `key` is the one addition made that way — see below.
  */
 export const radius = {
   /** Cards and modals. */
   card: 20,
   /** Buttons and inputs. */
   control: 16,
+  /**
+   * Letter-keyboard keys only (D-11, Design System §4 "Keys").
+   *
+   * The fourth value, added through the doc rather than around it. "Consistent"
+   * in section 3 means consistent *relative to the component*: `control`'s 16px
+   * is half the width of a 32pt key, so a keyboard built from it comes out as a
+   * grid of capsules — confirmed on the iPhone SE before this token existed.
+   */
+  key: 10,
   /** Badges, tags, stickers. */
   pill: 999,
 } as const;
@@ -163,6 +172,15 @@ const hardShadow = (offset: number) =>
 export const shadow = {
   /** Badges and stickers — section 4 says 2-4px. */
   badge: hardShadow(3),
+  /**
+   * Letter-keyboard keys — section 4's "Keys" component (D-11).
+   *
+   * Same 3px as `badge` and deliberately a separate token: a key is a control
+   * and a badge is decoration, so the two should be retunable independently
+   * even while they happen to agree. `KEY_PRESS_TRANSLATE` below must move with
+   * this value — a key travels exactly as far as its shadow is offset.
+   */
+  key: hardShadow(3),
   /** Secondary buttons — section 4 says 4px. */
   control: hardShadow(4),
   /** Primary buttons — section 4 says 6px. */
@@ -185,6 +203,39 @@ export const shadow = {
  * Paired with `shadow.none` so the control lands exactly where its shadow was.
  */
 export const pressTranslate = 4;
+
+/**
+ * The same rule for keyboard keys, whose shadow is smaller (D-11).
+ *
+ * Section 4's "translate 4-6px" is written against controls carrying 4-6px
+ * shadows; the rule underneath it is that a pressed control lands exactly where
+ * its shadow was. A key carries `shadow.key` (3px), so it travels 3px — using
+ * `pressTranslate` here would overshoot and read as a key sliding out from
+ * under itself.
+ */
+export const KEY_PRESS_TRANSLATE = 3;
+
+/**
+ * How far the OS text setting may scale a keyboard key's label (D-11).
+ *
+ * A key is sized by the 10-column grid it sits in and cannot grow with its
+ * label, so this is a cap rather than the free scaling everything else gets.
+ * Past `MAX_SYSTEM_KEYBOARD_FONT_SCALE` the screen stops trying and hands
+ * typing back to the OS keyboard — see `usePrefersSystemKeyboard`.
+ */
+export const MAX_KEY_FONT_SCALE = 1.3;
+
+/**
+ * The OS text scale past which the in-app keyboard is abandoned entirely
+ * (D-11).
+ *
+ * Chosen as the point where a capped label stops being an acceptable
+ * compromise: at 1.6x the surrounding UI has grown 60% while the keys have
+ * grown 30%, so the keyboard reads as a shrunken foreign object on the screen
+ * — and a player at that setting is telling the OS they need larger text, which
+ * the OS keyboard can honour and this one cannot.
+ */
+export const MAX_SYSTEM_KEYBOARD_FONT_SCALE = 1.6;
 
 /**
  * The widest a column of content is allowed to get (WL-409).

@@ -24,6 +24,15 @@
       "reason": "Same root cause, package and reachability as GHSA-w3rx-r6r6-pgpr.",
       "mitigation": "metro.config.js disables the jxl, jxl-stream and heif parsers alongside icns.",
       "reviewBy": "2026-11-08"
+    },
+    {
+      "url": "https://github.com/advisories/GHSA-vcc3-ghjq-m6fr",
+      "package": "decode-uri-component",
+      "severity": "moderate",
+      "title": "decode-uri-component: Denial of service via exponential decoding of malformed percent-encoded input",
+      "reason": "Transitive via @react-navigation/native -> @react-navigation/core -> query-string@7.1.3, which pins decode-uri-component ^0.2.2. Note this is a separate advisory from the 2022 one (<0.2.1) that 0.2.2 was published to fix; this one's range is <=0.4.2. Neither available route out is safe: the patched 0.5.0 is ESM-only (type: module, exports with no CommonJS entry) while query-string@7.1.3 is CommonJS calling require('decode-uri-component'), so an overrides pin passes CI and then throws ERR_REQUIRE_ESM at runtime; and npm's own fixAvailable is a major downgrade of @react-navigation/native to 3.8.4, which would remove the v7 API the app is built on. React Navigation v6 depends on the same query-string range, so downgrading the navigation stack does not avoid it either. No safe upgrade exists until React Navigation ships a core using a fixed query-string.",
+      "mitigation": "The vulnerable parser is unreachable in this app. React Navigation only calls query-string from its deep-link handling, and deep linking is not configured: RootNavigator renders NavigationContainer with no linking prop, and nothing in src/ sets link prefixes or calls getInitialURL. No user-, network- or OS-supplied URL reaches decode-uri-component, so there is no input to make malformed.",
+      "reviewBy": "2026-12-01"
     }
   ]
 }
