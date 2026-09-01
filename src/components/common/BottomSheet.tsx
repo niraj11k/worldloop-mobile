@@ -1,5 +1,12 @@
 import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 
 import {
@@ -72,7 +79,26 @@ export function BottomSheet({
       animationType="none"
       onRequestClose={onRequestClose}
       testID={testID}>
-      <View style={styles.scrim}>
+      {/*
+        Keyboard avoidance for any sheet carrying a field — today that is
+        `ReportWordSheet`'s comment box and its Settings-entry word field
+        (WL-312). A sheet is anchored to the bottom edge, which is precisely
+        where the keyboard arrives, so without this the field being typed into
+        and the Send Report / Cancel buttons below it are both underneath it.
+
+        **`padding` on Android too**, unlike the game screen, and the difference
+        is not an inconsistency. `GameScreen` passes `undefined` on Android
+        because the activity's own window is set to `adjustResize` in the
+        manifest, so the OS already does the work. A `Modal` is a *separate
+        window* and that manifest setting does not reach it, so there is
+        nothing to double up with — leaving this `undefined` would mean no
+        avoidance at all on Android.
+
+        Harmless on the sheets with no field (Hint, Pause, Definition, and the
+        confirmations): no keyboard opens over them, so this measures a
+        zero-height keyboard and adds nothing.
+      */}
+      <KeyboardAvoidingView style={styles.scrim} behavior="padding">
         {/*
           The scrim is a sibling of the sheet rather than its parent, so a tap
           inside the sheet cannot bubble out and dismiss it. Marked
@@ -89,7 +115,16 @@ export function BottomSheet({
           pointerEvents={dismissOnScrimPress ? 'auto' : 'none'}
         />
 
-        <SpringIn>
+        {/*
+          Both the wrapper and the sheet shrink rather than overflowing. Once
+          the keyboard has taken its share of the screen a tall sheet no longer
+          fits, and a bottom-anchored child that cannot shrink grows off the
+          *top* of the screen instead — taking its title and its first controls
+          with it. Shrinking here pushes the squeeze down into whichever part
+          of the sheet is built to absorb it (in `ReportWordSheet`, the options
+          list, which scrolls).
+        */}
+        <SpringIn style={styles.sheetWrapper}>
           <View
             style={[styles.sheet, style]}
             accessibilityViewIsModal
@@ -98,7 +133,7 @@ export function BottomSheet({
             {children}
           </View>
         </SpringIn>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -106,7 +141,9 @@ export function BottomSheet({
 const styles = StyleSheet.create({
   scrim: { flex: 1, justifyContent: 'flex-end', backgroundColor: scrim },
   scrimPressable: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  sheetWrapper: { flexShrink: 1 },
   sheet: {
+    flexShrink: 1,
     backgroundColor: palette.paper,
     padding: spacing.lg,
     gap: spacing.md,

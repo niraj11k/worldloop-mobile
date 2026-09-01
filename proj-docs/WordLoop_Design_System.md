@@ -202,6 +202,72 @@ Every interactive and card-like component follows the same construction:
 - Focus state: border color shifts to `grape`, plus a visible focus outline — this is a hard accessibility requirement (Wireframe doc section 18, "clear focus states") and must not be dropped for aesthetic reasons.
 - Error state: border shifts to `red-alert` AND an icon/text label appears — never color alone, per the "no colour-only meaning" rule.
 
+### Keys (on-screen letter keyboard)
+
+> **Added 2026-08-31 — Delivery Plan D-11: the game screen types on an in-app A-Z keyboard,
+> not the OS keyboard.** This section previously had no key component because none was needed.
+> The construction below is the standard one from the top of section 4, with two measured
+> deviations (border weight and tap-target width), both scoped to this component alone.
+
+- `paper` fill, `ink` border **2px**, **10px radius** (`radius.key`), 3px hard offset shadow
+  bottom-right (`shadow.key`).
+- **The 10px radius is a fourth value in section 3's scale, added deliberately.** The scale's
+  rule is that radius is "generous and consistent", and consistency there means *relative to
+  the component*, not an identical number everywhere: 16px on a 32pt-wide key is half its
+  width, which produces a capsule, not a key — verified on the iPhone SE, where a full grid
+  of them reads as a tray of lozenges rather than a keyboard. 10px keeps the puffy geometry
+  the thesis asks for while leaving the key legibly rectangular. It applies to keys only.
+- **Border weight is the 2px badge weight, not the 3px component default.** On a ~32pt key
+  a 3px border is 19% of the key's width, and two adjacent keys put 6px of solid `ink`
+  between them — a 26-key grid built that way reads as a black mesh with letters trapped in
+  it, not as a set of tactile objects. 2px is already in the system (`borderWidth.thin`), so
+  this stays inside the palette's rules rather than inventing a weight. **The border itself
+  is not optional** — WL-202 established it as load-bearing for WCAG 1.4.11, and that
+  finding was about the border's *presence*, not its thickness.
+- Label in the monospace button-label role, uppercase. Never the display face: keys are UI
+  chrome, and section 2 forbids the display face below 20px.
+- **Press state:** translate 3px toward the shadow and drop it — the same press-into-the-page
+  move every other control makes, scaled to this component's smaller shadow so the key lands
+  exactly where its shadow was. (The 4-6px figure at the top of section 4 is tied to the
+  4-6px shadows those controls carry; the *rule* is "travel equals the shadow offset".)
+- **Required-letter highlight:** the key for the round's required letter takes a `sunbeam`
+  fill with an `ink` label while the input is empty, and reverts to `paper` the moment the
+  player types anything. This is a deliberate scope limit, not a simplification — only the
+  *first* letter of a word is constrained, so a highlight that persisted past the first
+  keystroke would be asserting something false. It restates section 6's required letter in
+  a second place without competing with the callout, which stays the dominant element.
+- Every letter key is the same width, derived from a 10-column top row. The row of 9 centres
+  within that grid rather than stretching to fill it — stretched keys make identical letters
+  different sizes on different rows, which breaks the muscle memory the QWERTY layout exists
+  to borrow.
+- **Two modifier keys, both 1.5 columns wide, on the bottom row:** Hide on the left where a
+  phone keyboard puts shift, Delete on the right where it puts backspace. `1.5 + 7 + 1.5`
+  is exactly 10, so that row matches the top row's width precisely rather than approximately.
+  Delete holds to repeat; Hide collapses the keyboard and is the one key that stays live
+  while a turn is resolving, because it changes what is on screen rather than what is in the
+  field.
+- **Collapsing is a first-class state, not a nicety.** Unlike the OS keyboard it replaces,
+  this one has no "done" and would otherwise cover the lower half of the board for the whole
+  round — on a 375pt phone that is the required-letter callout section 6 calls the dominant
+  element on the screen. Collapsed, the keyboard is replaced by the Submit/Hint row (those
+  controls live inside the keyboard and must not leave with it), and focusing the field —
+  by tapping it, or automatically at the start of the next turn — brings it back.
+
+**Tap-target exception (deliberate, and scoped to this component).** Keys are 48pt tall but
+about 32pt wide on the smallest supported phone (375pt). That is under the 48pt
+`MIN_TAP_TARGET` every other control in the app meets. Ten columns of letters cannot be 48pt
+wide on a 375pt screen — it is arithmetically impossible, not a matter of effort — and the
+platform keyboards this replaces sit at roughly 32x42pt for exactly the same reason. Keys
+clear WCAG 2.5.8's 24x24 AA floor with room to spare, and the full 48pt height keeps the
+vertical axis at the app's normal size. **No control outside the letter keyboard may cite
+this exception.**
+
+**Text scaling.** Key labels cap at roughly 1.3x rather than growing with the OS text
+setting, because a key is sized by the grid it sits in and cannot grow with its label.
+Past that point the layout stops being viable at all, and the screen hands typing back to
+the OS keyboard — which is also what happens when a screen reader is running. See D-11 for
+why that fallback is part of the decision rather than a nicety.
+
 ### Badges / tags / stickers
 - Pill-shaped, `sunbeam` or `bubblegum` fill, `ink` border 2-3px, small drop shadow (2-4px), often rotated 3-6 degrees for the "sticker" feel. Used for streak counts, difficulty tags, "new word" callouts.
 

@@ -59,9 +59,11 @@ import { DefinitionSheet } from '@components/game/DefinitionSheet';
 import { ReportWordSheet } from '@components/game/ReportWordSheet';
 import { HintSheet } from '@components/game/HintSheet';
 import { GameOverPanel } from '@components/game/GameOverPanel';
+import { LetterKeyboard } from '@components/game/LetterKeyboard';
 import { PauseSheet } from '@components/game/PauseSheet';
 import { discoveredWordsForSession } from '@features/profile/guestProfile';
 import { useConfirmBeforeLeave } from '@hooks/useConfirmBeforeLeave';
+import { usePrefersSystemKeyboard } from '@hooks/usePrefersSystemKeyboard';
 import { announceForAccessibility } from '@utils/accessibility';
 import { useConnectivityStore } from '@store/useConnectivityStore';
 import { useProfileStore } from '@store/useProfileStore';
@@ -71,6 +73,7 @@ import {
   palette,
   spacing,
   shadow,
+  borderWidth,
   typeScale,
   displayTextProps,
   CONTENT_MAX_WIDTH,
@@ -182,6 +185,12 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   const dictionaryAvailable = isDictionaryAvailable();
   const saveRound = useSavedRoundStore(state => state.save);
   const clearSavedRound = useSavedRoundStore(state => state.clear);
+  /**
+   * D-11: normally `false` — the player types on the in-app `LetterKeyboard`.
+   * Goes `true` for a screen reader or a very large OS text size, where the OS
+   * keyboard is genuinely the better tool; see the hook for the argument.
+   */
+  const prefersSystemKeyboard = usePrefersSystemKeyboard();
 
   /*
     WL-403: Home's "Resume Game" arrives with `resume`, and the round it
@@ -260,6 +269,17 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
    * still applies to whichever submission this turn eventually succeeds.
    */
   const [hintUsedThisTurn, setHintUsedThisTurn] = useState(false);
+  /**
+   * WL-313: whether the player has collapsed the in-app keyboard to see the
+   * board.
+   *
+   * Screen-local and deliberately not persisted — it is a view state for the
+   * moment the player wants a look at the chain, not a preference. It resets
+   * itself on the next turn through the focus path below rather than being
+   * cleared explicitly anywhere: the turn-start effect focuses the field, and
+   * focus is what brings the keyboard back.
+   */
+  const [keyboardCollapsed, setKeyboardCollapsed] = useState(false);
 
   const inputRef = useRef<TextInput>(null);
   /**
@@ -472,6 +492,62 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
       return;
     }
     setSession(result);
+  };
+
+  /**
+   * The one place the field's value changes, whatever produced the change —
+   * a `LetterKeyboard` key, a hardware keystroke, or the OS keyboard in
+   * `prefersSystemKeyboard` mode (D-11).
+   *
+   * All three land here rather than each doing their own three-way update,
+   * which is what keeps `latestInputRef` in step with `input` no matter which
+   * input path the player is using. See the ref's own docblock for why it
+   * exists at all.
+   */
+  const commitInput = (text: string) => {
+    latestInputRef.current = text;
+    setInput(text);
+    setSession(current => setSessionInput(current, text));
+  };
+
+  /**
+   * A key on the in-app keyboard (D-11).
+   *
+   * Reads the current value from `latestInputRef` rather than from `input`,
+   * for the ordinary reason a rapid sequence of taps needs it to: two keys
+   * pressed inside one render would both append to the same stale `input`
+   * string, and the first letter would vanish.
+   *
+   * Lowercased on the way in. The keys are drawn uppercase because that is how
+   * a keyboard looks, but the chain, the field, and `normalizeWord` all work in
+   * lowercase, and the player should see the word the way the game will show it
+   * back to them.
+   */
+  const handleKeyPress = (letter: string) => {
+    if (busy || roundOver) return;
+    commitInput(latestInputRef.current + letter.toLowerCase());
+  };
+
+  const handleDelete = () => {
+    if (busy || roundOver) return;
+    commitInput(latestInputRef.current.slice(0, -1));
+  };
+
+  /**
+   * WL-313: the keyboard's Hide key.
+   *
+   * Blurs the field as well as collapsing the keyboard, and the blur is the
+   * load-bearing half — it is what makes the field's own focus the way back.
+   * A caret still blinking over a keyboard that is gone would be inviting the
+   * player to type into nothing, and leaving the field focused would mean
+   * tapping it produced no `onFocus` and therefore no way to reopen.
+   *
+   * Whatever has been typed is kept. Hiding the keyboard is a request to look
+   * at the board, not to abandon the word.
+   */
+  const handleHideKeyboard = () => {
+    setKeyboardCollapsed(true);
+    inputRef.current?.blur();
   };
 
   const handleSubmit = async () => {
@@ -726,8 +802,15 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
 
       {/*
         Wireframe section 19: input and Submit must stay visible above the
-        keyboard. The header sits outside this so it never shifts — only the
-        scrollable game content moves. Android already sets
+        keyboard. The dock below is what actually delivers that now (WL-311) —
+        this wrapper is here for the `prefersSystemKeyboard` fallback, where an
+        OS keyboard really does appear and the dock has to be lifted clear of
+        it. In the normal in-app-keyboard path no OS keyboard ever opens, so
+        this measures a zero-height keyboard and does nothing, which is the
+        correct behaviour rather than a wasted wrapper.
+
+        The header sits outside it so it never shifts — only the scrollable
+        game content moves. Android already sets
         `windowSoftInputMode="adjustResize"` in the manifest, so pairing that
         with an app-level `padding` behavior here would double-offset the
         content; `undefined` on Android leaves the OS-level resize as the only
@@ -909,19 +992,90 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
                 )}
               </View>
 
+            </>
+          )}
+        </ScrollView>
+
+        {/*
+          The input dock (WL-311). Everything the player's turn is *taken* with
+          — the field, its error, and the keyboard — sits outside the
+          `ScrollView`, pinned to the bottom of the screen.
+
+          This is the actual fix for the bug device testing found. Wireframe
+          §19 requires the input and Submit to stay visible above the keyboard,
+          and WL-303 tried to satisfy that with keyboard avoidance alone while
+          leaving both *inside* the scroll content — roughly 600pt down it, on
+          the far side of the required-letter card. So the keyboard opened on
+          every turn onto a viewport still parked at the top of the board, and
+          scrolling to the field only moved the buttons under the keyboard
+          instead. Content that must never be hidden cannot be content that has
+          to be scrolled to; the two requirements are in direct conflict, and
+          this is which one wins.
+
+          Hidden once the round is over: there is no turn left to take, and
+          `GameOverPanel` gets the whole screen back.
+        */}
+        {!roundOver && (
+          <View style={styles.dock}>
+            {/*
+              Scrollable, and only ever actually scrolls at large OS text sizes
+              (WL-311). At ordinary sizes this is a plain column that happens to
+              be inside a scroll view — the content is far shorter than the
+              space, so nothing moves.
+
+              It exists because the dock is pinned: the field, its error, the
+              report link and (in fallback mode) two stacked buttons can, at
+              accessibility text sizes, add up to more than the screen has left
+              once the keyboard has its share. Fixed content in a fixed height
+              has nowhere to go, and the middle of it was being squeezed —
+              found on the iPhone SE at `accessibility-extra-large`, where the
+              error message and "Report this word" were both cut in half. The
+              keyboard below is deliberately *not* inside this: a keyboard the
+              player has to scroll to reach is the bug this task exists to fix.
+            */}
+            <ScrollView
+              style={styles.dockFields}
+              contentContainerStyle={styles.dockFieldsContent}
+              keyboardShouldPersistTaps="handled">
               <Input
                 ref={inputRef}
                 accessibilityLabel="Your word"
                 value={input}
-                onChangeText={text => {
-                  latestInputRef.current = text;
-                  setInput(text);
-                  setSession(current => setSessionInput(current, text));
-                }}
+                onChangeText={commitInput}
                 editable={!busy}
                 autoFocus
+                /*
+                  WL-313: focus is the single way the keyboard comes back, and
+                  it covers both routes without either needing to know about
+                  the other — the player tapping the field, and the turn-start
+                  effect focusing it at the top of every new turn. A collapsed
+                  keyboard therefore lasts until the player wants to type
+                  again, which is exactly as long as it should.
+                */
+                onFocus={() => setKeyboardCollapsed(false)}
+                /*
+                  D-11: the OS keyboard does not open — `LetterKeyboard` below
+                  is the input surface. The field is still a real, focused
+                  `TextInput`, which is the point: the caret, hardware
+                  keyboards, and the WL-303 desync fix all keep working, and
+                  the fallback is this one prop.
+                */
+                showSoftInputOnFocus={prefersSystemKeyboard}
+                /*
+                  Off on both paths, not just the in-app one. WL-505 found iOS
+                  autocorrect rewriting the field *after* a submission was
+                  judged — "yaffle" was rejected and the field then held
+                  "Raffle" — which in a game about whether a word is real is a
+                  correctness bug, not a convenience. The in-app keyboard makes
+                  it unreachable; these make it unreachable in fallback mode
+                  too.
+                */
+                autoCorrect={false}
+                autoCapitalize="none"
+                spellCheck={false}
                 // Wireframe section 8: submit via the keyboard's return key,
-                // not just the Submit button.
+                // not just the Submit button. Still live for hardware keyboards
+                // and for the OS keyboard in fallback mode.
                 onSubmitEditing={handleSubmit}
                 returnKeyType="done"
                 // Doubles as Wireframe section 9's "input_empty" state message
@@ -962,23 +1116,60 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
                 <Text style={styles.statusMessage}>Checking word…</Text>
               )}
 
-              <View style={styles.actionsRow}>
-                <Button
-                  label={session.phase === 'validating' ? 'Checking…' : 'Submit'}
-                  onPress={handleSubmit}
-                  disabled={submitDisabled}
-                  tone="grape"
-                />
-                <Button
-                  label="Hint"
-                  variant="secondary"
-                  disabled={hintDisabled}
-                  onPress={() => setHintSheetVisible(true)}
-                />
-              </View>
-            </>
-          )}
-        </ScrollView>
+              {/*
+                In fallback mode the actions stay their own row, because the OS
+                keyboard has no room for them. With the in-app keyboard they
+                live inside it — see `LetterKeyboard`, which is also what buys
+                back the vertical space this whole change is for.
+
+                They come back out here when the keyboard is collapsed
+                (WL-313), because Submit and Hint travel with it otherwise. A
+                player who typed a word, hid the keyboard to check the chain,
+                and then had to reopen the keyboard purely to reach Submit
+                would be paying for the look twice.
+              */}
+              {(prefersSystemKeyboard || keyboardCollapsed) && (
+                <View style={styles.actionsRow}>
+                  <Button
+                    label={session.phase === 'validating' ? 'Checking…' : 'Submit'}
+                    onPress={handleSubmit}
+                    disabled={submitDisabled}
+                    tone="grape"
+                  />
+                  <Button
+                    label="Hint"
+                    variant="secondary"
+                    disabled={hintDisabled}
+                    onPress={() => setHintSheetVisible(true)}
+                  />
+                </View>
+              )}
+            </ScrollView>
+
+            {!prefersSystemKeyboard && !keyboardCollapsed && (
+              <LetterKeyboard
+                onKeyPress={handleKeyPress}
+                onDelete={handleDelete}
+                onHide={handleHideKeyboard}
+                onSubmit={handleSubmit}
+                onHint={() => setHintSheetVisible(true)}
+                submitLabel={session.phase === 'validating' ? 'Checking…' : 'Submit'}
+                submitDisabled={submitDisabled}
+                hintDisabled={hintDisabled}
+                /*
+                  Design System §4: the required letter's key is highlighted
+                  only while it is genuinely the next thing to be typed. Once
+                  the word has a first letter the constraint is satisfied and
+                  the highlight would be claiming something false.
+                */
+                highlightLetter={
+                  input.length === 0 ? session.requiredLetter.toUpperCase() : null
+                }
+                disabled={busy}
+              />
+            )}
+          </View>
+        )}
       </KeyboardAvoidingView>
 
       {/*
@@ -1148,6 +1339,49 @@ const styles = StyleSheet.create({
   },
   chainText: { ...typeScale.chainWord, color: palette.ink },
   input: { width: '100%' },
+  /**
+   * The pinned turn-taking area (WL-311). Opaque, because the board scrolls
+   * behind it and `paper` content sliding under a transparent dock reads as a
+   * rendering fault.
+   *
+   * The `ink` top border is the same boundary language §4 gives every other
+   * surface, and it is doing a real job here rather than decorating: without
+   * it the board's last line of text simply vanishes at the dock's edge with
+   * nothing to explain why. It is a container edge, not a new component.
+   */
+  dock: {
+    backgroundColor: palette.paper,
+    borderTopWidth: borderWidth.base,
+    borderTopColor: palette.ink,
+    /*
+      The dock takes what it needs and the board yields, rather than the two
+      splitting the screen. That is the right priority for this surface: the
+      board is reference material the player can scroll to, while the dock is
+      how the turn is actually taken. Capped so a very large text size cannot
+      push the board off the screen altogether — past that the fields scroll
+      within their own share instead.
+    */
+    flexShrink: 0,
+    maxHeight: '80%',
+  },
+  /**
+   * The field and its messages carry the screen's normal gutters; the keyboard
+   * below does not — it manages its own, because its key grid is sized from the
+   * window and would come out narrow inside a padded parent.
+   */
+  dockFields: { flexGrow: 0, flexShrink: 1 },
+  dockFieldsContent: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    // Also the dock's floor in `prefersSystemKeyboard` mode, where there is no
+    // keyboard below to supply one — and where the action row's 6px shadow
+    // would otherwise be clipped by the screen edge.
+    paddingBottom: spacing.md,
+    gap: spacing.md,
+    width: '100%',
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: 'center',
+  },
   statusMessage: { ...typeScale.body, color: palette.ink, textAlign: 'center' },
   // WL-506: a quiet full-width strip, not a Card and not `tomato`. Neither of
   // these states is an error the player caused or can fix, and dressing them
