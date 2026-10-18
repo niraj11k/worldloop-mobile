@@ -212,9 +212,18 @@ hintsUsed
 isOfflineSession
 previousBestChainLength (number | null — the player's longest chain before this
                         round, for the round-end personal-best bonus)
+endedByPlayer          (boolean — true when the player chose End Game or Restart;
+                        added by Delivery Plan D-15)
 ```
 
 Notes:
+
+- **`endedByPlayer` (D-15, 2026-10-13).** End Game records the result as `computer_win`, the
+  same status as the computer genuinely leaving the player with no words. The two need
+  different game-over messages, and WL-605 must not read giving up as being beaten, so the
+  game carries which one happened. `false` for every game still in play. A saved game
+  from before this field existed is always an active game, so a missing value reads as
+  `false` without a format version bump or a D-14 conversion step.
 
 - `status` includes `technical_failure`, added to `GameStatus` by WL-110 (see section 6's
   note on `RoundSummary.result`). This line previously listed only five values, predating
@@ -226,6 +235,12 @@ Notes:
   real best of `0`: an unknown baseline awards no milestone, whereas a genuine first
   round beats zero and earns one. WL-402 is what will supply the real value; until then
   every session runs with `null`.
+  **Superseded by D-14 (2026-10-06):** the bonus now compares against the profile's best
+  **at the moment the game ends** (Architecture §7). A copy taken at game start goes stale
+  when a paused game sits while another game sets a new best. The concurrency concern
+  above was about reading *mid-round*; a single read at the end is safe, because only one
+  game is ever being played. WL-411 decides whether this field is refreshed at the end or
+  retired.
 
 - `phase` is the `TurnPhase` union also declared in `types/game.ts`; it's UI/interaction
   state that has no reason to exist in a server-persisted `GameSession`, only in the
@@ -311,9 +326,18 @@ longest_chain
 hints_used
 result                 (player_win / computer_win / draw / abandoned — reuses GameStatus,
                         see note below)
+ended_by_player        (boolean — D-15; true when the player chose End Game or Restart)
 is_personal_best
 created_at
 ```
+
+**`ended_by_player` (D-15, 2026-10-13).** Copied from `GameSessionState.endedByPlayer` when
+the round is summarised, so round history and WL-605's tuning can tell a player-ended
+`computer_win` from a genuine one. **Cost:** one boolean per round, on a history capped at
+`MAX_RETAINED_ROUNDS` (100), so at most about 2.5KB on device. **No migration:** the
+profile parser is forgiving, and a round recorded before this field existed reads as
+`false`. That is accurate rather than a guess, because End Game didn't exist then, so every
+earlier `computer_win` really was the computer leaving the player with no words.
 
 **~~Open item this review surfaced, not resolved~~ — RESOLVED 2026-08-19 in `WL-110`.**
 Neither `GameStatus` nor this `result` field had a distinct value for Wireframe §14's fifth

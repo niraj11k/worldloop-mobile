@@ -226,6 +226,13 @@ Round-level bonus (optional, proposed):
 - +20 for winning the round.
 - +5 per personal-best chain-length milestone.
 
+**Which personal best a game is compared against (Delivery Plan D-14, 2026-10-06):** the
+player's best chain length **at the moment the game ends**, not when it started. This
+doesn't change the formula, only the comparison. A game can now be paused for days while
+another game sets a new best (D-13, D-14). Comparing against the best from when the game
+started would then announce "new best" and pay the +5 for a chain shorter than the
+player's real best.
+
 **Status:** First-pass draft, approved for prototyping. Subject to tuning per PRD section 16.
 
 ---

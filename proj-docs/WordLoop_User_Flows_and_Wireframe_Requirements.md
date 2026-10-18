@@ -182,12 +182,39 @@ Give the user immediate access to gameplay and optional secondary functions.
 #### Required elements
 
 - Start Game button.
+- Resume entry for the paused game, only while one exists (Delivery Plan D-13).
 - Best score.
-- Best streak or longest chain.
+- Words discovered, the total number of new words the player has found (Delivery Plan
+  D-15). This replaces "Best streak or longest chain": End Game records a computer win,
+  which resets the win streak, so a streak would read 0 for nearly every player. Words
+  discovered only grows and measures what the game is for. The mockup above still shows
+  the old Best Streak tile.
 - Word Review entry.
 - How to Play entry.
 - Settings entry.
 - Optional daily challenge placeholder.
+
+#### Resuming a game (Delivery Plan D-13, 2026-09-23)
+
+- At most one game is paused at a time. Home shows it as **Resume Easy game · 12 words**,
+  naming the difficulty and chain length so the player knows which game is waiting.
+- A game interrupted by a crash or force-quit also shows here, as a game still being
+  played rather than a paused one. If one is paused too, both entries appear; tapping the
+  paused one first asks the player to pause or end the interrupted game, under the same
+  rules as leaving any game (§13).
+- The mockup above predates saved games and doesn't show the entry.
+
+#### Games kept across days (Delivery Plan D-14, 2026-10-06)
+
+- A paused game has no expiry. The Resume entry also says how long ago it was last
+  played: **Resume Easy game · 12 words · 3 days ago**, using "today", "yesterday" or
+  "N days ago".
+- If an app update leaves a saved game unrestorable, Home shows a one-time notice instead
+  of the game silently disappearing: **"Your saved Easy game couldn't be restored after
+  the update."** The notice is an informational caption, not an error (§17 tone): the
+  player did nothing wrong.
+- Resuming opens straight onto the board, which already shows the last six words and
+  the required letter. There is no welcome-back screen.
 
 #### Important decision
 
@@ -231,6 +258,19 @@ Let the player select the challenge level with understandable descriptions.
 - Default selection: Easy.
 - Continue remains disabled until a difficulty is selected, unless Easy is preselected.
 - The selected difficulty must persist into the game session.
+
+#### With a paused game (Delivery Plan D-13, 2026-09-23)
+
+There is never more than one game per difficulty, and at most one paused game.
+
+- **Choosing the paused game's difficulty** offers **Resume** or **End and Start New**.
+  The second confirms first and names the game it ends ("Your Easy game (12 words) will
+  end").
+- **Choosing another difficulty** starts a new game, and the paused one stays paused.
+  Before it starts, the screen says plainly that **the new game can't be paused while the
+  other one is**. The paused game can't be reached without leaving the new one, so the new
+  game can only be ended. The player learns this before starting, not when trying to
+  leave.
 
 ## 7. How-to-play screen
 
@@ -466,7 +506,8 @@ The game must never block a round because an enrichment API is unavailable.
 | [Resume Game]                  |
 | [How to Play]                  |
 | [Restart Game]                 |
-| [Exit to Home]                 |
+| [Pause & Exit]                 |
+| [End Game]                     |
 +--------------------------------+
 ```
 
@@ -474,8 +515,32 @@ The game must never block a round because an enrichment API is unavailable.
 
 - Preserve the current game state.
 - Do not lose the chain if the user leaves temporarily.
-- Confirm before restarting or exiting.
+- Confirm before restarting, ending, or exiting.
 - Pause computer timers if timers are added later.
+
+### Leaving a game (Delivery Plan D-13, 2026-09-23)
+
+*Exit to Home* is replaced by two explicit choices. The same choices apply to every way
+out of a game: this screen, the header back control, Android's back button, and the iOS
+swipe-back gesture.
+
+- **Pause & Exit** keeps the game for later and returns Home, where it shows as the
+  paused game (§5).
+- **End Game** ends the game after a confirmation, and shows the End Game result (§14,
+  Delivery Plan D-15). Confirmation copy:
+
+  ```text
+  End this game?
+  Your 12-word chain is saved to your history, and any new words stay in Review Words.
+  [End Game]  [Keep Playing]
+  ```
+- **Keep Playing** returns to the board.
+- **When another difficulty's game is already paused,** Pause & Exit isn't offered, and
+  the dialog says why: only one game can be paused, and the Easy game already is. The
+  player can end this game or keep playing. There is deliberately no option to end the
+  paused game from here; the player ends it themselves by resuming it (D-13 rule 4).
+- **Restart Game** ends this game and starts a new one at the same difficulty, so it
+  counts as ending the game.
 
 ## 14. Game-over screen
 
@@ -512,6 +577,39 @@ The game must never block a round because an enrichment API is unavailable.
 - Encouraging message.
 
 Avoid overly competitive language for a learning-oriented casual game.
+
+### End Game result (Delivery Plan D-15, 2026-10-13)
+
+When the player ends a game themselves, it is **recorded** as a computer win but the screen
+never says so. It shows an encouraging message built from the game's own numbers instead.
+The first matching row wins:
+
+| When | Headline | Line |
+|---|---|---|
+| New longest chain | **New Best Chain!** | "23 words in a row — your longest yet." |
+| Found 1 new word | **Nice Find!** | "You discovered a new word: ZEPHYR. It's waiting in Review Words." |
+| Found 2+ new words | **Words Collected!** | "You discovered 4 new words this game. See them in Review Words." |
+| 10+ words, nothing new | **Well Played!** | "18 words strong. Your next chain starts whenever you're ready." |
+| Short game | **Good Game!** | "Every chain starts with one word. Ready for a fresh letter?" |
+
+Every End Game result closes with the same sign-off:
+
+> **Sorry to see you go. Hope to see you in the next game!**
+
+Rules:
+
+- The numbers and the word are real values from the game. The new word is shown in
+  capitals, as words are elsewhere in the app.
+- The **"New words discovered"** stat line is hidden when the message already says it, so
+  the screen doesn't repeat itself.
+- **Avoid:** "Don't give up", "Better luck next time" and "You lost". Each frames ending a
+  game as failure.
+- **Restart Game** ends the game the same way but goes straight to a new game, with no
+  result screen.
+- **Not affected:** a genuine computer win (the computer left the player with no words)
+  keeps its existing copy, which is true in that case and false after End Game. The
+  computer-timeout's End Round is still recorded as **player exits** (`abandoned`),
+  because the app stalled rather than the player choosing to stop.
 
 ## 15. Word review screen
 
