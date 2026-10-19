@@ -109,6 +109,9 @@ A round follows this sequence:
 4. The app validates the word.
 5. The computer selects a valid response.
 6. The game continues until one side has no valid move or reaches another ending condition.
+   **The player ending the game is one such condition** (Delivery Plan D-15, 2026-10-13):
+   it is recorded as a computer win, marked as player-ended, and shown with an
+   encouraging message rather than a loss (Wireframe §14).
 7. The game displays the result and optional learning feedback.
 
 ### Example

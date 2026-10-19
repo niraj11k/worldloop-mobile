@@ -5,9 +5,9 @@ const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
  *
  * Metro reads image asset dimensions via `image-size`, whose ICNS, JXL and
  * HEIF parsers can be driven into an infinite loop by a malformed file.
- * Every published version of `image-size` (<= 2.0.2) is affected, so there
- * is nothing to upgrade to; see the "Dependency audit state" section in
- * README.md.
+ * The fix (2.0.3+) is a major version Metro doesn't accept: Metro 0.84
+ * depends on `image-size@^1.0.2`, and the 1.x line has no patched release.
+ * See the "Dependency audit state" section in README.md.
  *
  * Metro passes a Buffer, so `image-size` picks a parser from the file's
  * magic bytes and ignores the extension — a hostile ICNS payload named
@@ -24,7 +24,8 @@ const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
  * and that module is loaded in this process, so we resolve Metro's own
  * copy rather than a hoisted one to be sure we mutate the same instance.
  *
- * Remove this once a patched `image-size` ships and Metro depends on it.
+ * Remove this once Metro depends on a patched `image-size`, or stops
+ * depending on it (Metro 0.87.1 already has).
  */
 function hardenImageSize() {
   try {

@@ -100,6 +100,10 @@ reference doc currently says, that's marked **[changes a doc]**.
 | **D-09** | v1 success metrics and targets | Phase 6 | Ratify or amend the table in section 2 before the playtest build, so M2 has a pass/fail bar rather than a vibe |
 | **D-10** | Product name clearance | Phase 8 | PRD §30 requires App Store / Play name availability, domain, social handles, and trademark checks. Start this in Phase 3 — it has external lead time and a rename late in the project touches the wordmark, the bundle IDs, the store listings, and the design system |
 | **D-11** | Game screen input method **[changes a doc]** | Phase 3 rework | **CLOSED 2026-08-31 — the game screen types on an in-app A-Z keyboard; the OS keyboard stays as the accessibility fallback.** Raised by physical-device testing (iPhone 14 Pro), which found the OS keyboard covering the input field and then the Submit/Hint row — WL-303 claimed keyboard avoidance that the layout never actually delivered, because the input and the actions were scroll content sitting ~600pt down a single `ScrollView`. The fix could have been layout alone, and three things argued for replacing the keyboard instead. **(1) Autocorrect is hostile to this product.** WL-505 already documents a real device incident: the field held "Raffle" after "yaffle" was rejected, so a word report would have named a word the game never judged — in a game whose entire premise is "is this a real word?", predictive text is an adversary, not a convenience. **(2) The OS keyboard's height is unknowable.** QuickType, the globe/mic row, and third-party keyboards vary it by ~90pt, so any layout that has to fit around it is tuned against a number that changes per device and per user. **(3) Wrong-language keyboards.** `autoFocus` fires every turn and iOS restores the last-used keyboard, so a player who was just texting in Hindi gets Devanagari on their turn, against an English-only word list, with nothing the app can do about it. Implemented as `LetterKeyboard` (`src/components/game/LetterKeyboard.tsx`) with the key component added to Design System §4; the real `TextInput` is kept underneath with `showSoftInputOnFocus={false}` so hardware keyboards, the caret, and the WL-303 `latestInputRef` desync fix all keep working. **The fallback is part of the decision, not a nicety:** `usePrefersSystemKeyboard` returns the screen to the OS keyboard when a screen reader is running (VoiceOver/TalkBack users keep dictation, the rotor, and braille input, which 26 custom buttons cannot replace) or when the OS text scale exceeds 1.6x (fixed-width keys cannot grow with their labels). **Cost:** ~32pt-wide keys on a 375pt phone, below the 48pt `MIN_TAP_TARGET` — see the scoped exception in Design System §4. Haptics are *not* wired to keys: the `hapticsEnabled` setting exists but nothing in the app fires haptic feedback yet, and keys should not be the one exception |
+| **D-12** | Analytics destination and transport | Phase 6 | **CLOSED 2026-09-08 — Firebase Analytics (GA4). D-03 stays closed; this is not a backend.** WL-601 had no destination: its acceptance criterion said "events reach the backend" while D-03 (closed 2026-08-17) removed the backend from v1 entirely, so the task as written could not be completed by any means. **Why Firebase:** WL-003 already ships `@react-native-firebase/app` + `/crashlytics` against a real project (`wordloop-52618`) with `google-services.json` and `GoogleService-Info.plist` committed, so this is `@react-native-firebase/analytics` added to an already-initialised core — a module on an existing integration, not a new vendor, no new licensor, no new fee, and nothing added to the Attributions screen. GA4 reports completion rate, D1/D7 return, and funnels as standard dashboards, which is what makes **WL-604 configuration rather than construction**. **Why this does not reopen D-03:** D-03 was about *server authority over gameplay* and the bespoke stack it implied (hosting, data store, API surface, offline reconciliation). A managed analytics product receives events over an SDK and decides nothing about a move's validity — the same category Crashlytics already occupies under D-03 today. Reopening D-03 would re-add roughly three weeks to the critical path to solve a problem a managed product solves for free. **Rejected:** a local event queue exported via the share sheet (the WL-505 pattern) — it cannot produce D1/D7 return or any cross-player rate, so it fails the exact question M2 exists to answer. **Consequences, to be carried rather than rediscovered:** ad-ID / IDFA collection is **disabled**, which keeps ATT and the privacy manifest's tracking-domain declarations out of v1 scope; WL-801's privacy policy must name Google Analytics for Firebase as a processor; WL-802's store declarations gain a Google data-sharing disclosure. The kill switch PRD §22 requires is a **separate open question** — build flag vs. user-visible Settings toggle — because a user-visible one changes Wireframe §16, which lists no analytics row |
+| **D-13** | Paused games and switching difficulty **[changes a doc]** | Before Phase 6 | **CLOSED 2026-09-23 — one game per difficulty; at most one paused game; the player ends a paused game themselves.** The first of three changes from reframing WordLoop around vocabulary and spelling practice rather than winning and losing; the other two (keeping a game across days, and what ending a game records) are being decided separately. **Rules:** (1) never two games of the same difficulty; (2) at most one *paused* game, meaning kept for later, shown on Home, with no expiry; (3) moving to another difficulty needs the current game paused or ended; (4) a second game can only be paused once the first paused game has ended, and the player ends it themselves by resuming it and choosing End Game. There is deliberately no shortcut that ends a game the player isn't looking at. **Rejected:** three parallel games, one per difficulty. That means three save slots, three Resume entries on Home and per-difficulty confirmations, which is more to build and more to explain for no clear gain. **Consequence of rule 4, stated so it isn't discovered in testing:** a game started while another is paused can only be ended, never paused, because the paused game can't be reached without leaving the current one first. The Difficulty screen says so before the game starts (Wireframe §6). **A crash or force-quit** keeps the interrupted game as *still being played*, not paused, under the same switching rules. This reverses WL-403's "a deliberate exit discards" rule (see the note there) and updates Wireframe §5, §6 and §13. The Data Model is unchanged: the paused game lives in its own storage slot, not as a new `GameStatus`. **Carried to the End Game decision (still open):** what End Game records and shows, and an analytics property marking an End Game chosen only because the pause slot was full, so it isn't read as giving up. Built as WL-410 |
+| **D-14** | Keeping a game across days **[changes a doc]** | Before Phase 6 | **CLOSED 2026-10-06 — saved games survive app updates and days away, with no expiry.** The second of the three vocabulary-reframe changes (see D-13). Most of it already worked: every move is saved, saves never expire, Home offers Resume, and WL-410 adds Pause & Exit. Four gaps appear once a game lasts days rather than minutes. **(1) Updates:** a change to the saved-game format used to mean the save was silently deleted (`SESSION_SCHEMA_VERSION`, WL-403). That was fine for a round worth minutes, not for a week-long game. Old saves are now converted to the new format. A committed sample saved game must keep restoring in CI, so an update that would break old saves fails the build, not a player's phone. If a save truly can't be converted, Home says so once rather than the game vanishing. **(2) Personal best:** a game compared itself against the best chain from when it *started*, so a game paused while another set a new best would wrongly announce "new best" and pay the +5. It now compares against the best when it ends (Architecture §7 updated; the formula is unchanged). **(3) Home** shows how old the game is: "Resume Easy game · 12 words · 3 days ago". The last-played time is stored with the save, not in `GameSessionState`, per Data Model §4's note that persistence timestamps sit outside the runtime shape, so the Data Model is unchanged. **(4) Coming back:** no welcome-back screen; the board's existing last-6-words view and the Home label are enough. **Kept as-is on purpose:** 3 hints per game, even across days. Changing it would change PRD §13 and scoring; revisit with playtest data at WL-605. **Stated limits:** saves are local only (D-03, D-04), so a reinstall or a new phone loses the game. Device backups may carry it over but this isn't promised. The phone's clock only affects the "N days ago" label and is never used for any rule. Words already played aren't re-checked when the dictionary updates. Built as WL-411 |
+| **D-15** | What End Game records and shows **[changes a doc]** | Before Phase 6 | **CLOSED 2026-10-13 — recorded as a computer win, marked as player-ended, shown as encouragement.** The third of the three vocabulary-reframe changes (D-13, D-14). **Recording:** `computer_win`, so the game counts as played and best score and best chain apply, and a long game earns credit instead of being thrown away. A new `endedByPlayer` / `ended_by_player` field on the game and round history (Data Model §4.1, §6) marks it, for two reasons: the game-over screen needs it to pick the right message (the existing computer-win copy, "No words were left beginning with that letter", is false after End Game), and WL-605 must be able to tell giving up from being beaten. Cost: one boolean per round, at most about 2.5KB of history, with no migration (see Data Model §6). **Display:** the computer win is never shown. Instead the player sees one of five message tiers built from the game's own numbers (new best chain, one new word named, several new words, 10+ words, short game), closed by the sign-off **"Sorry to see you go. Hope to see you in the next game!"** Copy is in Wireframe §14 and the confirmation in §13. **Home:** Best Streak is replaced by **Words discovered** (Wireframe §5), because a computer win resets the streak and it would read 0 for nearly everyone. `GuestProfile.localStreak` is kept in the data, dormant, rather than deleted. **Edges:** Restart Game ends the same way with no result screen; the computer-timeout End Round stays `abandoned`; a genuine computer win keeps its existing copy. **Knock-on for 1.1:** the dormant "after first completed game" account prompts (D-04) will now fire after End Game. **Rejected:** showing the computer win on screen, which would undercut the message. PRD §7 rule 6 is updated to name the player ending the game as an ending condition. Built as WL-412 |
 
 ---
 
@@ -2163,6 +2167,17 @@ round state including chain, score, and hints used.
 > mid-computer-turn restore, which is the one case too fast to trigger by hand (the
 > window is one 350ms think delay).
 
+> **Revised by D-13 (2026-09-23): a deliberate exit no longer has to discard.** Leaving
+> a game now offers **Pause & Exit**, which keeps it for later, alongside **End Game**.
+> This is the "Exit and save for later" flagged for WL-404 above. The save-slot mechanics
+> are unchanged and still cover exits the player didn't choose; D-13 adds a second slot
+> for the one paused game. Built as WL-410.
+
+> **Revised by D-14 (2026-10-06): saves from an older build are no longer discarded.**
+> The "strict parsing" rule above stays for genuinely corrupt saves, but a save in an
+> older format is converted rather than thrown away, because a paused game can now be
+> worth days of play. Built as WL-411.
+
 **WL-404 · Pause screen** — S · 1d · WL-401 — **DONE 2026-08-29**
 Wireframe §13: Resume, How to Play, Restart, Exit to Home. Confirm before restart or exit.
 *Done when:* all four actions work and both destructive ones confirm first.
@@ -2617,6 +2632,66 @@ landscape either works or is deliberately locked out with that decision recorded
 > orientation support was left as it is rather than removed on no evidence. **Flagged for
 > WL-805's device pass**, which is where a real tablet belongs anyway.
 
+**WL-410 · One paused game per difficulty** — M · 1.5–2d · D-13, WL-403, WL-404
+Implements D-13. **Sequenced before WL-601**, so analytics events are built for this game
+loop rather than the old one. Four parts:
+
+- **A second storage slot** for the one paused game, beside WL-403's slot for the game
+  being played, with the same eager save and strict parsing rules.
+- **Leaving a game** from Pause, Back or Exit to Home offers **Pause & Exit**, **End
+  Game** and **Keep Playing**. When a game of another difficulty is already paused, Pause
+  & Exit isn't offered and the dialog says why.
+- **The Difficulty screen** offers Resume or End and Start New for the paused
+  difficulty. It warns, before another difficulty starts, that the new game can't be
+  paused while the other one is.
+- **Home** shows "Resume Easy game · 12 words" (difficulty and chain length) for the
+  paused game.
+
+What End Game records and shows is the open End Game decision (see D-13). Until that
+closes, End Game uses today's `abandoned` recording, so this task doesn't block on it.
+*Done when:* every rule in D-13 holds on both platforms, including after a force-quit with
+one game paused and another in progress. Delete My Data clears the paused game and Reset
+Statistics does not. Unit tests cover each rule in the storage store, not only in the UI.
+
+**WL-411 · Keep a game across days** — M · 1–1.5d · D-14, WL-410
+Implements D-14. **Sequenced before WL-601**, for the same reason as WL-410. Four parts:
+
+- **Saves survive app updates.** Replace "discard on version mismatch" in
+  `sessionPersistence.ts` with a conversion step per format version, for both save
+  slots. Commit a sample saved game as a test fixture that must keep restoring. If a
+  save can't be converted, Home shows a one-time notice: "Your saved Easy game couldn't
+  be restored after the update."
+- **Personal best is read when the game ends** (Architecture §7, D-14), for both the
+  +5 bonus and the game-over "new best" line.
+- **Store a last-played time with each save**, and show it on Home as "Resume Easy
+  game · 12 words · 3 days ago", using "today", "yesterday" and "N days ago".
+- **No welcome-back screen.** Resume opens on the board as today.
+
+*Done when:* a save written by the previous format version restores after an update;
+the sample-save test fails if conversion breaks; a game resumed after another game set a
+new best doesn't claim "new best"; and the Home label reads correctly for today,
+yesterday and several days ago, on both platforms.
+
+**WL-412 · End Game result and Home stat** — M · 1–1.5d · D-15, WL-410
+Implements D-15. **Sequenced before WL-601**, so analytics events record the new ending.
+Four parts:
+
+- **`endedByPlayer` on the game and round history** (Data Model §4.1, §6). Set by End Game
+  and Restart, copied into the round summary, missing values read as `false`. This
+  replaces WL-410's interim `abandoned` recording for End Game.
+- **The End Game result screen** (Wireframe §14): five message tiers chosen from the game's
+  real numbers, the sign-off line, and the "New words discovered" stat hidden when the
+  message already says it. Copy lives as data in `gameConstants.ts`, like
+  `GAME_OVER_CONTENT`, so nothing is restated in the component.
+- **The End Game confirmation** (Wireframe §13) on the existing `ConfirmSheet`.
+- **Home's Best Streak tile becomes Words discovered** (Wireframe §5).
+
+*Done when:* each of the five tiers is reached in a unit test from real session data,
+including the one-word and plural cases. A genuine computer win still shows its existing
+copy. A player-ended game counts toward games played and bests. Every message fits
+without clipping on the iPhone SE (3rd gen) at default and largest text sizes, on both
+platforms.
+
 ---
 
 ### Phase 5 — Learning layer
@@ -3060,11 +3135,34 @@ stating plainly to the player.
 
 ### Phase 6 — Instrumentation and tuning → **M2**
 
-**WL-601 · Analytics layer** — M · 1.5d · none
+**WL-601 · Analytics layer** — M · 1.5d · D-12
 An anonymous-identifier event pipeline per PRD §22 — no personal information, disclosed in
 the privacy policy.
-*Done when:* events reach the backend with an anonymous ID and no PII, and a kill switch
-exists.
+
+**Destination is Firebase Analytics, not a WordLoop-operated server (D-12).** The original
+criterion here said "events reach the backend", which D-03 had already deleted from v1;
+that wording is corrected below rather than left to be discovered mid-task. Add
+`@react-native-firebase/analytics` to the core `@react-native-firebase/app` that WL-003
+already initialises against `wordloop-52618`, and follow the WL-003 pattern exactly: one
+file imports `@react-native-firebase/*` behind a local seam (`crashReporting.ts` /
+`firebaseCrashReporter.ts`), so the provider stays a one-file decision the way
+`StorageAdapter` keeps D-07 reversible.
+
+**The anonymous identifier already exists — do not mint a second one.** `GuestProfile.guestId`
+(WL-402) is persisted, survives restart, and carries no personal information; it is what
+PRD §22's "anonymous player identifier" asks for. Set it as the Firebase user ID and send
+no other profile field. Ad-ID collection is disabled per D-12.
+
+*Done when:* a scripted session's events appear in Firebase DebugView carrying `guestId`
+and no other identifier or free text in any payload; the kill switch suppresses every
+event when off, proven by a unit test **and** by an empty DebugView on a real run; and the
+layer is inert in dev the way `crashReporting.ts` is.
+
+> **Open, and it gates this task's kill switch:** whether the switch is a build/remote flag
+> (the `ACCOUNTS_ENABLED_V1` pattern) or a user-visible Settings toggle. Wireframe §16's v1
+> settings list has no analytics row, so the second choice changes that doc — which per
+> `CLAUDE.md` happens before the code, not after. Decide it alongside D-12, not during
+> implementation.
 
 **WL-602 · Gameplay events** — M · 1.5d · WL-601, all Phase 3
 Every PRD §23 event: game started, difficulty selected, valid move, invalid move (with
@@ -3072,6 +3170,11 @@ reason), hint used, definition opened, game completed, player win, computer win,
 abandoned, rematch started.
 *Done when:* a scripted 10-round session produces a complete, correctly-ordered event
 stream verified against the §23 list.
+
+> **Added by D-13 and D-15:** the "game completed" event carries `ended_by_player`, and
+> any player-ended game also carries `ended_while_pause_slot_full` (true when the player
+> couldn't pause because another game already was). WL-605 needs both so that a game
+> ended to free the pause slot, or ended by choice, isn't read as Hard being too hard.
 
 **WL-603 · Account-prompt events (dormant)** — S · 1d · WL-601
 The Architecture §10 event list. D-04 is closed — these ship dormant behind the same
