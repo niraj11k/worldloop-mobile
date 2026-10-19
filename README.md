@@ -296,23 +296,37 @@ dictionary itself — see the Delivery Plan, Phase 1.
 
 ## Dependency audit state
 
-`npm audit` reports 8 high-severity advisories. Every one of them is the
-same root cause — `image-size`, reached only through `metro`, the bundler.
-It does not ship in the app binary. A freshly generated RN 0.86.2 app
-reports the same.
+Last reviewed **2026-10-19**. `npm audit` reports 60 entries, which collapse
+to **6 distinct advisories in 4 packages**. All 6 are accepted, time-boxed
+exceptions in `audit-allowlist.json`, and none of the 4 packages runs in the
+shipped app.
 
-| Root | Severity | Path | Status |
+| Package | Advisories | Reached via | Why it can't be upgraded away |
 | --- | --- | --- | --- |
-| `image-size@1.2.1` | 8 × high | `metro` (bundler) | No fix exists |
+| `image-size@1.2.1` | 2 × high | `metro` (bundler), build time | Fix is 2.x; Metro 0.84 pins `^1.0.2` |
+| `@grpc/grpc-js@1.9.16` | 1 × high, 1 × low | RNFB → Firebase JS SDK → Firestore | Fix is 1.13.6; Firestore pins `~1.9.0` |
+| `braces@3.0.3` | 1 × high | Metro's file watcher, Jest | Every published version is affected |
+| `sprintf-js@1.0.3` | 1 × moderate | Jest code-coverage tooling | Every published version is affected |
 
 **`image-size`** (GHSA-w3rx-r6r6-pgpr, GHSA-5p2g-fcmc-qvqq) — DoS via
 infinite loops on malformed ICNS/JXL/HEIF files. The advisory covers
-`<= 2.0.2`, which is every published version: **there is no patched
-release to upgrade to**, so no override or version bump can clear it.
-Metro (0.84 through 0.87) depends on `image-size@^1.0.2` and calls it at
-bundle time to read the dimensions of assets in `src/assets/`.
+`<= 2.0.2`. **A patched release now exists** (2.0.3, September 2026), but
+it is the next major version, and the 1.x line Metro depends on has no fix.
+Metro 0.84 through 0.87.0 depend on `image-size@^1.0.2` and call it at
+bundle time to read the dimensions of assets in `src/assets/`; Metro 0.87.1
+no longer depends on it at all, so the advisory disappears once React Native
+moves onto that Metro. Until then there are two routes:
 
-It cannot be swapped for another package. It is required from exactly one
+- **Taken: the mitigation below**, which keeps Metro on the version it
+  declares.
+- **Available: an `overrides` pin to `image-size@2.0.4`.** Tested on
+  2026-10-19 against the exact call Metro makes (CommonJS default export,
+  `Buffer` in, `{width, height}` out): it works, and 2.x still exposes
+  `disableTypes()`. It would clear both advisories, at the cost of running
+  Metro outside its declared dependency range. Worth taking if this
+  exception keeps being renewed.
+
+It cannot be swapped for a *different* package. It is required from exactly one
 module in the whole tree — `metro/src/Assets.js` — as a synchronous
 CommonJS default export taking a `Buffer` and returning `{width, height}`.
 Nothing matches that shape: `image-dimensions` is ESM-only (Metro's
@@ -333,10 +347,34 @@ Metro's own `image-size` instance at startup, which costs nothing and
 makes the same payload fail instantly with "disabled file type" while
 legitimate images resolve normally.
 
-`npm audit` still reports these 8, because it matches installed versions
-and cannot see reachability. The vulnerable code is present but no longer
-reachable through Metro. Drop the mitigation once a patched `image-size`
-ships and Metro depends on it.
+`npm audit` still reports both advisories, because it matches installed
+versions and cannot see reachability. The vulnerable code is present but no
+longer reachable through Metro. Drop the mitigation once Metro depends on a
+patched `image-size`, or no longer depends on it at all.
+
+**`@grpc/grpc-js`** (GHSA-m9gg-hp2v-232j, GHSA-f596-whhp-79r4) — a
+certificate-authorisation flaw and a server-side error-message leak.
+`@react-native-firebase/app` depends on the Firebase JS SDK as its fallback
+for non-native platforms (web, macOS), and that SDK's Firestore pins
+grpc-js `~1.9.0`, below the 1.13.6 fix. It cannot run here:
+
+- On iOS and Android, RNFB uses the native Firebase SDKs.
+- This app installs only `app` and `crashlytics`, and nothing loads
+  Firestore.
+- Firestore's React Native build (`dist/index.rn.js`) has no reference to
+  grpc-js at all. grpc-js serves only Firestore's Node.js build, and it
+  needs Node's `http2` module, which doesn't exist in a React Native app.
+
+Forcing 1.13.6 through `overrides` would buy nothing at runtime and put
+Firestore outside its declared range.
+
+**`braces`** (GHSA-vfj7-8cjw-p6xm) and **`sprintf-js`**
+(GHSA-hp3w-g68c-fv3c) — denial of service on hostile input, with every
+published version affected, so there is nothing to upgrade to. Both are
+build and test tooling only. `braces` expands the glob patterns in Metro's
+and Jest's own configuration. `sprintf-js` sits under Jest's code-coverage
+config loader, which this project doesn't enable. Neither ever sees input
+from outside the repository.
 
 ### The audit gate
 
@@ -375,6 +413,18 @@ suite is pure `ruleEngine` logic with no React rendering, so the breakage
 is easy to miss. Pin deliberately instead.
 
 ### Previously flagged, now resolved
+
+**October 2026 batch.** New advisories against `shell-quote` (critical),
+`compression`, `qs`, `joi`, `js-yaml` and `brace-expansion` failed the gate
+on 2026-10-19, with no change to `package.json`. Every one had a patched
+release inside the range its parent already allowed, so a plain
+`npm audit fix` (no `--force`) cleared them by updating only
+`package-lock.json`: shell-quote 1.12.0, compression 1.8.2, qs 6.16.1,
+joi 17.13.8, js-yaml 4.3.2 / 3.15.2, and brace-expansion 1.1.21 / 2.1.7 /
+5.0.12. The same refresh moved `@react-navigation/core` to 7.24.0, which no
+longer depends on `query-string`. That removed `decode-uri-component`
+(GHSA-vcc3-ghjq-m6fr) from the tree entirely, so its allowlist exception
+was deleted as stale.
 
 `fast-xml-parser` (GHSA-gh4j-gqv2-49f6) accounted for 7 moderate
 advisories via `@react-native-community/cli-*`, which pinned `^4.4.1`.

@@ -2022,7 +2022,7 @@ PODS:
     - React-utils (= 0.86.2)
     - ReactNativeDependencies
   - ReactNativeDependencies (0.86.2)
-  - RNFBApp (26.3.2):
+  - RNFBApp (26.4.0):
     - Firebase/CoreOnly (= 12.18.0)
     - hermes-engine
     - RCTRequired
@@ -2045,7 +2045,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - RNFBCrashlytics (26.3.2):
+  - RNFBCrashlytics (26.4.0):
     - Firebase/Crashlytics (= 12.18.0)
     - FirebaseCoreExtension (= 12.18.0)
     - hermes-engine
@@ -2481,8 +2481,8 @@ SPEC CHECKSUMS:
   ReactCodegen: 3bbb7de19774794a7428ef623a7b777106cf3737
   ReactCommon: 9002f006f571256348994183f7d4387aa7cf84e8
   ReactNativeDependencies: 2bd6854ade79bf1b60586d1ab7813a389df1b6bf
-  RNFBApp: b967a9f36f5b03cdaaf3926cd0418c05b32ae255
-  RNFBCrashlytics: 17df8197fb710494580eb23b092c17a8a7298b09
+  RNFBApp: e767823f39a9b587d3c4867bbe064bd78f4d814b
+  RNFBCrashlytics: c57b2db38d8f3c234b4db87f466b4122b30d3a27
   RNScreens: de068bbd7d91b820fedac25c597d4b14830de74b
   Yoga: 9891cfb1c680f64de9c41b09e7453dea33454d2b
 
