@@ -56,6 +56,8 @@ doesn't mention it — per `CLAUDE.md`'s rule to flag rather than silently resol
 | Analytics and any optional advertising disclosed in the privacy policy | ⬜ | PRD §22 | WL-801 |
 | Apple "App Privacy" nutrition label completed and cross-checked against the actual fired-event list (not the planned one) | ⬜ | Delivery Plan, common store-rejection cause noted in the risk table | WL-802 |
 | Google Play "Data Safety" form completed and cross-checked the same way | ⬜ | Delivery Plan | WL-802 |
+| Analytics collection declared as **optional** in Google Play Data safety (players can opt out in Settings), and the opt-out described in the privacy policy | ⬜ | Delivery Plan D-16 | WL-801, WL-802 |
+| GA4 event-level data retention set to 2 months in the Firebase/GA4 console, matching the deletion policy | ⬜ | Delivery Plan D-16; `WordLoop_Guest_Data_Deletion_Policy.md` | WL-601 |
 | ~~If any server-side guest record exists, scheduled deletion after the documented inactivity period is actually running, not just specified~~ | N/A for v1 | D-03 (resolved 2026-08-17): v1 is client-authoritative with no backend, so no server-side guest record exists to expire. Re-open if D-03 is ever reversed | — |
 | "Report a word" free-text comment field (`WordReport.player_comment`) — confirm the privacy policy covers what happens to submitted comments, since it's user-authored free text even though it's never shown to other users | ⬜ | **[Gap]** — the field exists (PRD §26, `WordLoop_Data_Model.md` §8) but no doc currently addresses its privacy handling | WL-505, WL-801 |
 
@@ -135,7 +137,13 @@ and no amount of additional code changes that:
 5. **Age rating / content questionnaire answers** (section D) — a judgment call about how
    the free-text word-report field and any future ad integration should be characterized,
    not something a document can decide unilaterally.
+6. **Analytics consent model for a global launch** (section B, Delivery Plan D-16). The
+   launch includes the EU and UK, where analytics that store identifiers on a device are
+   commonly treated as needing **opt-in** consent. v1 is built opt-out (on by default, with
+   a Settings toggle), with collection held off natively until the app allows it, so moving
+   to opt-in behind a consent prompt is a small change. Whether the law requires that
+   change, and in which regions, needs a person with legal authority. **Blocks WL-801.**
 
-None of these block Phase 1 or Phase 2 engineering work. Items 1, 2, 3, and 5 should be
+None of these block Phase 1 or Phase 2 engineering work. Items 1, 2, 3, 5 and 6 should be
 closed out during v1's Phase 8, before `WL-806`. Item 4 moves to whenever 1.1 accounts
 work is scheduled.

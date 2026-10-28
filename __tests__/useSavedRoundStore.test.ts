@@ -39,12 +39,13 @@ const roundInPlay = (): GameSessionState => ({
  * The app being killed: the store is a module-level singleton, so clearing it
  * without touching storage is exactly what a force-quit leaves behind.
  */
-const killApp = () => useSavedRoundStore.setState({ saved: null, status: 'idle' });
+const killApp = () => useSavedRoundStore.setState({ saved: null, paused: null, status: 'idle' });
 
 describe('useSavedRoundStore', () => {
   beforeEach(async () => {
     killApp();
     await storage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
+    await storage.removeItem(STORAGE_KEYS.PAUSED_SESSION);
   });
 
   it('has nothing to resume on a fresh install', async () => {
@@ -104,6 +105,16 @@ describe('useSavedRoundStore', () => {
     expect(useSavedRoundStore.getState().saved).toBeNull();
   });
 
+  it('keeps nothing for a game the player has not moved in yet', async () => {
+    await useSavedRoundStore.getState().save(roundInPlay());
+    await useSavedRoundStore
+      .getState()
+      .save(createSession({ sessionId: 'session-2', difficulty: 'easy', startingWord: 'apple' }));
+
+    expect(useSavedRoundStore.getState().saved).toBeNull();
+    await expect(storage.getItem(STORAGE_KEYS.CURRENT_SESSION)).resolves.toBeNull();
+  });
+
   it('offers nothing to resume after the round is given up', async () => {
     await useSavedRoundStore.getState().save(roundInPlay());
     await useSavedRoundStore.getState().clear();
@@ -127,5 +138,157 @@ describe('useSavedRoundStore', () => {
 
     await expect(storage.getItem(STORAGE_KEYS.GUEST_PROFILE)).resolves.toBe('profile-value');
     await storage.removeItem(STORAGE_KEYS.GUEST_PROFILE);
+  });
+});
+
+/**
+ * D-13's rules, as the store enforces them (WL-410). Each `it` names the rule
+ * it pins, so a failure here reads as which rule broke.
+ */
+describe('useSavedRoundStore — paused games (D-13)', () => {
+  const easyGame = (): GameSessionState => ({
+    ...playerPlays(
+      createSession({ sessionId: 'easy-1', difficulty: 'easy', startingWord: 'apple' }),
+      'eagle',
+    ),
+    phase: 'input_empty',
+  });
+  const mediumGame = (): GameSessionState => ({
+    ...playerPlays(
+      createSession({ sessionId: 'medium-1', difficulty: 'medium', startingWord: 'table' }),
+      'eagle',
+    ),
+    phase: 'input_empty',
+  });
+  const store = () => useSavedRoundStore.getState();
+
+  beforeEach(async () => {
+    killApp();
+    await storage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
+    await storage.removeItem(STORAGE_KEYS.PAUSED_SESSION);
+  });
+
+  it('Pause & Exit moves the game into the pause slot and out of the current one', async () => {
+    await store().save(easyGame());
+    await expect(store().pause(easyGame())).resolves.toBe(true);
+
+    expect(store().paused?.sessionId).toBe('easy-1');
+    expect(store().saved).toBeNull();
+    await expect(storage.getItem(STORAGE_KEYS.CURRENT_SESSION)).resolves.toBeNull();
+  });
+
+  it('a paused game survives the app being killed, with no expiry', async () => {
+    await store().pause(chargeHint(easyGame()));
+
+    killApp();
+    await store().load();
+
+    const restored = store().paused;
+    expect(restored?.sessionId).toBe('easy-1');
+    expect(restored?.chain.map(move => move.normalizedWord)).toEqual(['apple', 'eagle']);
+    expect(restored?.hintsUsed).toBe(1);
+    expect(store().saved).toBeNull();
+  });
+
+  it('rule 2/4: a second game cannot be paused while one already is', async () => {
+    await store().pause(easyGame());
+
+    await expect(store().pause(mediumGame())).resolves.toBe(false);
+    expect(store().paused?.sessionId).toBe('easy-1');
+  });
+
+  it('rule 4: once the paused game has ended, another can be paused', async () => {
+    await store().pause(easyGame());
+    await store().clearPaused();
+
+    await expect(store().pause(mediumGame())).resolves.toBe(true);
+    expect(store().paused?.sessionId).toBe('medium-1');
+  });
+
+  it('refuses to pause a game with nothing in it, or one that is over', async () => {
+    const untouched = createSession({ sessionId: 'x', difficulty: 'hard', startingWord: 'apple' });
+    await expect(store().pause(untouched)).resolves.toBe(false);
+    await expect(store().pause(abandonSession(easyGame()))).resolves.toBe(false);
+    expect(store().paused).toBeNull();
+  });
+
+  it('resuming moves the paused game back into play and frees the pause slot', async () => {
+    await store().pause(easyGame());
+
+    const resumed = await store().resumePaused();
+
+    expect(resumed?.sessionId).toBe('easy-1');
+    expect(store().saved?.sessionId).toBe('easy-1');
+    expect(store().paused).toBeNull();
+    await expect(storage.getItem(STORAGE_KEYS.PAUSED_SESSION)).resolves.toBeNull();
+
+    // …so the same game can be paused again.
+    await expect(store().pause(easyGame())).resolves.toBe(true);
+  });
+
+  it('rule 3: the paused game cannot be resumed while another game is still open', async () => {
+    await store().pause(easyGame());
+    await store().save(mediumGame());
+
+    await expect(store().resumePaused()).resolves.toBeNull();
+    expect(store().paused?.sessionId).toBe('easy-1');
+    expect(store().saved?.sessionId).toBe('medium-1');
+  });
+
+  it('a pause interrupted mid-write keeps the game, as the one still in play', async () => {
+    // Pause writes the pause slot first and clears the current slot second; an
+    // app killed between the two leaves the same game in both.
+    const game = easyGame();
+    await store().save(game);
+    await storage.setItem(STORAGE_KEYS.PAUSED_SESSION, await storage.getItem(STORAGE_KEYS.CURRENT_SESSION) ?? '');
+
+    killApp();
+    await store().load();
+
+    expect(store().saved?.sessionId).toBe('easy-1');
+    expect(store().paused).toBeNull();
+    await expect(storage.getItem(STORAGE_KEYS.PAUSED_SESSION)).resolves.toBeNull();
+  });
+
+  it('a force-quit with one game paused and another in play restores both', async () => {
+    await store().pause(easyGame());
+    await store().save(mediumGame());
+
+    killApp();
+    await store().load();
+
+    expect(store().paused?.difficulty).toBe('easy');
+    expect(store().saved?.difficulty).toBe('medium');
+  });
+
+  it('a paused game killed mid-computer-turn resumes ready to finish that turn', async () => {
+    await store().pause(beginComputerTurn(easyGame()));
+
+    killApp();
+    await store().load();
+
+    expect(store().paused?.phase).toBe('computer_thinking');
+  });
+
+  it('Delete My Data (clearAll) empties both slots', async () => {
+    await store().pause(easyGame());
+    await store().save(mediumGame());
+
+    await store().clearAll();
+    killApp();
+    await store().load();
+
+    expect(store().saved).toBeNull();
+    expect(store().paused).toBeNull();
+  });
+
+  it('ending the open game leaves the paused game alone', async () => {
+    await store().pause(easyGame());
+    await store().save(mediumGame());
+
+    await store().clear();
+
+    expect(store().saved).toBeNull();
+    expect(store().paused?.sessionId).toBe('easy-1');
   });
 });

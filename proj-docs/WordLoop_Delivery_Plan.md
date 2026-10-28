@@ -51,29 +51,76 @@ dataset** and the **native project**, in that order of difficulty.
 Per PRD §23 ("downloads alone should not be treated as product validation") and §29 Phase
 5, v1 exists to answer one question:
 
-> **Do casual players finish a round and immediately start another one?**
+> **Do casual players finish a game, start another, and come back to learn more words?**
+
+(Broadened by D-09 on 2026-10-19 from "Do casual players finish a round and immediately
+start another one?", to include the vocabulary-learning reframe of D-13 to D-15.)
 
 Everything in this plan is sequenced to answer that as early and as cheaply as possible.
-The success bar for v1, to be confirmed as part of D-09:
+The success bar is set by **D-09 (closed 2026-10-19)** in three layers, because a playtest
+of 5–10 people and a public launch can't be judged the same way.
 
-| Metric | Target | Source |
+**1. M2 gates: pass/fail for the playtest, counted in players.** With 5–10 players these
+catch only strong signals ("half of 8" can't tell a true 40% from a true 60%). They are
+smoke tests, not measurements. Gates 1–3 are Wireframe §24's three questions; gate 4 is
+the learning reframe's.
+
+| Gate | Pass if | Measured by | If it fails, fix before Phase 8 |
+|---|---|---|---|
+| 1. Understands the rule | No more than 1 in 5 players needs the rule explained again after their first game | Moderator notes | How to Play and first-turn guidance |
+| 2. Knows what to do next | No more than 1 in 5 gets stuck on any screen (asks, or waits about 10 seconds unsure), including Resume, Pause & Exit and End Game | Moderator notes | The flow where players got stuck |
+| 3. Wants another game | At least half start another game, unprompted, after their first one ends | Moderator notes, confirmed by analytics | The game-over screen and End Game message |
+| 4. Uses the learning features | At least half open a definition or Review Words without being told to | Moderator notes, confirmed by analytics | Definition discoverability |
+| 5. Invalid-word rate | 25% or less of all submitted words rejected, across all players | Analytics (per word: roughly 150+ words, enough for a percentage) | Rejection feedback, likely where spelling help comes in |
+
+WL-606's script must define "explained again" and "stuck" precisely, or two moderators
+will score gates 1 and 2 differently.
+
+**Take-home week.** After the moderated session, testers keep the build for 7 days. This is
+the only pre-launch look at whether people come back, and at whether paused games kept
+across days (D-14) get resumed. It is **tracked, not a gate**: eight recruited testers
+can't stand in for real players. It costs no engineering, since WL-602's events already
+record it, but adds a week to M2.
+
+**2. Tracked, not gated** (WL-602 events, WL-604 dashboard, WL-605 tuning):
+
+- Turns per game, by difficulty, split by `ended_by_player`. This replaces win rate as the
+  signal for tuning Hard (WL-605).
+- End Game rate, including `ended_while_pause_slot_full`.
+- Hints used per game.
+- Definition-open rate (an obligation from D-08).
+- New words discovered per game.
+- Spread of invalid-word reasons. "No single reason above 40%" is watch-only, because
+  typos all land as `unknown_word`.
+- Pause & Exit and Resume use, including the days between pausing and resuming.
+- Player win rate by difficulty. Recorded because PRD §9.4 asks for it to be monitored, but
+  expected to read about 0% (see D-15), so it is not a target.
+
+**3. M4 launch targets: percentages for public players** (WL-904). **Provisional:**
+re-confirmed at the M2 gate, once the D-13 to D-15 changes (WL-410 to WL-412) have shipped
+and M2 data exists.
+
+| Target | Value | Note |
 |---|---|---|
-| Game completion rate | ≥ 60% of started games reach a result | PRD §23 |
-| Rematch rate | ≥ 35% of completed games are followed by another game in the same session | PRD §23, §25 |
 | D1 / D7 return | ≥ 25% / ≥ 10% | PRD §23 |
-| Player win rate, Hard | 20–40% (not 0%, not 80%) | PRD §9.4 |
-| Invalid-word rate | ≤ 25% of player submissions, and no single reason above 40% of rejections | PRD §23, §25 |
+| Another game after one ends, same session | ≥ 35% | The rematch target, counting any way a game ends (PRD §23, §25) |
+| Opens a definition in the first week | ≥ 30% of players | New for the reframe; a starting guess for M2 to correct |
+| Invalid-word rate | ≤ 25% of submitted words | PRD §23, §25 |
 
-Two of these — rematch rate and player win rate by difficulty — are the ones that decide
-whether the difficulty weights in Architecture §6 need retuning. They must be
-instrumented before the first external playtest, not after.
+**Dropped from the earlier draft:**
+
+- **Game completion rate ≥ 60%.** End Game (D-15) gives every game a result, so it would
+  always read close to 100%.
+- **Player win rate on Hard, 20–40%.** A player can almost never win (D-15), so it reads
+  about 0%. The band was also this plan's own number, not PRD §9.4's: §9.4 only says Hard
+  "must not be unbeatable by design".
 
 ### Release milestones
 
 | Milestone | Contents | Audience | Gate to pass |
 |---|---|---|---|
 | **M1 — Internal playable** | End of Phase 3 | Team only, dev build | A full round is playable start to finish on a real device |
-| **M2 — Playtest build** | End of Phase 6 | 5–10 recruited players (Wireframe §24) | Core-loop comprehension + rematch behaviour observed |
+| **M2 — Playtest build** | End of Phase 6, plus a 7-day take-home week | 5–10 recruited players (Wireframe §24) | The five D-09 gates in §2 |
 | **M3 — Store release** | End of Phase 8 | Public, iOS + Play | Store compliance, privacy, crash-free rate |
 | **M4 — Validation readout** | Phase 9 | Internal decision | Go / no-go on the school product (PRD §27) |
 
@@ -97,10 +144,11 @@ reference doc currently says, that's marked **[changes a doc]**.
 | **D-06** | Display + monospace font selection and mobile licence | Phase 2 | **CLOSED 2026-08-26 — `Baloo 2` (display) + `JetBrains Mono` (monospace).** Both are Google Fonts; the SIL OFL text was checked directly and explicitly permits bundling/embedding inside app software at no cost, with only a requirement to ship the licence text (covered by the WL-407 Attributions screen). Baloo 2 chosen over Fredoka (too close to "kids app") and Lilita One (single weight only, no light cut for the 40px wordmark). JetBrains Mono chosen over IBM Plex Mono (more corporate) and Space Mono (weaker legibility at 12px captions). See Design System §2 |
 | **D-07** | Local storage library | Phase 0 | **CLOSED — MMKV.** Corrected from the original framing: this decision only governs the small key-value `StorageAdapter` (`GUEST_PROFILE`, `SETTINGS`, `CURRENT_SESSION`, `ACCOUNT_PROMPT_STATE`), not the dictionary — that has its own format decision in WL-105, unrelated to this one. The real case: settings need synchronous reads to feel instant on toggle, not async-round-trip loading states; `zustand` (already the project's state library) has first-class MMKV persist-middleware support; and `react-native-nitro-modules` was already a dependency before this review, which only makes sense as MMKV v4 support — meaning `@react-native-async-storage/async-storage` was leftover template weight, not a live second candidate. Removed from `package.json`. Trade-off unchanged: MMKV needs native linking, so `WL-002` (the actual implementation) is gated on `WL-001` regardless |
 | **D-08** | Definition/enrichment provider | Phase 5 | **CLOSED 2026-08-30 — no commercial provider; bundled Princeton WordNet 3.1 glosses.** The original guidance ("bundled short glosses *if the chosen word list carries them*") had no path, because ESDB carries none — only a commonness tier and two flags per word — which WL-405 had already flagged as blocking. WordNet supplies them, and was the right answer rather than a convenient one: ESDB already uses WordNet for its part-of-speech work, so **the notice was already shipping** in Settings → Attributions and the app takes on no new licensor and no fee. Coverage is **70.1%** of the playable list (98,963 of 141,217) with Morphy lemmatisation; the remaining 30% take Wireframe §12's "Definition unavailable" state, which that doc already specifies as a first-class outcome. Cost is **~3.1MB** (deduplicated by sense — 45,094 distinct glosses cover all 98,963 words), keeping the bundle near 4.8MB against WL-105's 8MB budget. Built by `scripts/generate-definitions.py`; see WL-501. One obligation *did* change — see §7.1 of the licence review: the app now redistributes the WordNet **database** directly, so it must carry the full **3.1** notice, not the abbreviated 1.6 excerpt ESDB publishes. **Phase 6 must still instrument definition-open rate** — that was never about which provider, and a bundled source makes the question cheaper to answer, not moot |
-| **D-09** | v1 success metrics and targets | Phase 6 | Ratify or amend the table in section 2 before the playtest build, so M2 has a pass/fail bar rather than a vibe |
+| **D-09** | v1 success metrics and targets **[changes a doc]** | Phase 6 | **CLOSED 2026-10-19 — three layers: M2 gates counted in players, tracked signals, provisional M4 percentages.** The original single table couldn't stand once the vocabulary reframe landed (D-13 to D-15). Completion rate always reads close to 100% because End Game gives every game a result. Hard win rate reads about 0% because a player can almost never win, and its 20–40% band was this plan's own number, wrongly cited to PRD §9.4. D1/D7 return belongs to launch, not a recruited playtest. **Decided** (full tables in §2): (1) **five M2 gates**: understands the rule, knows what to do next, wants another game, uses the learning features, invalid-word rate ≤ 25%. Each failing gate names the core-loop fix it calls for before Phase 8. (2) **Tracked, not gated**: turns per game by difficulty split by `ended_by_player`, which replaces win rate as WL-605's tuning signal; End Game rate; hints; definition-open rate (D-08); new words; invalid-reason spread; Pause/Resume use; win rate, recorded but not a target. (3) **M4 targets** (D1/D7 ≥ 25%/10%, another game after one ends ≥ 35%, definition opened in week one ≥ 30%, invalid-word rate ≤ 25%), **provisional, re-confirmed at the M2 gate** once WL-410 to WL-412 have shipped and playtest data exists. **Also decided:** a **7-day take-home week** after the moderated session, tracked and not gated (no engineering; M2 moves back one week). The §2 headline question is broadened to "Do casual players finish a game, start another, and come back to learn more words?" PRD §23 is annotated to match. **Rejected:** percentage targets at M2, which 5–10 players can't support |
+| **D-16** | Analytics off switch and player opt-out **[changes a doc]** | Phase 6 | **CLOSED 2026-10-19 — a build flag plus a player-facing Settings toggle, on by default; collection starts off at the native level until the app allows it.** Closes the question D-12 left open. **The technical constraint behind the design:** Firebase Analytics starts collecting automatically the moment it initialises (first open, session start, app lifecycle), before any of the app's JavaScript runs, so switching it off from code only takes effect from that point onward. Collection is therefore **disabled at the native level** through `firebase.json` (`analytics_auto_collection_enabled: false`, which RNFB writes into the iOS and Android builds), and the app enables it at startup only when **all three** hold: a release build, the `ANALYTICS_ENABLED` build flag on (the `ACCOUNTS_ENABLED_V1` pattern), and the player's setting on. That makes every "off" state trustworthy: first launch, dev builds, opted-out players and after Delete My Data. The same file turns off ad-ID collection, as D-12 decided. **Player control:** Settings gains **"Share anonymous usage data"**, subtitled *"Helps improve WordLoop. Never includes the words you type."* (Wireframe §16), stored as a new `analyticsEnabled` setting (Data Model §2.1). Changing it takes effect immediately. **The subtitle is a standing constraint:** no analytics event may ever carry a word the player typed, including rejected words, which could be anything (WL-602). **Delete My Data** keeps the player's analytics choice rather than resetting it to on, and resets the Firebase analytics ID so old and new data can't be linked (Guest Data Deletion Policy). **Reset Statistics** leaves it alone. **GA4 event-level retention is set to 2 months**, to honour the deletion policy's draft "retained for up to 90 days"; GA4's aggregated reports aren't covered by that setting, which WL-801 must word honestly. **Rejected:** a build flag alone (A), which gives players no choice and needs a store release to flip; and a Firebase Remote Config switch on top (C), which adds a module and a startup fetch to guard against a leak WL-601's no-free-text test already blocks, with GA4's admin data deletion as the fallback. **Open, and a blocker for WL-801:** the launch is **global, including the EU and UK**, where analytics that store identifiers on a device are commonly treated as needing **opt-in consent**. Whether that applies, and whether the default must therefore be off behind a consent prompt in some or all regions, is a **legal question**, recorded in the Store Submission Checklist's legal sign-off list. The native-off design already supports opt-in: switching the default is a constant change plus a consent screen, not a rework. The playtest is unaffected, because testers are recruited and give informed consent in WL-606's script. Folded into WL-601 (estimate 1.5d → about 2–2.5d) |
 | **D-10** | Product name clearance | Phase 8 | PRD §30 requires App Store / Play name availability, domain, social handles, and trademark checks. Start this in Phase 3 — it has external lead time and a rename late in the project touches the wordmark, the bundle IDs, the store listings, and the design system |
 | **D-11** | Game screen input method **[changes a doc]** | Phase 3 rework | **CLOSED 2026-08-31 — the game screen types on an in-app A-Z keyboard; the OS keyboard stays as the accessibility fallback.** Raised by physical-device testing (iPhone 14 Pro), which found the OS keyboard covering the input field and then the Submit/Hint row — WL-303 claimed keyboard avoidance that the layout never actually delivered, because the input and the actions were scroll content sitting ~600pt down a single `ScrollView`. The fix could have been layout alone, and three things argued for replacing the keyboard instead. **(1) Autocorrect is hostile to this product.** WL-505 already documents a real device incident: the field held "Raffle" after "yaffle" was rejected, so a word report would have named a word the game never judged — in a game whose entire premise is "is this a real word?", predictive text is an adversary, not a convenience. **(2) The OS keyboard's height is unknowable.** QuickType, the globe/mic row, and third-party keyboards vary it by ~90pt, so any layout that has to fit around it is tuned against a number that changes per device and per user. **(3) Wrong-language keyboards.** `autoFocus` fires every turn and iOS restores the last-used keyboard, so a player who was just texting in Hindi gets Devanagari on their turn, against an English-only word list, with nothing the app can do about it. Implemented as `LetterKeyboard` (`src/components/game/LetterKeyboard.tsx`) with the key component added to Design System §4; the real `TextInput` is kept underneath with `showSoftInputOnFocus={false}` so hardware keyboards, the caret, and the WL-303 `latestInputRef` desync fix all keep working. **The fallback is part of the decision, not a nicety:** `usePrefersSystemKeyboard` returns the screen to the OS keyboard when a screen reader is running (VoiceOver/TalkBack users keep dictation, the rotor, and braille input, which 26 custom buttons cannot replace) or when the OS text scale exceeds 1.6x (fixed-width keys cannot grow with their labels). **Cost:** ~32pt-wide keys on a 375pt phone, below the 48pt `MIN_TAP_TARGET` — see the scoped exception in Design System §4. Haptics are *not* wired to keys: the `hapticsEnabled` setting exists but nothing in the app fires haptic feedback yet, and keys should not be the one exception |
-| **D-12** | Analytics destination and transport | Phase 6 | **CLOSED 2026-09-08 — Firebase Analytics (GA4). D-03 stays closed; this is not a backend.** WL-601 had no destination: its acceptance criterion said "events reach the backend" while D-03 (closed 2026-08-17) removed the backend from v1 entirely, so the task as written could not be completed by any means. **Why Firebase:** WL-003 already ships `@react-native-firebase/app` + `/crashlytics` against a real project (`wordloop-52618`) with `google-services.json` and `GoogleService-Info.plist` committed, so this is `@react-native-firebase/analytics` added to an already-initialised core — a module on an existing integration, not a new vendor, no new licensor, no new fee, and nothing added to the Attributions screen. GA4 reports completion rate, D1/D7 return, and funnels as standard dashboards, which is what makes **WL-604 configuration rather than construction**. **Why this does not reopen D-03:** D-03 was about *server authority over gameplay* and the bespoke stack it implied (hosting, data store, API surface, offline reconciliation). A managed analytics product receives events over an SDK and decides nothing about a move's validity — the same category Crashlytics already occupies under D-03 today. Reopening D-03 would re-add roughly three weeks to the critical path to solve a problem a managed product solves for free. **Rejected:** a local event queue exported via the share sheet (the WL-505 pattern) — it cannot produce D1/D7 return or any cross-player rate, so it fails the exact question M2 exists to answer. **Consequences, to be carried rather than rediscovered:** ad-ID / IDFA collection is **disabled**, which keeps ATT and the privacy manifest's tracking-domain declarations out of v1 scope; WL-801's privacy policy must name Google Analytics for Firebase as a processor; WL-802's store declarations gain a Google data-sharing disclosure. The kill switch PRD §22 requires is a **separate open question** — build flag vs. user-visible Settings toggle — because a user-visible one changes Wireframe §16, which lists no analytics row |
+| **D-12** | Analytics destination and transport | Phase 6 | **CLOSED 2026-09-08 — Firebase Analytics (GA4). D-03 stays closed; this is not a backend.** WL-601 had no destination: its acceptance criterion said "events reach the backend" while D-03 (closed 2026-08-17) removed the backend from v1 entirely, so the task as written could not be completed by any means. **Why Firebase:** WL-003 already ships `@react-native-firebase/app` + `/crashlytics` against a real project (`wordloop-52618`) with `google-services.json` and `GoogleService-Info.plist` committed, so this is `@react-native-firebase/analytics` added to an already-initialised core — a module on an existing integration, not a new vendor, no new licensor, no new fee, and nothing added to the Attributions screen. GA4 reports completion rate, D1/D7 return, and funnels as standard dashboards, which is what makes **WL-604 configuration rather than construction**. **Why this does not reopen D-03:** D-03 was about *server authority over gameplay* and the bespoke stack it implied (hosting, data store, API surface, offline reconciliation). A managed analytics product receives events over an SDK and decides nothing about a move's validity — the same category Crashlytics already occupies under D-03 today. Reopening D-03 would re-add roughly three weeks to the critical path to solve a problem a managed product solves for free. **Rejected:** a local event queue exported via the share sheet (the WL-505 pattern) — it cannot produce D1/D7 return or any cross-player rate, so it fails the exact question M2 exists to answer. **Consequences, to be carried rather than rediscovered:** ad-ID / IDFA collection is **disabled**, which keeps ATT and the privacy manifest's tracking-domain declarations out of v1 scope; WL-801's privacy policy must name Google Analytics for Firebase as a processor; WL-802's store declarations gain a Google data-sharing disclosure. The kill switch WL-601 requires was left as a **separate open question** — build flag vs. user-visible Settings toggle — because a user-visible one changes Wireframe §16, which lists no analytics row. **Closed by D-16.** *(Corrected 2026-10-19: this entry originally said PRD §22 requires the kill switch. It doesn't; §22 asks for an anonymous ID, a privacy policy, disclosure, and compliance with applicable privacy requirements. The kill switch comes from WL-601's own original done-when.)* |
 | **D-13** | Paused games and switching difficulty **[changes a doc]** | Before Phase 6 | **CLOSED 2026-09-23 — one game per difficulty; at most one paused game; the player ends a paused game themselves.** The first of three changes from reframing WordLoop around vocabulary and spelling practice rather than winning and losing; the other two (keeping a game across days, and what ending a game records) are being decided separately. **Rules:** (1) never two games of the same difficulty; (2) at most one *paused* game, meaning kept for later, shown on Home, with no expiry; (3) moving to another difficulty needs the current game paused or ended; (4) a second game can only be paused once the first paused game has ended, and the player ends it themselves by resuming it and choosing End Game. There is deliberately no shortcut that ends a game the player isn't looking at. **Rejected:** three parallel games, one per difficulty. That means three save slots, three Resume entries on Home and per-difficulty confirmations, which is more to build and more to explain for no clear gain. **Consequence of rule 4, stated so it isn't discovered in testing:** a game started while another is paused can only be ended, never paused, because the paused game can't be reached without leaving the current one first. The Difficulty screen says so before the game starts (Wireframe §6). **A crash or force-quit** keeps the interrupted game as *still being played*, not paused, under the same switching rules. This reverses WL-403's "a deliberate exit discards" rule (see the note there) and updates Wireframe §5, §6 and §13. The Data Model is unchanged: the paused game lives in its own storage slot, not as a new `GameStatus`. **Carried to the End Game decision (still open):** what End Game records and shows, and an analytics property marking an End Game chosen only because the pause slot was full, so it isn't read as giving up. Built as WL-410 |
 | **D-14** | Keeping a game across days **[changes a doc]** | Before Phase 6 | **CLOSED 2026-10-06 — saved games survive app updates and days away, with no expiry.** The second of the three vocabulary-reframe changes (see D-13). Most of it already worked: every move is saved, saves never expire, Home offers Resume, and WL-410 adds Pause & Exit. Four gaps appear once a game lasts days rather than minutes. **(1) Updates:** a change to the saved-game format used to mean the save was silently deleted (`SESSION_SCHEMA_VERSION`, WL-403). That was fine for a round worth minutes, not for a week-long game. Old saves are now converted to the new format. A committed sample saved game must keep restoring in CI, so an update that would break old saves fails the build, not a player's phone. If a save truly can't be converted, Home says so once rather than the game vanishing. **(2) Personal best:** a game compared itself against the best chain from when it *started*, so a game paused while another set a new best would wrongly announce "new best" and pay the +5. It now compares against the best when it ends (Architecture §7 updated; the formula is unchanged). **(3) Home** shows how old the game is: "Resume Easy game · 12 words · 3 days ago". The last-played time is stored with the save, not in `GameSessionState`, per Data Model §4's note that persistence timestamps sit outside the runtime shape, so the Data Model is unchanged. **(4) Coming back:** no welcome-back screen; the board's existing last-6-words view and the Home label are enough. **Kept as-is on purpose:** 3 hints per game, even across days. Changing it would change PRD §13 and scoring; revisit with playtest data at WL-605. **Stated limits:** saves are local only (D-03, D-04), so a reinstall or a new phone loses the game. Device backups may carry it over but this isn't promised. The phone's clock only affects the "N days ago" label and is never used for any rule. Words already played aren't re-checked when the dictionary updates. Built as WL-411 |
 | **D-15** | What End Game records and shows **[changes a doc]** | Before Phase 6 | **CLOSED 2026-10-13 — recorded as a computer win, marked as player-ended, shown as encouragement.** The third of the three vocabulary-reframe changes (D-13, D-14). **Recording:** `computer_win`, so the game counts as played and best score and best chain apply, and a long game earns credit instead of being thrown away. A new `endedByPlayer` / `ended_by_player` field on the game and round history (Data Model §4.1, §6) marks it, for two reasons: the game-over screen needs it to pick the right message (the existing computer-win copy, "No words were left beginning with that letter", is false after End Game), and WL-605 must be able to tell giving up from being beaten. Cost: one boolean per round, at most about 2.5KB of history, with no migration (see Data Model §6). **Display:** the computer win is never shown. Instead the player sees one of five message tiers built from the game's own numbers (new best chain, one new word named, several new words, 10+ words, short game), closed by the sign-off **"Sorry to see you go. Hope to see you in the next game!"** Copy is in Wireframe §14 and the confirmation in §13. **Home:** Best Streak is replaced by **Words discovered** (Wireframe §5), because a computer win resets the streak and it would read 0 for nearly everyone. `GuestProfile.localStreak` is kept in the data, dormant, rather than deleted. **Edges:** Restart Game ends the same way with no result screen; the computer-timeout End Round stays `abandoned`; a genuine computer win keeps its existing copy. **Knock-on for 1.1:** the dormant "after first completed game" account prompts (D-04) will now fire after End Game. **Rejected:** showing the computer win on screen, which would undercut the message. PRD §7 rule 6 is updated to name the player ending the game as an ending condition. Built as WL-412 |
@@ -123,7 +171,7 @@ part-time data/tooling hand for Phase 1. Two engineers compresses the calendar b
 | **3** | Playable core loop → **M1** | 8–10d | A round is playable on-device with all 7 game-screen states from Wireframe §9 |
 | **4** | App shell, persistence, accessibility | 7–9d | All MVP screens navigable; game survives backgrounding; a11y audit passes |
 | **5** | Learning layer | 6–8d | Hints, definition overlay, word review, and report-a-word all functional |
-| **6** | Instrumentation + tuning → **M2** | 5–7d | Every PRD §23 event fires; playtest build distributed |
+| **6** | Instrumentation + tuning → **M2** | 5–7d, plus a 1-week take-home (D-09) | Every PRD §23 event fires; playtest build distributed; D-09 gates scored |
 | **7** | Accounts + backend *(1.1 release — D-04 closed, out of the v1 critical path)* | 15–20d | Guest→account linking works; in-app deletion works |
 | **8** | Store release readiness → **M3** | 7–9d | Both store submissions accepted |
 | **9** | Market validation → **M4** | 3–4 wks | Go/no-go recommendation on the school product |
@@ -2674,7 +2722,7 @@ landscape either works or is deliberately locked out with that decision recorded
 > orientation support was left as it is rather than removed on no evidence. **Flagged for
 > WL-805's device pass**, which is where a real tablet belongs anyway.
 
-**WL-410 · One paused game per difficulty** — M · 1.5–2d · D-13, WL-403, WL-404
+**WL-410 · One paused game per difficulty** — M · 1.5–2d · D-13, WL-403, WL-404 — **DONE 2026-10-23**
 Implements D-13. **Sequenced before WL-601**, so analytics events are built for this game
 loop rather than the old one. Four parts:
 
@@ -2694,6 +2742,78 @@ closes, End Game uses today's `abandoned` recording, so this task doesn't block 
 *Done when:* every rule in D-13 holds on both platforms, including after a force-quit with
 one game paused and another in progress. Delete My Data clears the paused game and Reset
 Statistics does not. Unit tests cover each rule in the storage store, not only in the UI.
+
+> **DONE 2026-10-23.** Same layering as WL-403:
+>
+> - `features/game/savedGames.ts` (pure): D-13's rules as `canPause`, `difficultyStartFor`
+>   and `reconcileSavedGames`.
+> - `services/game/sessionRepository.ts`: now takes a slot, with a new `PAUSED_SESSION` key.
+> - `store/useSavedRoundStore.ts`: gains `paused`, `pause`, `resumePaused`, `clearPaused`
+>   and `clearAll`.
+>
+> Resuming moves the paused game back into the current slot, so `GameScreen`'s resume path
+> is unchanged. The leave dialog reuses `ConfirmSheet`, which gained an optional middle
+> action for Pause & Exit.
+>
+> **Write order is deliberate.** Pause writes the pause slot and then clears the current
+> one; resume writes the current slot and then clears the pause one. An app killed
+> between the two writes leaves the same game in both slots. `load` treats that game as
+> still in play, so it is never lost and never shown twice. Pinned by test.
+>
+> **Five calls beyond the task text, each small:**
+>
+> 1. **A game the player hasn't moved in is no longer saved.** Pressing Back on a fresh
+>    game used to leave it in the save slot, so Home offered "Resume · 1 words". Harmless
+>    before D-13; under D-13 that empty game would block Start Game behind "pause or end
+>    it". This uses the existing `isRoundInProgress` rule, which already treats such a game
+>    as having nothing to lose.
+> 2. **Delete My Data now clears saved games.** It never cleared even the current slot
+>    before, so a "Resume" survived deleting everything. Both slots are now cleared.
+> 3. **The End Game confirmation was built now**, with D-15's copy, because Wireframe §13
+>    requires confirming before ending and that copy is already true of the interim
+>    `abandoned` recording. WL-412 inherits it rather than building it.
+> 4. **The Difficulty screen's paused card** says "Paused game · 12 words", so the player
+>    can see which difficulty holds it before selecting it. Not in §6; added because the
+>    rule is otherwise invisible until a selection happens to land on it.
+> 5. **An interrupted game uses the same "Resume Easy game · N words" label** as a paused
+>    one. The difficulty already tells the two apart, and the interrupted one is listed
+>    first.
+>
+> **Pause sheet routes skip the leave dialog.** Pause & Exit and a confirmed End Game set
+> `leavingDeliberately`, which disarms the guard. The navigation runs in an effect after
+> that render commits, and `usePreventRemove`'s listener reads the latest value, so the
+> navigation goes straight through with no second dialog.
+>
+> *Verified on the iPhone SE (3rd gen) simulator and the `Medium_Phone_API_36.1` emulator,
+> every D-13 rule:*
+>
+> - Start Game with an interrupted game raised "Your Easy game is still open" with all
+>   three choices, and Pause It led to Difficulty with Easy marked paused.
+> - Selecting another difficulty showed the can't-pause warning before the game started.
+> - In that game, Back (and Android's hardware back) raised "Leave this game?" with Pause &
+>   Exit withheld and the reason given; the Pause sheet showed the same note in its place.
+> - **A force-quit with Easy paused and another game in progress restored both on Home.**
+>   Resume Easy then offered only End It for the open game, and ending it opened the Easy
+>   game exactly as left (iOS: 5 words / score 24; Android: 9 words / score 50).
+> - With the slot free again, Back offered all three choices, and Pause & Exit returned
+>   Home with the game kept.
+> - Start Game then went straight to Difficulty, confirming the game was paused rather
+>   than open.
+> - End and Start New confirmed with "Your 5-word chain is saved…" and dealt a fresh Easy
+>   game.
+> - The Pause sheet's Pause & Exit and End Game both left without a second dialog.
+> - Reset Statistics kept the paused game, and Delete My Data removed it.
+> - No `FATAL` or `AndroidRuntime` in `adb logcat`.
+>
+> 22 new unit tests: 12 on the store, one per rule plus the interrupted-write and
+> force-quit cases, and 10 on the pure rules. Temporarily breaking `canPause` fails 2 of
+> them, so they can fail.
+>
+> **Found while testing, not in scope here:** ESDB tags capitalised adjectives
+> inconsistently. `french` is rejected as a proper noun, but `jewish` and `christian` are
+> playable and computer-playable; the Medium game opened on JEWISH. This is the same
+> source-tagging gap WL-103 records for `robert`/`nike`/`pepsi`, and worth a review given
+> what the words are.
 
 **WL-411 · Keep a game across days** — M · 1–1.5d · D-14, WL-410
 Implements D-14. **Sequenced before WL-601**, for the same reason as WL-410. Four parts:
@@ -3200,11 +3320,21 @@ and no other identifier or free text in any payload; the kill switch suppresses 
 event when off, proven by a unit test **and** by an empty DebugView on a real run; and the
 layer is inert in dev the way `crashReporting.ts` is.
 
-> **Open, and it gates this task's kill switch:** whether the switch is a build/remote flag
-> (the `ACCOUNTS_ENABLED_V1` pattern) or a user-visible Settings toggle. Wireframe §16's v1
-> settings list has no analytics row, so the second choice changes that doc — which per
-> `CLAUDE.md` happens before the code, not after. Decide it alongside D-12, not during
-> implementation.
+> **Kill switch decided by D-16 (2026-10-19); estimate rises to about 2–2.5d.** Additional
+> scope:
+>
+> - Add `firebase.json` with `analytics_auto_collection_enabled: false` and ad-ID
+>   collection off, so nothing is collected natively until the app allows it.
+> - Add an `ANALYTICS_ENABLED` build flag.
+> - Add the `analyticsEnabled` setting (Data Model §2.1) and the Settings row (Wireframe §16).
+> - Enable collection at startup only for a release build with the flag and the setting
+>   both on; apply toggle changes immediately.
+> - Make Delete My Data keep the choice and reset the analytics ID.
+>
+> The done-when's kill-switch check becomes: the flag off, the setting off and a dev build
+> each produce an empty DebugView, **including on first launch**. Do not confirm the
+> deletion dialog's copy as-is; it currently says settings are removed, which will no
+> longer be true of this one.
 
 **WL-602 · Gameplay events** — M · 1.5d · WL-601, all Phase 3
 Every PRD §23 event: game started, difficulty selected, valid move, invalid move (with
@@ -3218,6 +3348,11 @@ stream verified against the §23 list.
 > couldn't pause because another game already was). WL-605 needs both so that a game
 > ended to free the pause slot, or ended by choice, isn't read as Hard being too hard.
 
+> **Constraint from D-16:** no event may carry a word the player typed, valid or rejected,
+> because the Settings toggle promises "Never includes the words you type." The invalid-move
+> event carries the **reason** only. Add a test that fails if any event payload contains
+> the submitted word.
+
 **WL-603 · Account-prompt events (dormant)** — S · 1d · WL-601
 The Architecture §10 event list. D-04 is closed — these ship dormant behind the same
 `ACCOUNTS_ENABLED_V1` flag as the rest of the account surface (`src/constants/
@@ -3229,12 +3364,24 @@ nothing while the flag is off.
 The section 2 metrics, plus invalid-reason distribution and win rate by difficulty.
 *Done when:* every D-09 metric is visible without running an ad-hoc query.
 
+> **Scope set by D-09 (2026-10-19):** the "tracked, not gated" list in §2 and the analytics
+> half of gates 3–5, viewable per playtest cohort so the take-home week can be read on its
+> own. Most of it is standard Firebase reporting (D-12), so this is mainly configuration.
+> Gates 1–2 come from moderator notes, not the dashboard.
+
 **WL-605 · Difficulty and scoring tuning pass** — M · 2d · WL-113, WL-604
 Use the simulator plus internal play to bring Hard into the 20–40% band and sanity-check
 score magnitudes. Architecture §6 and §7 both label their formulas first-pass drafts
 explicitly awaiting this.
 *Done when:* final weights are committed **and the Architecture doc is updated** with the
 tuned values and the evidence behind them.
+
+> **Target changed by D-09 (2026-10-19):** the 20–40% Hard band is dropped; a player can
+> almost never win, so it reads about 0%. The tuning signal is now **turns per game by
+> difficulty, split by `ended_by_player`**, and the target is set from M2 data rather than
+> a number fixed in advance. That sequences this task after the playtest, not before it.
+> PRD §9.4's "must not be unbeatable by design" still stands, and becoming beatable is a
+> question about how games end, not only about weights.
 
 **WL-606 · Playtest build and script** — M · 1.5d · all Phase 5
 TestFlight and Play internal testing builds, plus a moderation script for 5–10 players per
@@ -3243,9 +3390,20 @@ what to do next, do they want another round.
 *Done when:* builds are installable by external testers and the script is written and
 reviewed.
 
+> **Scope added by D-09 (2026-10-19):** the script scores all five §2 gates and defines
+> "explained again" (gate 1) and "stuck" (gate 2) precisely enough that two moderators would
+> score them the same way. It ends by handing over the 7-day take-home week: testers keep
+> the build with no instructions to return. TestFlight external testing needs Beta App
+> Review first, so allow a day or two before the first session.
+
 > **M2 gate:** playtest complete, findings written up, and a decision made on whether any
 > core-loop change is needed before store submission. This is the milestone the plan exists
 > to reach.
+>
+> **Made concrete by D-09:** the moderated session and the 7-day take-home week are both
+> complete. Each of §2's five gates is scored pass or fail, and every failing gate becomes
+> the named core-loop fix before Phase 8. The provisional M4 targets are then re-confirmed
+> or corrected against the playtest data.
 
 ---
 
@@ -3336,6 +3494,12 @@ Must match actual behaviour, including the Guest Deletion doc's point that unins
 *Done when:* both documents are live, linked in-app, and reviewed against what the app
 actually collects.
 
+> **Blocked by a legal question from D-16:** the launch is global, so the EU/UK analytics
+> consent model (opt-out as built, or opt-in behind a consent prompt) needs legal sign-off
+> before this policy can be final. The policy must also name Google Analytics for Firebase
+> as a processor (D-12), describe the opt-out, and word GA4 retention honestly: event-level
+> data is kept for 2 months, aggregated reports are not covered.
+
 **WL-802 · Store privacy declarations** — M · 1d · WL-801
 Apple App Privacy details and Google Play Data Safety, consistent with WL-801 and the
 analytics in WL-602. Inconsistency here is a common rejection cause.
@@ -3365,10 +3529,10 @@ WL-005, plus a11y and offline.
 
 Non-engineering, per PRD §29 Phase 5. Runs against the live M3 build.
 
-**WL-901** · Recruit and observe casual players; report against D-09 targets — 1wk
+**WL-901** · Recruit and observe casual players; report against D-09's M4 targets (§2, as re-confirmed at the M2 gate) — 1wk
 **WL-902** · Interview learners and parents on perceived educational value — 1wk
 **WL-903** · Teacher interviews (5–8) on classroom fit — 1wk · PRD §27
-**WL-904** · Retention and metrics readout at 2 and 4 weeks post-launch — 0.5wk · WL-604
+**WL-904** · Retention and metrics readout at 2 and 4 weeks post-launch, against D-09's M4 targets — 0.5wk · WL-604
 **WL-905** · Go/no-go recommendation on the school product — 0.5wk · all Phase 9
 
 > **M4 gate:** an evidence-based recommendation on PRD §27, explicitly *not* an assumption

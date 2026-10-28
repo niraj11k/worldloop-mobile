@@ -7,8 +7,9 @@ import { Card } from '@components/common/Card';
 import { ConfirmSheet } from '@components/common/ConfirmSheet';
 import { IconButton } from '@components/common/IconButton';
 import { HomeBackdrop } from '@components/home/HomeBackdrop';
-import { HOME_EMPTY_STATE, START_NEW_ROUND_CONFIRM } from '@constants/gameConstants';
+import { HOME_EMPTY_STATE, OPEN_GAME_CHOICE, resumeGameLabel } from '@constants/gameConstants';
 import { abandonSession } from '@features/game/gameSession';
+import { canPause } from '@features/game/savedGames';
 import { useProfileStore } from '@store/useProfileStore';
 import { useSavedRoundStore } from '@store/useSavedRoundStore';
 import { palette, spacing, typeScale, displayTextProps, CONTENT_MAX_WIDTH } from '@theme/theme';
@@ -20,8 +21,9 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
  * Spec: Wireframe doc section 5, empty state from section 17, built on the
  * WL-204 component set (WL-405).
  *
- * Required elements, all present: Start Game, Best Score, Best Streak, Word
- * Review, How to Play, Settings. Explicitly *not* here, per section 5's own
+ * Required elements, all present: Start Game, the Resume entries for saved
+ * games (D-13), Best Score, Best Streak, Word Review, How to Play, Settings.
+ * Explicitly *not* here, per section 5's own
  * "important decision": no shop, social feed, leaderboard, or school
  * dashboard — "they would compete with the main action."
  *
@@ -50,9 +52,19 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 export function HomeScreen({ navigation }: Props): React.JSX.Element {
   const profile = useProfileStore(state => state.profile);
   const recordRound = useProfileStore(state => state.recordRound);
-  const savedRound = useSavedRoundStore(state => state.saved);
-  const clearSavedRound = useSavedRoundStore(state => state.clear);
-  const [confirmNewRound, setConfirmNewRound] = useState(false);
+  /** A game a crash or force-quit interrupted: still open, not paused (D-13). */
+  const openGame = useSavedRoundStore(state => state.saved);
+  /** The one game the player chose to keep for later (D-13). */
+  const pausedGame = useSavedRoundStore(state => state.paused);
+  const clearOpenGame = useSavedRoundStore(state => state.clear);
+  const pauseGame = useSavedRoundStore(state => state.pause);
+  const resumePaused = useSavedRoundStore(state => state.resumePaused);
+  /**
+   * Where the player was heading when an open game got in the way: D-13 rule
+   * 3 means it has to be paused or ended first. `null` while no choice is
+   * being asked.
+   */
+  const [blockedBy, setBlockedBy] = useState<'start' | 'resume_paused' | null>(null);
 
   /**
    * Three states, not two (WL-402/405). `gamesPlayed`, not "a profile
@@ -65,32 +77,79 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
    */
   const hasPlayed = profile !== null && profile.gamesPlayed > 0;
 
-  /**
-   * Start Game, with WL-401's rule applied to a round that isn't on screen:
-   * nothing discards a round without asking. With nothing saved this is just
-   * a navigation.
-   */
-  const handleStartGame = () => {
-    if (savedRound === null) {
-      navigation.navigate('Difficulty');
-      return;
+  /** Moves the paused game back into play and opens it (D-13). */
+  const openPausedGame = async () => {
+    const game = await resumePaused();
+    if (game !== null) {
+      navigation.navigate('Game', { difficulty: game.difficulty, resume: true });
     }
-    setConfirmNewRound(true);
   };
 
   /**
-   * The saved round is given up here rather than when the new round is dealt,
-   * so it is recorded as `abandoned` against the profile the same way a
-   * discarded round on the game screen is — one rule, both paths.
+   * Start Game and the paused game's Resume both lead away from an open game,
+   * so with one open they ask first (D-13 rule 3). With nothing open, Start
+   * Game goes straight to Difficulty: a paused game stays paused while a game
+   * of another difficulty is played.
    */
-  const handleDiscardSavedRound = () => {
-    if (savedRound !== null) {
-      recordRound(abandonSession(savedRound));
+  const handleStartGame = () => {
+    if (openGame === null) {
+      navigation.navigate('Difficulty');
+      return;
     }
-    clearSavedRound();
-    setConfirmNewRound(false);
-    navigation.navigate('Difficulty');
+    setBlockedBy('start');
   };
+
+  const handleResumePaused = () => {
+    if (openGame === null) {
+      openPausedGame();
+      return;
+    }
+    setBlockedBy('resume_paused');
+  };
+
+  /**
+   * The dialog closes first, then the open game is dealt with, then the
+   * player carries on to where they were heading. `next` is read before the
+   * close, since closing clears it.
+   */
+  const settleOpenGame = async (settle: () => Promise<void>) => {
+    const next = blockedBy;
+    setBlockedBy(null);
+    await settle();
+    if (next === 'start') {
+      navigation.navigate('Difficulty');
+    } else if (next === 'resume_paused') {
+      await openPausedGame();
+    }
+  };
+
+  /** Keep the open game for later, then carry on. */
+  const handlePauseOpenGame = () =>
+    settleOpenGame(async () => {
+      if (openGame !== null) {
+        await pauseGame(openGame);
+      }
+    });
+
+  /**
+   * End the open game, then carry on. It is ended here rather than when the
+   * next game is dealt, so it is recorded as `abandoned` against the profile
+   * the same way End Game on the game screen records it — one rule, both
+   * paths.
+   */
+  const handleEndOpenGame = () =>
+    settleOpenGame(async () => {
+      if (openGame !== null) {
+        recordRound(abandonSession(openGame));
+      }
+      await clearOpenGame();
+    });
+
+  /**
+   * Rule 4 decides the dialog's shape: heading for the paused game means the
+   * pause slot is taken, so the open game can only be ended.
+   */
+  const openGamePausable = openGame !== null && canPause(pausedGame, openGame);
 
   return (
     <View style={styles.screen}>
@@ -135,20 +194,30 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
           />
 
           {/*
-          WL-403: only rendered while a round is actually saved, so it is never
-          a control that does nothing. The chain length tells the player which
-          round is waiting without making them open it to find out.
+          WL-403 / D-13: each entry is only rendered while its game exists, so
+          neither is ever a control that does nothing. "Resume Easy game · 12
+          words" names the difficulty because there can be two games waiting:
+          one a crash or force-quit interrupted, and one the player paused.
+          The interrupted one comes first, since it is the one still in play.
         */}
-          {savedRound !== null && (
+          {openGame !== null && (
             <Button
-              label={`Resume Game · ${savedRound.chain.length} words`}
+              label={resumeGameLabel(openGame.difficulty, openGame.chain.length)}
               variant="secondary"
               onPress={() =>
                 navigation.navigate('Game', {
-                  difficulty: savedRound.difficulty,
+                  difficulty: openGame.difficulty,
                   resume: true,
                 })
               }
+              style={styles.fullWidthButton}
+            />
+          )}
+          {pausedGame !== null && (
+            <Button
+              label={resumeGameLabel(pausedGame.difficulty, pausedGame.chain.length)}
+              variant="secondary"
+              onPress={handleResumePaused}
               style={styles.fullWidthButton}
             />
           )}
@@ -238,14 +307,31 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
           </Pressable>
         )}
 
+        {/*
+          D-13 rule 3, for a game the player isn't looking at. Pause It is
+          withheld, and the message says why, when the pause slot is taken.
+
+          Always mounted, with only its copy depending on the open game: the
+          choice itself clears that game, and unmounting a modal while it is
+          still visible can leave an invisible overlay eating taps on iOS.
+        */}
         <ConfirmSheet
-          visible={confirmNewRound}
-          title={START_NEW_ROUND_CONFIRM.title}
-          message={START_NEW_ROUND_CONFIRM.message}
-          confirmLabel={START_NEW_ROUND_CONFIRM.confirmLabel}
-          cancelLabel={START_NEW_ROUND_CONFIRM.cancelLabel}
-          onConfirm={handleDiscardSavedRound}
-          onCancel={() => setConfirmNewRound(false)}
+          visible={blockedBy !== null && openGame !== null}
+          title={openGame === null ? '' : OPEN_GAME_CHOICE.title(openGame.difficulty)}
+          message={
+            openGame === null || openGamePausable || pausedGame === null
+              ? OPEN_GAME_CHOICE.message
+              : OPEN_GAME_CHOICE.pauseFullMessage(openGame.difficulty, pausedGame.difficulty)
+          }
+          confirmLabel={OPEN_GAME_CHOICE.endLabel}
+          cancelLabel={OPEN_GAME_CHOICE.cancelLabel}
+          extraAction={
+            openGamePausable
+              ? { label: OPEN_GAME_CHOICE.pauseLabel, onPress: handlePauseOpenGame }
+              : undefined
+          }
+          onConfirm={handleEndOpenGame}
+          onCancel={() => setBlockedBy(null)}
         />
       </ScrollView>
     </View>

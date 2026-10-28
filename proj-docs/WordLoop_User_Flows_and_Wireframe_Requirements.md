@@ -655,6 +655,11 @@ Rules:
   translation. Target for a post-v1 release once a real dark palette is designed.
 - Text size or accessibility option.
 - Reset local statistics.
+- **Share anonymous usage data** on/off (Delivery Plan D-16, 2026-10-19). On by default,
+  subtitled *"Helps improve WordLoop. Never includes the words you type."* Changing it takes
+  effect immediately. Delete My Data keeps this choice. The default may change to off
+  behind a consent prompt in some regions once the EU/UK legal review in D-16 is done. The
+  mockup below predates this row.
 - Privacy policy.
 - Terms of use.
 - Report a word.

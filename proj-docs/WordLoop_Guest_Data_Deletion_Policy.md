@@ -197,6 +197,21 @@ settings, and discovered words from this device.
 
 If server-side guest data exists, the action should also request deletion of that record.
 
+### Analytics and Delete My Data (Delivery Plan D-16, 2026-10-19)
+
+v1 keeps no WordLoop server, but it does send anonymous analytics to Google Analytics for
+Firebase (D-12). Delete My Data handles that as follows:
+
+- **It resets the Firebase analytics ID**, so data sent before and after the deletion can't
+  be linked to each other. That is as close to "request deletion of that record" as a
+  client app can get. Data already sent ages out under the retention setting below.
+- **It keeps the player's "Share anonymous usage data" choice.** It's a privacy preference,
+  not stored data, and resetting it to on would quietly undo an opt-out. The dialog's
+  "removes … settings" wording must say so when WL-601 builds this.
+- **GA4 event-level retention is set to 2 months**, inside the 90-day figure in the draft
+  privacy wording below. GA4's aggregated reports aren't covered by that setting, and the
+  privacy policy (WL-801) must say so rather than imply everything is deleted.
+
 ## Reinstallation behaviour
 
 ### Local-only guest data
