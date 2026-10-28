@@ -16,6 +16,7 @@ import { serializeReportsForExport } from '@features/report/wordReports';
 import { reportError } from '@services/crashReporting/crashReporting';
 import { useProfileStore } from '@store/useProfileStore';
 import { useReportStore } from '@store/useReportStore';
+import { useSavedRoundStore } from '@store/useSavedRoundStore';
 import { useSettingsStore } from '@store/useSettingsStore';
 import { palette, spacing, typeScale, displayTextProps, CONTENT_MAX_WIDTH } from '@theme/theme';
 
@@ -85,6 +86,7 @@ export function SettingsScreen({ navigation }: Props): React.JSX.Element {
   const { soundEnabled, hapticsEnabled, toggleSound, toggleHaptics } = useSettingsStore();
   const resetStats = useProfileStore(state => state.resetStats);
   const deleteGuestData = useProfileStore(state => state.deleteGuestData);
+  const clearSavedGames = useSavedRoundStore(state => state.clearAll);
   const [pending, setPending] = useState<PendingAction>(null);
   const [reportVisible, setReportVisible] = useState(false);
 
@@ -132,6 +134,11 @@ export function SettingsScreen({ navigation }: Props): React.JSX.Element {
       // is a message in flight, not a score. The confirmation copy already
       // draws exactly this line between the two actions.
       clearReports();
+      // WL-410: saved games go too — the paused one and any a crash left
+      // open. Their chains are game history the confirmation names, and a
+      // "Resume" left on Home after deleting everything would contradict it.
+      // Reset Statistics leaves them, the same way it leaves reports.
+      clearSavedGames();
     }
     setPending(null);
   };

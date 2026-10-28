@@ -15,6 +15,12 @@ export interface ConfirmSheetProps {
   cancelLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
+  /**
+   * A third, non-destructive choice between the safe and destructive ones —
+   * D-13's Pause & Exit, which keeps the game rather than ending it. Omit it
+   * for an ordinary two-way confirmation.
+   */
+  extraAction?: { label: string; onPress: () => void };
   testID?: string;
 }
 
@@ -48,7 +54,8 @@ export interface ConfirmSheetProps {
  * inside the contrast matrix WL-202 verified.
  *
  * The safe action is also rendered first, so a screen reader reaches "keep
- * playing" before "discard".
+ * playing" before "discard". An `extraAction` sits between the two, in order
+ * of how much each choice gives up.
  */
 export function ConfirmSheet({
   visible,
@@ -58,6 +65,7 @@ export function ConfirmSheet({
   cancelLabel = 'Cancel',
   onConfirm,
   onCancel,
+  extraAction,
   testID,
 }: ConfirmSheetProps): React.JSX.Element {
   return (
@@ -71,6 +79,9 @@ export function ConfirmSheet({
 
       <View style={styles.actions}>
         <Button label={cancelLabel} tone="grape" onPress={onCancel} />
+        {extraAction !== undefined && (
+          <Button label={extraAction.label} variant="secondary" onPress={extraAction.onPress} />
+        )}
         <Button label={confirmLabel} variant="secondary" onPress={onConfirm} />
       </View>
     </BottomSheet>

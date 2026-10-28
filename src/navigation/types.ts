@@ -12,11 +12,12 @@ export type RootStackParamList = {
   Home: undefined;
   Difficulty: undefined;
   /**
-   * `resume` asks the screen to pick up the saved round in progress (WL-403)
-   * instead of dealing a new one. Only Home's "Resume Game" sets it, and only
-   * when a round is actually saved; `difficulty` still comes along so the
-   * route is self-describing and the screen has a value if the save turns out
-   * to be gone.
+   * `resume` asks the screen to pick up the game in the store's current save
+   * slot (WL-403) instead of dealing a new one. Set by a Resume entry on Home
+   * or the Difficulty screen; for a paused game, the caller moves it into the
+   * current slot first (`resumePaused`, D-13). `difficulty` still comes along
+   * so the route is self-describing and the screen has a value if the save
+   * turns out to be gone.
    */
   Game: { difficulty: Difficulty; resume?: boolean };
   HowToPlay: undefined;

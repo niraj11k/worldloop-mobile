@@ -43,10 +43,14 @@ import {
   COMPUTER_TIMEOUT_MESSAGE,
   DICTIONARY_UNAVAILABLE_MESSAGE,
   OFFLINE_NOTICE,
-  DISCARD_ROUND_CONFIRM,
+  END_GAME_CONFIRM,
   HINT_LIMIT_PER_ROUND,
+  LEAVE_GAME_CHOICE,
   RESTART_ROUND_CONFIRM,
+  leaveGamePauseFullMessage,
+  pauseSlotFullNote,
 } from '@constants/gameConstants';
+import { canPause } from '@features/game/savedGames';
 import { Badge } from '@components/common/Badge';
 import { Button } from '@components/common/Button';
 import { Card } from '@components/common/Card';
@@ -164,8 +168,9 @@ const FALLBACK_STARTING_WORD = 'apple';
  * The round both reads from and writes to the guest profile (WL-402) — the
  * personal-best baseline comes in at session creation and a finished round is
  * folded back in once — and is saved after every change so it survives the
- * app being killed (WL-403). Pause is wired to the four Wireframe section 13
- * actions (WL-404).
+ * app being killed (WL-403). Pause is wired to the Wireframe section 13
+ * actions (WL-404), and leaving offers Pause & Exit or End Game under D-13's
+ * one-paused-game rules (WL-410).
  */
 export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   const { difficulty } = route.params;
@@ -185,6 +190,9 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   const dictionaryAvailable = isDictionaryAvailable();
   const saveRound = useSavedRoundStore(state => state.save);
   const clearSavedRound = useSavedRoundStore(state => state.clear);
+  const pauseGame = useSavedRoundStore(state => state.pause);
+  /** D-13: the one paused game, which decides whether this one can be paused. */
+  const pausedGame = useSavedRoundStore(state => state.paused);
   /**
    * D-11: normally `false` — the player types on the in-app `LetterKeyboard`.
    * Goes `true` for a screen reader or a very large OS text size, where the OS
@@ -193,9 +201,11 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   const prefersSystemKeyboard = usePrefersSystemKeyboard();
 
   /*
-    WL-403: Home's "Resume Game" arrives with `resume`, and the round it
-    refers to is whatever the launch load put in the store — already
-    phase-normalized by `restoreSession`, so a round killed mid-computer-turn
+    WL-403: a Resume entry arrives with `resume`, and the game it refers to
+    is the store's current slot. For a game interrupted by a crash, that is
+    what the launch load put there; for a paused game, the caller moved it
+    there first (`resumePaused`, D-13). Either way it is already
+    phase-normalized by `restoreSession`, so a game killed mid-computer-turn
     comes back as `computer_thinking` and the effect below finishes the turn
     the dead process started.
 
@@ -260,9 +270,23 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
    * judgement it is being reported for — see `handleSubmit`.
    */
   const [rejectedWord, setRejectedWord] = useState('');
-  /** WL-404: Wireframe section 13's pause sheet, and Restart's confirmation. */
+  /**
+   * WL-404: Wireframe section 13's pause sheet, and the confirmations for its
+   * two actions that give something up — Restart and End Game (D-13).
+   */
   const [pauseSheetVisible, setPauseSheetVisible] = useState(false);
   const [confirmRestart, setConfirmRestart] = useState(false);
+  const [confirmEndGame, setConfirmEndGame] = useState(false);
+  /**
+   * D-13: the player has already chosen to leave from the pause sheet (Pause &
+   * Exit, or a confirmed End Game), so the way out must not raise the Back
+   * control's "Leave this game?" — that would ask the same question twice.
+   *
+   * State rather than a ref, because it has to switch the leave guard off
+   * *before* the navigation is dispatched. The navigation runs in an effect,
+   * after the render that disarmed the guard has committed.
+   */
+  const [leavingDeliberately, setLeavingDeliberately] = useState(false);
   /**
    * Whether the hint sheet was used this turn — carried through an invalid
    * resubmission (only a genuine new turn resets it, below) so the penalty
@@ -307,15 +331,25 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   const roundInProgress = isRoundInProgress(session);
   /**
    * WL-401: every route off this screen — the header back control, Android's
-   * hardware back button, the iOS swipe-back gesture, Game Over's own Home /
-   * Play Again, and Pause's Exit to Home (WL-404) — is held here until the
-   * player confirms, for as long as there is a round to lose.
-   * `isRoundInProgress` goes false the moment the round ends, so the
-   * game-over actions are never gated behind a dialog asking about a round
+   * hardware back button, the iOS swipe-back gesture, and Game Over's own
+   * Home / Play Again — is held here until the player chooses what happens to
+   * the game, for as long as there is a game to lose. D-13 made that a choice
+   * rather than a yes/no: Pause & Exit, End Game, or Keep Playing.
+   * `isRoundInProgress` goes false the moment the game ends, so the
+   * game-over actions are never gated behind a dialog asking about a game
    * that is already finished.
    */
-  const { confirmVisible, confirmLeave, cancelLeave } =
-    useConfirmBeforeLeave(roundInProgress);
+  const { confirmVisible, confirmLeave, cancelLeave } = useConfirmBeforeLeave(
+    roundInProgress && !leavingDeliberately,
+  );
+  /**
+   * D-13 rules 2 and 4: Pause & Exit only while the one pause slot is free.
+   * When it isn't, `pausedGame` is another difficulty's game (rule 1), and
+   * every leave route says so instead of offering the button.
+   */
+  const pauseAvailable = canPause(pausedGame, session);
+  const pauseUnavailableNote =
+    pauseAvailable || pausedGame === null ? null : pauseSlotFullNote(pausedGame.difficulty);
   const busy =
     session.phase === 'validating' ||
     session.phase === 'valid_move' ||
@@ -374,8 +408,23 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
    * effect below.
    */
   useEffect(() => {
+    // Not once the player has chosen to leave: by then the game has been
+    // paused or ended, and writing it back to the current slot would
+    // resurrect it as an open game on Home.
+    if (leavingDeliberately) return;
     saveRound(session);
-  }, [session, saveRound]);
+  }, [session, saveRound, leavingDeliberately]);
+
+  /**
+   * D-13: the way out once the player has chosen to leave from the pause
+   * sheet. Runs after the render that switched the leave guard off has
+   * committed, so `usePreventRemove` lets this navigation straight through.
+   */
+  useEffect(() => {
+    if (leavingDeliberately) {
+      navigation.popTo('Home');
+    }
+  }, [leavingDeliberately, navigation]);
 
   /**
    * WL-403: finish the computer's turn if the app was killed during it.
@@ -622,8 +671,8 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
    *
    * Rebuilds the round in place rather than re-entering the route: a
    * `replace('Game', …)` would remove this screen, which WL-401's guard would
-   * intercept with "Leave this round?" — a second dialog asking about the
-   * round the player has just agreed to give up. Everything a round owns is
+   * intercept with "Leave this game?" — a second dialog asking about the
+   * game the player has just agreed to give up. Everything a round owns is
    * reset here, including the two refs, so the new round is indistinguishable
    * from one started from the Difficulty screen.
    *
@@ -669,31 +718,71 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   };
 
   /**
-   * The player chose to leave a round in progress (WL-401's confirmation).
+   * End Game, by any route (D-13): the Back control's leave choice, or the
+   * pause sheet after its confirmation.
    *
-   * Records it as `abandoned` before replaying the held navigation action —
-   * the gap WL-401 left open and WL-402 closes. The screen is about to
-   * unmount, so this deliberately does not `setSession`: the state is written
-   * to the profile, not to a component that is going away. `recordRound` is
-   * not awaited for the same reason, and does not need to be — the write
-   * underneath is synchronous MMKV.
+   * Recorded as `abandoned` — WL-410's interim recording until WL-412 builds
+   * D-15's End Game result. The screen is about to unmount, so this
+   * deliberately does not `setSession`: the state is written to the profile,
+   * not to a component that is going away. `recordRound` is not awaited for
+   * the same reason, and does not need to be — the write underneath is
+   * synchronous MMKV.
    *
-   * An abandoned round still lands in the history and still keeps any words
+   * An abandoned game still lands in the history and still keeps any words
    * the player found; it just doesn't count as a game played, doesn't touch
    * a best, and doesn't break the streak (see `recordRoundCompleted`).
+   *
+   * The current save slot is cleared too: the slot exists for exits the
+   * player did not choose (WL-403), so an ended game must not be offered
+   * back on Home afterwards.
    */
-  const handleConfirmLeave = () => {
+  const endGame = () => {
     if (!roundRecordedRef.current) {
       roundRecordedRef.current = true;
       recordRound(abandonSession(session));
     }
-    // WL-403: and it is gone for good. Leaving deliberately is the player
-    // ending the round — the save slot exists for exits they did not choose
-    // (see the WL-403 note in the Delivery Plan), so it must not quietly
-    // offer this round back on Home afterwards, having just told the player
-    // it would be lost.
     clearSavedRound();
+  };
+
+  /** The leave choice's End Game: end it, then replay the held navigation. */
+  const handleLeaveAndEnd = () => {
+    endGame();
     confirmLeave();
+  };
+
+  /**
+   * The leave choice's Pause & Exit (D-13): keep the game in the pause slot,
+   * then replay the held navigation, so Back still goes back. Only offered
+   * while `pauseAvailable`; the store checks the same rule again.
+   */
+  const handleLeaveAndPause = () => {
+    pauseGame(session);
+    confirmLeave();
+  };
+
+  /**
+   * Pause sheet's Pause & Exit. A game with nothing in it yet (`!roundInProgress`)
+   * has nothing to keep, so it simply leaves — the same as Back does for it.
+   */
+  const handlePauseAndExit = () => {
+    setPauseSheetVisible(false);
+    if (roundInProgress) {
+      pauseGame(session);
+    }
+    setLeavingDeliberately(true);
+  };
+
+  /**
+   * Pause sheet's End Game, after its confirmation (Wireframe §13: confirm
+   * before ending). A game with nothing in it yet skips the confirmation, the
+   * same rule Restart follows: there is nothing to end.
+   */
+  const handleConfirmEndGame = () => {
+    setConfirmEndGame(false);
+    if (roundInProgress) {
+      endGame();
+    }
+    setLeavingDeliberately(true);
   };
 
   /**
@@ -1176,11 +1265,10 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
         Wireframe section 13. Every action closes the sheet first so no
         dialog has to render on top of it.
 
-        Exit to Home deliberately has no confirmation of its own: `popTo` is
-        exactly the navigation WL-401's guard intercepts, so the player gets
-        the same "Leave this round?" dialog the back button raises — one
-        question, asked once, in one wording. Restart isn't a navigation, so
-        it confirms below.
+        D-13: Pause & Exit keeps the game, so it needs no confirmation; End
+        Game and Restart give something up, so each confirms below. Both leave
+        routes switch the Back control's leave choice off first
+        (`leavingDeliberately`), since the player has already chosen.
       */}
       <PauseSheet
         visible={pauseSheetVisible}
@@ -1201,9 +1289,32 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
             handleRestart();
           }
         }}
-        onExit={() => {
+        onPauseAndExit={handlePauseAndExit}
+        onEndGame={() => {
           setPauseSheetVisible(false);
-          navigation.popTo('Home');
+          if (roundInProgress) {
+            setConfirmEndGame(true);
+          } else {
+            handleConfirmEndGame();
+          }
+        }}
+        pauseUnavailableNote={pauseUnavailableNote}
+      />
+
+      {/*
+        Cancelling puts the player back in the pause sheet they came from, the
+        same as Restart's: they declined ending the game, not the pause.
+      */}
+      <ConfirmSheet
+        visible={confirmEndGame}
+        title={END_GAME_CONFIRM.title}
+        message={END_GAME_CONFIRM.message(session.chain.length)}
+        confirmLabel={END_GAME_CONFIRM.confirmLabel}
+        cancelLabel={END_GAME_CONFIRM.cancelLabel}
+        onConfirm={handleConfirmEndGame}
+        onCancel={() => {
+          setConfirmEndGame(false);
+          setPauseSheetVisible(true);
         }}
       />
 
@@ -1269,21 +1380,30 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
       />
 
       {/*
-        Wireframe section 13's confirm-before-discard rule. `confirmLeave`
-        replays the exact navigation action that was held, so back goes back
-        and Home goes Home.
+        Wireframe section 13's leave choice (D-13), for every navigation the
+        guard holds. `confirmLeave` replays the exact action that was held, so
+        back goes back and Home goes Home, whichever choice was made.
 
-        `handleConfirmLeave` records the round as abandoned on the way out
-        (WL-402); it is also the point WL-602's "game abandoned" analytics
-        event belongs at.
+        With the pause slot full, Pause & Exit is withheld and the message
+        says why. `endGame` is where WL-602's "game completed" analytics event,
+        with `ended_by_player`, belongs.
       */}
       <ConfirmSheet
         visible={confirmVisible}
-        title={DISCARD_ROUND_CONFIRM.title}
-        message={DISCARD_ROUND_CONFIRM.message}
-        confirmLabel={DISCARD_ROUND_CONFIRM.confirmLabel}
-        cancelLabel={DISCARD_ROUND_CONFIRM.cancelLabel}
-        onConfirm={handleConfirmLeave}
+        title={LEAVE_GAME_CHOICE.title}
+        message={
+          pauseAvailable || pausedGame === null
+            ? LEAVE_GAME_CHOICE.message
+            : leaveGamePauseFullMessage(pausedGame.difficulty)
+        }
+        confirmLabel={LEAVE_GAME_CHOICE.endLabel}
+        cancelLabel={LEAVE_GAME_CHOICE.cancelLabel}
+        extraAction={
+          pauseAvailable
+            ? { label: LEAVE_GAME_CHOICE.pauseLabel, onPress: handleLeaveAndPause }
+            : undefined
+        }
+        onConfirm={handleLeaveAndEnd}
         onCancel={cancelLeave}
       />
     </View>

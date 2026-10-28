@@ -90,10 +90,18 @@ localScores            (RoundSummary[], newest first, capped at 100)
 bests                  ({ score, chainLength })
 localStreak            ({ current, best } — consecutive wins, see below)
 discoveredWords        (DiscoveredWord[] — section 7)
-settings               ({ soundEnabled, hapticsEnabled })
+settings               ({ soundEnabled, hapticsEnabled, analyticsEnabled })
 isLinked
 linkedUserId
 ```
+
+**`settings.analyticsEnabled` (Delivery Plan D-16, 2026-10-19).** The player's analytics
+opt-out, defaulting to `true`. A stored profile without it reads as the default, so no
+migration is needed. `parseProfile` defaults each setting individually (`boolOr(…,
+DEFAULT_SETTINGS.…)`), so WL-601 adds one line in the same pattern. Unlike the other
+settings it **survives Delete My Data**: it's a privacy choice, and someone who opted out
+and then deleted their data shouldn't find sharing switched back on. The default may change
+once D-16's EU/UK legal question is answered.
 
 Differences from section 2, each deliberate:
 

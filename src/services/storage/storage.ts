@@ -22,6 +22,8 @@ export const STORAGE_KEYS = {
   GUEST_PROFILE: 'wordloop:guest_profile',
   SETTINGS: 'wordloop:settings',
   CURRENT_SESSION: 'wordloop:current_session',
+  /** D-13 / WL-410: the one game kept for later, beside the game being played. */
+  PAUSED_SESSION: 'wordloop:paused_session',
   ACCOUNT_PROMPT_STATE: 'wordloop:account_prompt_state',
   /** WL-505's locally-queued word reports, exported from Settings (D-03). */
   WORD_REPORTS: 'wordloop:word_reports',

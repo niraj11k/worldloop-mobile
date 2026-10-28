@@ -4,7 +4,7 @@
  * wording without updating that doc, since it's been reviewed for tone
  * ("avoid making casual players feel like they are taking an examination").
  */
-import type { GameStatus, HintLevel, InvalidReason } from '@app-types/game';
+import type { GameSessionState, GameStatus, HintLevel, InvalidReason } from '@app-types/game';
 
 export const INVALID_WORD_MESSAGES: Record<InvalidReason, string> = {
   wrong_letter: 'Your word must begin with {letter}.',
@@ -99,51 +99,105 @@ export const GAME_OVER_CONTENT: Record<
   },
 };
 
+type DifficultyLevel = GameSessionState['difficulty'];
+
+/** How a difficulty is named in copy ("your Easy game"). */
+export const DIFFICULTY_LABELS: Record<DifficultyLevel, string> = {
+  easy: 'Easy',
+  medium: 'Medium',
+  hard: 'Hard',
+};
+
+const wordCount = (words: number) => `${words} ${words === 1 ? 'word' : 'words'}`;
+
 /**
- * WL-401's confirm-before-discard copy (Wireframe section 13, "confirm before
- * restarting or exiting"). The doc states the rule but gives no wording, so
- * this is written to section 10's reviewed tone — states the consequence
- * plainly, no scolding, no "are you sure".
- *
- * The labels name the outcome rather than answering a question ("Discard
- * Round" / "Keep Playing", not "Yes" / "No"), so the destructive one is still
- * unambiguous when a screen reader reads the buttons apart from the message.
- * Reused by WL-404's Pause screen, whose Exit and Restart discard the same
- * round in the same way.
+ * The label for a saved game on Home and the Difficulty screen (Wireframe §5,
+ * D-13): "Resume Easy game · 12 words". The difficulty names *which* game,
+ * since there can be two.
  */
-export const DISCARD_ROUND_CONFIRM = {
-  title: 'Leave this round?',
-  message: 'Your chain and score for this round will be lost.',
-  confirmLabel: 'Discard Round',
+export const resumeGameLabel = (difficulty: DifficultyLevel, words: number): string =>
+  `Resume ${DIFFICULTY_LABELS[difficulty]} game · ${wordCount(words)}`;
+
+/**
+ * Leaving a game in progress, by any route — the Back control, Android's back
+ * button, the iOS swipe (Wireframe §13, D-13). Replaces WL-401's "Leave this
+ * round? … Discard Round", because leaving is no longer only a loss: Pause &
+ * Exit keeps the game.
+ *
+ * Written to section 10's reviewed tone: states the choice plainly, no "are
+ * you sure". Labels name the outcome, so each is unambiguous when a screen
+ * reader reads the buttons apart from the message.
+ */
+export const LEAVE_GAME_CHOICE = {
+  title: 'Leave this game?',
+  message: 'Pause it to pick up later, or end it now.',
+  pauseLabel: 'Pause & Exit',
+  endLabel: 'End Game',
   cancelLabel: 'Keep Playing',
 } as const;
 
 /**
- * WL-403: shown when the player starts a new round while one is saved.
- *
- * Same rule as `DISCARD_ROUND_CONFIRM` — nothing discards a round without
- * being asked (Wireframe section 13) — but a different situation, so a
- * different message: the round at risk is not the one on screen, and the way
- * to keep it is the Resume entry the player just walked past. The message
- * says so, since a dialog that only offers "lose it" or "cancel" leaves the
- * player to work out the third option themselves.
+ * D-13 rule 4's explanation, wherever Pause & Exit is withheld: the dialog
+ * must say *why* it isn't offered (Wireframe §13). Names the paused game,
+ * because the fix is going back to that game, not this one.
  */
-export const START_NEW_ROUND_CONFIRM = {
-  title: 'Start a new round?',
-  message: 'Your saved round will be lost. Resume Game keeps it.',
-  confirmLabel: 'Start New',
+export const pauseSlotFullNote = (paused: DifficultyLevel): string =>
+  `Only one game can be paused, and your ${DIFFICULTY_LABELS[paused]} game already is.`;
+
+/** The leave dialog's message when Pause & Exit is withheld. */
+export const leaveGamePauseFullMessage = (paused: DifficultyLevel): string =>
+  `${pauseSlotFullNote(paused)} You can end this game or keep playing.`;
+
+/**
+ * Pause's End Game (Wireframe §13). The copy is the one Delivery Plan D-15
+ * specifies; WL-410 builds it early because §13 requires a confirmation before
+ * ending, and it is already true of the interim `abandoned` recording: an
+ * abandoned game still goes into the history and keeps its new words.
+ */
+export const END_GAME_CONFIRM = {
+  title: 'End this game?',
+  message: (words: number) =>
+    `Your ${words}-word chain is saved to your history, and any new words stay in Review Words.`,
+  confirmLabel: 'End Game',
+  cancelLabel: 'Keep Playing',
+} as const;
+
+/**
+ * Home, when a game is still open — interrupted by a crash or force-quit —
+ * and the player starts or resumes another (D-13 rule 3: it must be paused or
+ * ended first). Replaces WL-403's "Start a new round? … Your saved round will
+ * be lost", since starting another game no longer has to cost this one.
+ */
+export const OPEN_GAME_CHOICE = {
+  title: (open: DifficultyLevel) => `Your ${DIFFICULTY_LABELS[open]} game is still open`,
+  message: 'Pause it to pick up later, or end it, before starting another.',
+  pauseFullMessage: (open: DifficultyLevel, paused: DifficultyLevel) =>
+    `${pauseSlotFullNote(paused)} End your ${DIFFICULTY_LABELS[open]} game to continue.`,
+  pauseLabel: 'Pause It',
+  endLabel: 'End It',
+  cancelLabel: 'Cancel',
+} as const;
+
+/** Difficulty screen, when another difficulty's game is paused (Wireframe §6, D-13). */
+export const unpausableGameNote = (paused: DifficultyLevel): string =>
+  `Your ${DIFFICULTY_LABELS[paused]} game is paused. While it is, a new game can be ended but not paused.`;
+
+/** Difficulty screen's End and Start New for the paused difficulty (Wireframe §6). */
+export const END_AND_START_NEW_CONFIRM = {
+  title: (paused: DifficultyLevel) => `End your ${DIFFICULTY_LABELS[paused]} game?`,
+  message: (paused: DifficultyLevel, words: number) =>
+    `Your ${words}-word chain is saved to your history, and a new ${DIFFICULTY_LABELS[paused]} game starts.`,
+  confirmLabel: 'End and Start New',
   cancelLabel: 'Cancel',
 } as const;
 
 /**
- * WL-404: Pause's Restart, the third place a round can be given up
- * (Wireframe section 13, "confirm before restarting or exiting").
+ * WL-404: Pause's Restart (Wireframe section 13, "confirm before restarting,
+ * ending, or exiting").
  *
- * Restart gets its own copy rather than reusing `DISCARD_ROUND_CONFIRM`
- * because the two answer different questions: leaving asks whether to give up
- * the round, restarting asks whether to trade it for another one. Exit to
- * Home has no copy of its own at all — it is a navigation, so WL-401's
- * "Leave this round?" already covers it.
+ * Restart gets its own copy rather than reusing the leave choice because the
+ * two answer different questions: leaving asks what to do with the game,
+ * restarting asks whether to trade it for another one.
  */
 export const RESTART_ROUND_CONFIRM = {
   title: 'Restart this round?',

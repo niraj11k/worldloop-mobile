@@ -4,7 +4,17 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList, Difficulty } from '@navigation/types';
 import { Button } from '@components/common/Button';
 import { Card } from '@components/common/Card';
+import { ConfirmSheet } from '@components/common/ConfirmSheet';
 import { IconButton } from '@components/common/IconButton';
+import {
+  END_AND_START_NEW_CONFIRM,
+  resumeGameLabel,
+  unpausableGameNote,
+} from '@constants/gameConstants';
+import { abandonSession } from '@features/game/gameSession';
+import { difficultyStartFor } from '@features/game/savedGames';
+import { useProfileStore } from '@store/useProfileStore';
+import { useSavedRoundStore } from '@store/useSavedRoundStore';
 import { palette, spacing, shadow, typeScale, displayTextProps, CONTENT_MAX_WIDTH } from '@theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Difficulty'>;
@@ -31,9 +41,46 @@ const DIFFICULTIES: { value: Difficulty; label: string; description: string }[] 
  * (Design System section 4). Selected fill reuses `sunbeam`, the same tone
  * `Badge` already uses for the difficulty tag shown in-game — the colour
  * picked here is the colour that follows the player into the round.
+ *
+ * ## With a paused game (D-13, Wireframe §6)
+ *
+ * There is never more than one game per difficulty. Selecting the paused
+ * game's difficulty replaces Continue with Resume or End and Start New, and
+ * its card says it holds a paused game. Selecting another difficulty keeps
+ * Continue, but says first that the new game can be ended but not paused —
+ * the player learns rule 4's consequence here, before starting, rather than
+ * when trying to leave.
  */
 export function DifficultyScreen({ navigation }: Props): React.JSX.Element {
   const [selected, setSelected] = useState<Difficulty>('easy');
+  const pausedGame = useSavedRoundStore(state => state.paused);
+  const resumePaused = useSavedRoundStore(state => state.resumePaused);
+  const clearPaused = useSavedRoundStore(state => state.clearPaused);
+  const recordRound = useProfileStore(state => state.recordRound);
+  const [confirmEndPaused, setConfirmEndPaused] = useState(false);
+
+  const start = difficultyStartFor(selected, pausedGame);
+
+  const handleResume = async () => {
+    const game = await resumePaused();
+    if (game !== null) {
+      navigation.navigate('Game', { difficulty: game.difficulty, resume: true });
+    }
+  };
+
+  /**
+   * End and Start New: the paused game is recorded as `abandoned`, the same
+   * as End Game anywhere else (WL-410's interim recording until WL-412), and a
+   * new game of the same difficulty starts.
+   */
+  const handleEndPausedAndStart = async () => {
+    setConfirmEndPaused(false);
+    if (pausedGame !== null) {
+      recordRound(abandonSession(pausedGame));
+    }
+    await clearPaused();
+    navigation.navigate('Game', { difficulty: selected });
+  };
 
   return (
     // WL-408: three option cards plus Continue outgrow a small phone at the
@@ -50,13 +97,18 @@ export function DifficultyScreen({ navigation }: Props): React.JSX.Element {
       <View style={styles.options}>
         {DIFFICULTIES.map(d => {
           const isSelected = d.value === selected;
+          const pausedHere = pausedGame?.difficulty === d.value ? pausedGame : null;
+          const pausedLine =
+            pausedHere === null ? null : `Paused game · ${pausedHere.chain.length} words`;
           return (
             <Pressable
               key={d.value}
               onPress={() => setSelected(d.value)}
               accessibilityRole="radio"
               accessibilityState={{ selected: isSelected }}
-              accessibilityLabel={`${d.label}: ${d.description}`}>
+              accessibilityLabel={`${d.label}: ${d.description}${
+                pausedLine === null ? '' : ` ${pausedLine}.`
+              }`}>
               <Card
                 fill={isSelected ? 'sunbeam' : 'paper'}
                 style={!isSelected ? styles.unselectedCard : undefined}>
@@ -65,17 +117,59 @@ export function DifficultyScreen({ navigation }: Props): React.JSX.Element {
                   <Text {...displayTextProps} style={styles.optionLabel}>{d.label}</Text>
                 </View>
                 <Text style={styles.optionDescription}>{d.description}</Text>
+                {pausedLine !== null && <Text style={styles.pausedLine}>{pausedLine}</Text>}
               </Card>
             </Pressable>
           );
         })}
       </View>
 
-      <Button
-        label="Continue"
-        tone="grape"
-        onPress={() => navigation.navigate('Game', { difficulty: selected })}
-        style={styles.continueButton}
+      {start === 'resume_or_restart' && pausedGame !== null ? (
+        <View style={styles.pausedActions}>
+          <Button
+            label={resumeGameLabel(pausedGame.difficulty, pausedGame.chain.length)}
+            tone="grape"
+            onPress={handleResume}
+            style={styles.continueButton}
+          />
+          <Button
+            label={END_AND_START_NEW_CONFIRM.confirmLabel}
+            variant="secondary"
+            onPress={() => setConfirmEndPaused(true)}
+            accessibilityHint="Ends your paused game and starts a new one. Asks first."
+            style={styles.continueButton}
+          />
+        </View>
+      ) : (
+        <>
+          {start === 'new_unpausable' && pausedGame !== null && (
+            <Text style={styles.note}>{unpausableGameNote(pausedGame.difficulty)}</Text>
+          )}
+          <Button
+            label="Continue"
+            tone="grape"
+            onPress={() => navigation.navigate('Game', { difficulty: selected })}
+            style={styles.continueButton}
+          />
+        </>
+      )}
+
+      {/*
+        Always mounted, with only its copy depending on the paused game, which
+        confirming clears — see the same note on Home's open-game choice.
+      */}
+      <ConfirmSheet
+        visible={confirmEndPaused && pausedGame !== null}
+        title={pausedGame === null ? '' : END_AND_START_NEW_CONFIRM.title(pausedGame.difficulty)}
+        message={
+          pausedGame === null
+            ? ''
+            : END_AND_START_NEW_CONFIRM.message(pausedGame.difficulty, pausedGame.chain.length)
+        }
+        confirmLabel={END_AND_START_NEW_CONFIRM.confirmLabel}
+        cancelLabel={END_AND_START_NEW_CONFIRM.cancelLabel}
+        onConfirm={handleEndPausedAndStart}
+        onCancel={() => setConfirmEndPaused(false)}
       />
     </ScrollView>
   );
@@ -109,5 +203,10 @@ const styles = StyleSheet.create({
   optionDot: { ...typeScale.body, color: palette.ink },
   optionLabel: { ...typeScale.chainWord, color: palette.ink },
   optionDescription: { ...typeScale.body, color: palette.ink },
+  pausedLine: { ...typeScale.caption, color: palette.ink },
+  note: { ...typeScale.body, color: palette.ink },
   continueButton: { alignSelf: 'center' },
+  // Buttons default to `alignSelf: 'flex-start'`, so each is centred like
+  // Continue rather than relying on the container.
+  pausedActions: { gap: spacing.md },
 });

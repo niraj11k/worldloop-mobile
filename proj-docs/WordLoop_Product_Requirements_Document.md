@@ -716,6 +716,8 @@ Avoid collecting personal information unless it serves a clear purpose. If analy
 - Provide a privacy policy.
 - Disclose analytics and optional advertising.
 - Follow applicable App Store, Google Play, and privacy requirements.
+- Let players switch analytics off in Settings, and never send the words they type
+  (Delivery Plan D-16, 2026-10-19).
 
 If the product later targets children or schools, privacy and parental-consent requirements must be reviewed before launch.
 
@@ -746,6 +748,12 @@ Important product metrics include:
 - Definition usage.
 - Hint usage.
 - Rematch rate.
+
+**Targets for these metrics are set in Delivery Plan D-09 (2026-10-19, §2).** Two are still
+recorded but are no longer targets: **game completion rate**, because the player can end a
+game themselves (D-15), so every game reaches a result; and **player win rate by
+difficulty**, because a player can almost never win, so it reads close to 0%. Rematch rate
+counts a new game after any ending. Definition usage gains a launch target.
 
 Downloads alone should not be treated as product validation.
 
