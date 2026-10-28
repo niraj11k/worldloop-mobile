@@ -8,6 +8,14 @@
 # Format: one lowercase word per line. Blank lines and lines starting with
 # '#' are ignored. Order is alphabetical and has no meaning.
 #
+# A line starting with '+' (e.g. "+bustier") is NOT an exclusion. It records
+# a word that was reviewed and deliberately stays playable. The generator
+# ignores these lines; `npm run dictionary:verify` reads them (Delivery Plan
+# D-18). The verifier fails if any ESDB form of a listed word (its plural,
+# past tense, etc.) is neither listed here nor marked '+'. So adding a word
+# means deciding its forms too, rather than silently missing "words" after
+# listing "word". All '+' lines are in the final block of this file.
+#
 # A word listed here that is not in the dictionary is harmless (it simply
 # never matches); the generator reports the count so a typo does not pass
 # unnoticed.
@@ -39,7 +47,8 @@
 # everyday sense is innocent and common is NOT excluded, even when the source
 # list flags it.
 #
-# Reviewed and deliberately NOT excluded, with the sense that keeps them in:
+# Reviewed and deliberately NOT excluded, with the sense that keeps them in
+# (each is also a '+' line below, so the review is machine-checked):
 #
 #   bareback     riding a horse without a saddle
 #   bastinado    historical form of punishment
@@ -74,140 +83,479 @@
 #     fingering (musical technique), boob (a blunder), hooker (rugby
 #     position), topless (an open-topped car), cum (as in "kitchen-cum-diner").
 #
+# Added outside LDNOOBW (Delivery Plan D-17, 2026-10-23):
+#
+#   jew, jews, jewed, jewing — once D-17 stopped counting ESDB's capitalised
+#     "Jew"/"Jews" as a common reading, the only lowercase sense left is the
+#     offensive verb ("to jew down"). ESDB holds it at its rarest tier with
+#     the [-] tag, which ESDB uses for a word moved to a rarer tier over
+#     "typo or other concerns". Without this the words would have stayed
+#     playable because of the slur.
+#
+# Added by Delivery Plan D-18 (2026-10-23):
+#
+#   - Word forms. Each listed word's forms come from ESDB's word groups and
+#     were reviewed one by one. They are listed below as ordinary entries
+#     (niggers, kikes, faggots, rapists...). Forms whose everyday sense
+#     dominates stay playable as '+' lines: cocked/cocking (a cocked hat),
+#     fagging (British: to toil), fagot/fagots (a bundle of sticks), ani (a
+#     bird), bustier (a garment), came, fagged ("fagged out"), and
+#     sheenier/sheeniest (ESDB also has "sheeny" as an archaic adjective
+#     meaning shiny; its comparatives only mean "shinier", so they stay even
+#     though "sheeny" itself is excluded as a slur).
+#   - "pissing" removed. Its family (piss, pissed, pisses) was never excluded,
+#     and ESDB rates them all vulgar-3, "not considered swear words today" --
+#     the same tier as crap and fart.
+#   - Slurs missing from LDNOOBW. The line: exclude a word whose every sense
+#     is a slur or disparaging term for a group of people (ethnic, national,
+#     religious, sexual, disability), whatever its strength. Candidates came
+#     from ESDB's own offensive-1/offensive-2/vulgar-1 usage notes and from
+#     WordNet glosses that mark a sense as a slur or disparaging term. Every
+#     candidate was reviewed by hand. WordNet only proposed candidates, so no
+#     new attribution is owed.
+#   - Family-safe-bar calls on the same line, flip them here if the judgement
+#     changes: mulatto, quadroon, octoroon (dated racial classifications);
+#     negroid, mongoloid; golliwog; nance, poofter. Also welsh/welshed/
+#     welshing/welsher and gyp/gypped/gypping: after D-17 their only
+#     remaining sense derives from an ethnic name, as with "jew".
+#   - Kept on purpose (a genuine everyday sense, PRD section 8.5's rose
+#     rule): chink (a gap), nip, paddy (rice field), spade, cracker, queer,
+#     fairy, pansy, dike/dyke (an embankment), pouf (a footstool), greaser,
+#     mickey ("taking the mickey"), kafir (a sorghum), oriental (rugs),
+#     gypsy (moth, cab), redneck, hillbilly, limey, retard (to slow), midget,
+#     cripple (to cripple).
+#
 # ---------------------------------------------------------------------------
 anal
 anilingus
 anus
+anuses
 arsehole
+arseholes
 ass
+asses
 asshole
+assholes
 autoerotic
 bastard
+bastards
 bestiality
 bimbos
 bitch
+bitched
 bitches
+bitching
 blowjob
+blowjobs
 bollocks
 bondage
 boner
+boners
 boob
+boobed
+boobing
 boobs
+boong
+boongs
 bulldyke
+bulldykes
+bullshat
 bullshit
+bullshits
+bullshitted
+bullshitter
+bullshitters
+bullshitting
 bunghole
+bungholes
+bustiest
 busty
+chickenshit
+chickenshits
 clit
+clitorides
 clitoris
+clitorises
+clits
 cock
 cocks
+cocksucker
+cocksuckers
+coolie
+coolies
 coon
 coons
 coprophilia
+coprophilias
 cum
+cummed
 cumming
+cums
 cunnilingus
 cunt
+cunts
+dago
+dagoes
+dagos
 darkie
+darkies
+darky
 dick
+dicks
 dildo
+dildoes
+dildos
+dominatrices
 dominatrix
+dominatrixes
 ejaculation
+ejaculations
 erotic
 fag
 faggot
+faggots
+fags
 fellatio
 fingering
+fingerings
 fuck
+fucked
+fucker
+fuckers
+fuckhead
+fuckheads
 fucking
+fucks
 genitals
+golliwog
+golliwogs
+gook
+gooks
+greaseball
+greaseballs
+gringo
+gringos
 grope
+groped
+gropes
+groping
+gyp
+gypped
+gypping
+gyps
 homoerotic
 honkey
+honkeys
+honkie
+honkies
+honky
 hooker
+hookers
+hornier
+horniest
 horny
+horseshit
+horseshits
 humping
 incest
+incests
 intercourse
+jew
+jewed
+jewing
+jews
 jigaboo
+jigaboos
 kike
+kikes
+kinkier
+kinkiest
 kinky
+kraut
+krauts
 lolita
 lovemaking
+lubra
+lubras
 masturbate
+masturbated
+masturbates
 masturbating
 masturbation
+masturbations
+masturbationsq
+mick
+micks
 milf
+milfs
 mong
+mongoloid
+mongoloids
+mongs
 motherfucker
+motherfuckers
+motherfucking
+mulatto
+mulattoes
+mulattos
+nance
+nances
 negro
+negroid
 nigga
+niggas
+niggaz
 nigger
+niggerhead
+niggers
 nipple
 nipples
 nsfw
 nude
+nuder
+nudes
+nudest
 nudity
 nympho
 nymphomania
+nymphos
+octoroon
+octoroons
 orgasm
+orgasms
+orgies
 orgy
 paedophile
+paedophiles
 paki
+pantie
 panties
 panty
 pedophile
+pedophiles
+penes
 penis
-pissing
+penises
+piccaninnies
+piccaninny
+pickaninnies
+pickaninny
+pom
+pommies
+pommy
+poms
 poof
+poofs
+poofter
+poofters
 poon
+poons
 porn
 porno
 pornography
 pubes
+pussier
+pussies
+pussiest
 pussy
+quadroon
+quadroons
 rape
+raped
+rapes
 raping
 rapist
+rapists
+recta
 rectum
+rectums
+redskin
+redskins
 rimming
 sadism
+sambo
+sambos
 scissoring
 semen
 sex
+sexed
+sexes
+sexier
+sexiest
+sexing
 sexual
+sexualities
 sexuality
 sexually
 sexy
+shat
+sheeny
+shiksa
+shiksas
 shit
+shite
+shites
+shitfaced
+shithead
+shitheads
+shitload
+shits
+shitted
+shittier
+shittiest
+shitting
 shitty
 slut
+sluts
 smut
+smuts
 sodomize
+sodomized
+sodomizes
+sodomizing
 sodomy
 spastic
+spastics
 spic
+spics
 spunk
+spunks
+squaw
+squaws
 swastika
+swastikas
 swinger
+swingers
 threesome
+threesomes
 tit
 tits
 titties
 titty
 topless
 tosser
+tossers
+trannies
 tranny
 tribadism
+tribadisms
+tushies
 tushy
 twat
+twats
 undressing
 vagina
+vaginae
+vaginas
 viagra
 vibrator
+vibrators
 voyeur
+voyeurs
 vulva
+vulvae
+vulvas
 wank
+wanked
+wanking
+wanks
+welsh
+welshed
+welsher
+welshers
+welshes
+welshing
 wetback
+wetbacks
+whitey
+whiteys
 whore
+whores
+whoring
+wog
+wogs
+wop
+wops
+yid
+yids
 zoophilia
+zoophilias
+
+# ---------------------------------------------------------------------------
+# Reviewed, stays playable (D-18 '+' lines; the generator ignores them)
+# ---------------------------------------------------------------------------
++ani
++bareback
++bastinado
++bustier
++butt
++came
++chink
++chinks
++cocked
++cocking
++cracker
++crackers
++cripple
++cripples
++dike
++dikes
++domination
++dyke
++dykes
++escort
++eunuch
++fagged
++fagging
++fagot
++fagots
++fairies
++fairy
++fecal
++gipsy
++greaser
++greasers
++gypsies
++gypsy
++hardcore
++hillbillies
++hillbilly
++kafir
++kafirs
++limey
++limeys
++mickey
++mickeys
++midget
++midgets
++nip
++nips
++oriental
++orientals
++paddies
++paddy
++pansies
++pansy
++pegging
++playboy
++pouf
++poufs
++queer
++queers
++redneck
++rednecks
++retard
++retarded
++retards
++scat
++sheenier
++sheeniest
++shrimping
++skeet
++snatch
++snowballing
++spade
++spades
++strappado
++suck
++sucks
