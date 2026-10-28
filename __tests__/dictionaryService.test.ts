@@ -87,7 +87,7 @@ describe('dictionaryService', () => {
 
   it('marks an obscure word playable by the player but not the computer', async () => {
     // PRD section 8.7 — obscurity narrows computer selection only.
-    const { found, entry } = await lookupWord('aalborg');
+    const { found, entry } = await lookupWord('aardwolf');
     expect(found).toBe(true);
     expect(entry).toMatchObject({
       isObscure: true,
@@ -199,10 +199,10 @@ describe('computerPlayableEntriesStartingWith (WL-106 measurement support)', () 
   });
 
   it('excludes proper nouns and obscure words', () => {
-    // 'edward' is a proper noun, 'aalborg' is obscure — neither is a legal
+    // 'edward' is a proper noun, 'aardwolf' is obscure — neither is a legal
     // computer move (PRD sections 8.5 and 8.7).
     expect(wordsOf('e')).not.toContain('edward');
-    expect(wordsOf('a')).not.toContain('aalborg');
+    expect(wordsOf('a')).not.toContain('aardwolf');
   });
 
   it('finds a known common word in its letter block', () => {

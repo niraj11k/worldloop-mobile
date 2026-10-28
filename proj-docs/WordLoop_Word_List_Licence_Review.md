@@ -128,14 +128,14 @@ The build also exposes a plain-text output (`make scowl.txt`) whose line format 
 | `word`, `normalized_word` | Yes — direct |
 | `base_word` | Yes — ESDB carries inflection/lemma relationships |
 | `part_of_speech` | Yes — ESDB includes basic POS |
-| `is_proper_noun` | Yes — via `POS-CLASS` (section 5) |
+| `is_proper_noun` | Yes — via `POS-CLASS` (section 5) **plus ESDB's capitalisation**. POS-CLASS alone proved unreliable, as ESDB's README itself warns; see Delivery Plan D-17 |
 | `is_common_word` / `is_obscure` | Yes — via size tier (section 4) |
-| `is_offensive` | **No** — ESDB has no offensiveness signal. Confirms WL-104 (a separately curated, configurable exclusion list per PRD §8.8) is still required and is not something this source provides |
+| `is_offensive` | **Partial, not enough on its own.** *(Corrected 2026-10-23, Delivery Plan D-18: this row originally said ESDB has no offensiveness signal.)* ESDB's `USAGE-NOTE` marks `offensive-1`/`offensive-2` (racial slurs) and `vulgar-1`/`vulgar-3` on every form of a word. But its README says the marking "only covers the worst offenders": 25 currently-allowed words in total. So WL-104's separately curated, configurable exclusion list (PRD §8.8) is still required. D-18 uses the notes as a check on that list (`dictionary:verify` fails if an allowed word carries `offensive-1/2` or `vulgar-1`), not as a replacement |
 | `is_allowed` | Derived — computed by the WL-102 pipeline from the above, not sourced directly |
 | `frequency_score` | Partial — size tier is a coarse proxy; not a continuous frequency score. Sufficient for Architecture §6/§7's commonness/rarity inputs per the D-02 recommendation to use tier-based scoring instead of a separate `wordfreq` dependency |
 | `source_name` / `source_version` | `"English Speller Database (ESDB), formerly SCOWL"` / `"rel-2026.02.25"` |
 
-No gap here changes the Phase 1 plan — the one real gap (`is_offensive`) was already scoped as its own task (WL-104) and was never expected to come from a spellchecker word list.
+No gap here changes the Phase 1 plan — the one real gap (`is_offensive`) was already scoped as its own task (WL-104) and was never expected to come from a spellchecker word list. ESDB's partial usage notes don't change that (D-18). Using them adds no licence obligation, because they're part of the same ESDB source this review already covers.
 
 ---
 

@@ -276,7 +276,7 @@ describe('obscurityPenalty (WL-108)', () => {
   });
 
   it('is 1 for an obscure word if one is ever supplied', () => {
-    expect(obscurityPenalty(entry('aalborg', { isObscure: true, isCommonWord: false }))).toBe(1);
+    expect(obscurityPenalty(entry('aardwolf', { isObscure: true, isCommonWord: false }))).toBe(1);
   });
 });
 
@@ -378,7 +378,7 @@ describe('generateCandidates against the real dictionary (WL-108 "Done when")', 
         generateCandidates({ requiredLetter: l, usedWords: new Set() }).map(c => c.word),
       ),
     );
-    for (const forbidden of ['bullshit', 'london', 'edward', 'aalborg']) {
+    for (const forbidden of ['bullshit', 'london', 'edward', 'aardwolf']) {
       expect(words.has(forbidden)).toBe(false);
     }
   });

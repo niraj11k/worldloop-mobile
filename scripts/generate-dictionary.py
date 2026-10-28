@@ -15,6 +15,8 @@ proj-docs/WordLoop_Word_List_Licence_Review.md:
   - region exclusion AU    -> same, belt-and-suspenders against the region tag
   - proper-noun POS-CLASS  -> section 5 and section 10's decision record,
                               which names the exact set used below
+  - capitalisation         -> Delivery Plan D-17: a row is common-word
+                              evidence only if ESDB spells it lowercase
 
 Two judgment calls are NOT from the licence review (game-design scope, not a
 legal constraint), and are called out here so they're easy to revisit:
@@ -87,6 +89,12 @@ PROPER_NOUN_POS_CLASSES = {"person", "surname", "place", "name", "demonym", "tra
 # fixture cases below (peter/james/newton/rose/mark/will/frank/amber),
 # which is what the exact set here is tuned against.
 NON_COMMON_POS_CLASSES = PROPER_NOUN_POS_CLASSES | {"upper"}
+# POS-CLASS alone is not enough (Delivery Plan D-17). ESDB's README says its
+# classes "can't be used to reliably filter out proper nouns": Monday and
+# Easter carry no tag, Jewish/Muslim/Latin are capitalised but untagged, and
+# its temporary `name?`/`upper?` tags (robert, nike, pepsi) are not in the set
+# above. ESDB's capitalisation is reliable, so a row also has to be spelled
+# lowercase to count as a common reading -- see is_common_row().
 
 WORD_PATTERN = re.compile(r"^[a-z]+$")
 
@@ -160,9 +168,23 @@ def load_exclusions() -> set[str]:
     words: set[str] = set()
     for line in EXCLUSIONS_PATH.read_text(encoding="utf-8").splitlines():
         entry = line.strip().lower()
-        if entry and not entry.startswith("#"):
+        # '+' lines record words reviewed and kept playable (D-18). They are
+        # for dictionary:verify, never exclusions.
+        if entry and not entry.startswith(("#", "+")):
             words.add(entry)
     return words
+
+
+def is_common_row(row: dict) -> bool:
+    """Whether an ESDB row is evidence of an ordinary (non-proper) reading.
+
+    Both conditions are needed. The POS-CLASS check keeps `upper`'s
+    acronyms out; the capitalisation check catches what POS-CLASS misses
+    (D-17). Lowercase rows of a dual-sense word -- rose, catholic, polish,
+    english (the billiards spin) -- still count, which is PRD section 8.5's
+    "rose must stay playable" rule.
+    """
+    return row["pos_class"] not in NON_COMMON_POS_CLASSES and row["raw_word"][:1].islower()
 
 
 def build_dictionary(rows: list[sqlite3.Row], exclusions: set[str]) -> tuple[list[dict], int]:
@@ -176,6 +198,7 @@ def build_dictionary(rows: list[sqlite3.Row], exclusions: set[str]) -> tuple[lis
             continue
         groups.setdefault(normalized, []).append(
             {
+                "raw_word": row["word"],
                 "size": row["size"],
                 "base_pos": row["base_pos"],
                 "pos_class": row["pos_class"] or "",
@@ -184,7 +207,7 @@ def build_dictionary(rows: list[sqlite3.Row], exclusions: set[str]) -> tuple[lis
 
     entries: list[dict] = []
     for normalized_word, group_rows in groups.items():
-        common_rows = [r for r in group_rows if r["pos_class"] not in NON_COMMON_POS_CLASSES]
+        common_rows = [r for r in group_rows if is_common_row(r)]
         is_proper_noun = len(common_rows) == 0
         representative_rows = common_rows if common_rows else group_rows
         best = min(representative_rows, key=lambda r: r["size"])
