@@ -42,24 +42,6 @@
       "reason": "Same dependency path and fix situation as GHSA-m9gg-hp2v-232j. This one concerns grpc-js acting as a server, which the app never does.",
       "mitigation": "Same as GHSA-m9gg-hp2v-232j: grpc-js is never loaded on iOS or Android.",
       "reviewBy": "2027-01-18"
-    },
-    {
-      "url": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
-      "package": "braces",
-      "severity": "high",
-      "title": "braces vulnerable to stack-exhaustion denial of service through deeply nested patterns",
-      "reason": "Build and test tooling only, never in the shipped app: react-native -> metro -> metro-file-map -> micromatch -> braces, and jest -> micromatch -> braces. The advisory covers <=3.0.3, which is every published version (3.0.3 is the latest), so there is no version to upgrade to. npm's fixAvailable is a downgrade to react-native 0.72.17, which the README's 'Do not run npm audit fix --force' section rules out.",
-      "mitigation": "The vulnerable expansion runs only on glob patterns written by this project (Metro's watcher and resolver config, Jest's testMatch and moduleNameMapper), on a developer machine or CI runner. No user-, network- or device-supplied pattern ever reaches it, so there is no attacker to supply a deeply nested one.",
-      "reviewBy": "2027-01-18"
-    },
-    {
-      "url": "https://github.com/advisories/GHSA-hp3w-g68c-fv3c",
-      "package": "sprintf-js",
-      "severity": "moderate",
-      "title": "sprintf-js vulnerable to denial of service through unbounded precision specifiers",
-      "reason": "Test tooling only: @react-native/jest-preset -> babel-jest -> babel-plugin-istanbul -> @istanbuljs/load-nyc-config -> js-yaml@3 -> argparse@1 -> sprintf-js@1.0.3. The advisory covers <=1.1.3, which is every published version, so there is no version to upgrade to; argparse 1.x also pins ~1.0.2.",
-      "mitigation": "Never in the shipped app. The path is code-coverage tooling, which this project does not enable (the test script is plain `jest`, with no collectCoverage), and even then sprintf-js only formats argparse's own help text from fixed format strings, never input from outside the repo.",
-      "reviewBy": "2027-01-18"
     }
   ]
 }
