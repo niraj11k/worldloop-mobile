@@ -1,0 +1,8 @@
+{
+  "name": "image-size",
+  "version": "2.0.4",
+  "private": true,
+  "description": "Local facade: CommonJS entry over image-size@2 that restores the synchronous file-path input image-size@1 accepted, for Metro. Wired in via package.json devDependencies + overrides. See README.md 'Dependency audit state'.",
+  "license": "MIT",
+  "main": "index.js"
+}

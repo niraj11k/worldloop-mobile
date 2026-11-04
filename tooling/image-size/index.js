@@ -4,8 +4,9 @@
  *
  * Both advisories (DoS via infinite loops in the ICNS, JXL and HEIF parsers)
  * cover image-size <=2.0.2. Metro 0.84 declares `image-size@^1.0.2`, and the
- * 1.x line has no patched release, so `package.json` `overrides` forces the
- * name `image-size` to this package instead.
+ * 1.x line has no patched release, so `package.json` installs this directory
+ * as the root `image-size` devDependency (`file:./tooling/image-size`) and
+ * the `image-size` override points Metro at it (`$image-size`).
  *
  * It exists because the override alone breaks bundling. Metro's
  * `getAssetData()` (`metro/src/Assets.js`) calls `imageSize(filePath)` with a
@@ -28,9 +29,12 @@
  * npm applies overrides by package name: a dependency on `image-size` from in
  * here would resolve to this file again.
  *
- * Remove this facade, the alias and the override once React Native moves to
- * a Metro that depends on `image-size@^2` or not at all (Metro 0.87.1
- * already dropped it).
+ * The root-dependency-plus-`$image-size`-override wiring (rather than a
+ * `file:` override) is for npm 10 compatibility; see ../minimatch/index.js.
+ *
+ * Remove this facade, the alias, the root dependency and the override once
+ * React Native moves to a Metro that depends on `image-size@^2` or not at
+ * all (Metro 0.87.1 already dropped it).
  */
 const fs = require('fs');
 const path = require('path');

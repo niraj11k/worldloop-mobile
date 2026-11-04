@@ -306,10 +306,10 @@ fixed by forcing a patched version through `package.json` `overrides`.
 
 | Package | Advisories | Reached via | Forced to | Why an override was needed |
 | --- | --- | --- | --- | --- |
-| `image-size` | GHSA-w3rx-r6r6-pgpr, GHSA-5p2g-fcmc-qvqq (2 × high) | `metro`, build time | `tooling/image-size-compat` → `image-size@2` | Fix is a new major; Metro 0.84 pins `^1.0.2`, and 2 dropped file-path input |
+| `image-size` | GHSA-w3rx-r6r6-pgpr, GHSA-5p2g-fcmc-qvqq (2 × high) | `metro`, build time | `tooling/image-size` → `image-size@2` | Fix is a new major; Metro 0.84 pins `^1.0.2`, and 2 dropped file-path input |
 | `@grpc/grpc-js` | GHSA-m9gg-hp2v-232j (high), GHSA-f596-whhp-79r4 (low) | RNFB → Firebase JS SDK → Firestore | `^1.14.7` | Fix is 1.13.6; Firestore pins `~1.9.0` |
-| `glob` | GHSA-3g3m-2fjr-6pw4 (moderate) | `babel-plugin-module-resolver`, Jest 29, `test-exclude` | `tooling/glob-compat` → `glob@14` | Fix is 14.0.2; consumers pin `^7` / `^9`, and 14 changed its CommonJS shape |
-| `minimatch` | GHSA-g3hv-75wg-m249 (moderate) | ESLint, `@eslint/*`, `eslint-plugin-react`, `typescript-estree`, `glob`, `test-exclude` | `tooling/minimatch-callable` → `minimatch@11` | Fix is 11.0.1; consumers pin `^3` / `^8` / `^10`, and 11 changed its CommonJS shape |
+| `glob` | GHSA-3g3m-2fjr-6pw4 (moderate) | `babel-plugin-module-resolver`, Jest 29, `test-exclude` | `tooling/glob` → `glob@14` | Fix is 14.0.2; consumers pin `^7` / `^9`, and 14 changed its CommonJS shape |
+| `minimatch` | GHSA-g3hv-75wg-m249 (moderate) | ESLint, `@eslint/*`, `eslint-plugin-react`, `typescript-estree`, `glob`, `test-exclude` | `tooling/minimatch` → `minimatch@11` | Fix is 11.0.1; consumers pin `^3` / `^8` / `^10`, and 11 changed its CommonJS shape |
 
 `@grpc/grpc-js` is a plain version pin. It never loads in a React Native
 app at all (RNFB uses the native Firebase SDKs on iOS and Android;
@@ -346,13 +346,29 @@ changed what `require()` returns or accepts:
 
 Those three overrides therefore point at local facades under `tooling/`,
 each a few lines that adapt the patched package back to the call form its
-consumers were written against. The real packages are installed under the
-root aliases `image-size-upstream` (`npm:image-size@^2`), `glob-upstream`
+consumers were written against. Each facade is a package *named* after the
+real one (`tooling/minimatch` is `minimatch@11.0.4`, and so on), installed
+as a root `file:` devDependency, and the override is a `$name` reference to
+that root dependency, so every nested consumer dedupes onto the one hoisted
+link. The real packages are installed under the root aliases
+`image-size-upstream` (`npm:image-size@^2`), `glob-upstream`
 (`npm:glob@^14`) and `minimatch-upstream` (`npm:minimatch@^11`), because
 npm applies overrides by package name and a dependency on the real name
 from inside a facade would resolve to the facade again. Each facade's
 header comment records the advisory, the consumers it exists for, and when
 to delete it.
+
+The wiring is deliberately *not* a `file:` override (`"minimatch":
+"file:./tooling/minimatch"`). That form works under npm 11 but npm 10 —
+the npm bundled with the Node 22 that CI runs — writes it into
+`package-lock.json` as links to paths under `node_modules/<consumer>/` that
+do not exist, and `npm ci` then installs broken symlinks and ESLint fails
+with "Cannot find module 'minimatch'". The root-dependency form is the
+ordinary linked-package shape and round-trips through `npm ci` on both.
+After touching any of this, verify with CI's npm as well as the local one:
+`npx npm@10.9.0 ci` in a scratch copy of `package.json`, the lockfile and
+`tooling/` should leave `node_modules/minimatch`, `glob` and `image-size`
+as working links into `tooling/`.
 
 **Removing an override.** Each one is scaffolding around an upstream range,
 and should go when the range catches up:
@@ -364,8 +380,8 @@ and should go when the range catches up:
   packages and the ESLint packages above declare `glob@^14` and
   `minimatch@^11` themselves, or when RN's Jest preset moves to Jest 30.
 
-Delete the facade directory, the `*-upstream` alias and the override
-together, then run a bundle (`npx react-native bundle ...`) as well as the
+Delete the facade directory, its root `file:` devDependency, the
+`*-upstream` alias and the override together, then run a bundle (`npx react-native bundle ...`) as well as the
 usual gates: the facades' consumers are build tooling, and only a bundle
 exercises the Metro one.
 

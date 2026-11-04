@@ -1,8 +1,0 @@
-{
-  "name": "image-size-compat",
-  "version": "2.0.4",
-  "private": true,
-  "description": "CommonJS facade over image-size@2 that restores the synchronous file-path input image-size@1 accepted, for Metro. See README.md 'Dependency audit state'.",
-  "license": "MIT",
-  "main": "index.js"
-}

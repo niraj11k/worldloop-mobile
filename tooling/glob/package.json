@@ -1,0 +1,8 @@
+{
+  "name": "glob",
+  "version": "14.0.3",
+  "private": true,
+  "description": "Local facade: CommonJS entry over glob@14 that restores the callable default export older consumers expect. Wired in via package.json devDependencies + overrides. See README.md 'Dependency audit state'.",
+  "license": "MIT",
+  "main": "index.js"
+}
