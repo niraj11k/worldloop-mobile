@@ -1,0 +1,8 @@
+{
+  "name": "minimatch-callable",
+  "version": "11.0.4",
+  "private": true,
+  "description": "Callable CommonJS facade over minimatch@11 for consumers written against the minimatch@3 default-export API. See README.md 'Dependency audit state'.",
+  "license": "MIT",
+  "main": "index.js"
+}

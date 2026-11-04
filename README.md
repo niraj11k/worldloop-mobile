@@ -296,85 +296,99 @@ dictionary itself — see the Delivery Plan, Phase 1.
 
 ## Dependency audit state
 
-Last reviewed **2026-10-19**. `npm audit` reports 60 entries, which collapse
-to **6 distinct advisories in 4 packages**. All 6 are accepted, time-boxed
-exceptions in `audit-allowlist.json`, and none of the 4 packages runs in the
-shipped app.
+Last reviewed **2026-11-05**. `npm audit` reports 9 entries, which collapse
+to **1 distinct advisory in 1 package**: `deepmerge` (low), the only
+accepted, time-boxed exception in `audit-allowlist.json`. It does not run
+in the shipped app. Every other advisory that used to stand here has been
+fixed by forcing a patched version through `package.json` `overrides`.
 
-| Package | Advisories | Reached via | Why it can't be upgraded away |
-| --- | --- | --- | --- |
-| `image-size@1.2.1` | 2 × high | `metro` (bundler), build time | Fix is 2.x; Metro 0.84 pins `^1.0.2` |
-| `@grpc/grpc-js@1.9.16` | 1 × high, 1 × low | RNFB → Firebase JS SDK → Firestore | Fix is 1.13.6; Firestore pins `~1.9.0` |
-| `braces@3.0.3` | 1 × high | Metro's file watcher, Jest | Every published version is affected |
-| `sprintf-js@1.0.3` | 1 × moderate | Jest code-coverage tooling | Every published version is affected |
+### Fixed through `overrides`
 
-**`image-size`** (GHSA-w3rx-r6r6-pgpr, GHSA-5p2g-fcmc-qvqq) — DoS via
-infinite loops on malformed ICNS/JXL/HEIF files. The advisory covers
-`<= 2.0.2`. **A patched release now exists** (2.0.3, September 2026), but
-it is the next major version, and the 1.x line Metro depends on has no fix.
-Metro 0.84 through 0.87.0 depend on `image-size@^1.0.2` and call it at
-bundle time to read the dimensions of assets in `src/assets/`; Metro 0.87.1
-no longer depends on it at all, so the advisory disappears once React Native
-moves onto that Metro. Until then there are two routes:
+| Package | Advisories | Reached via | Forced to | Why an override was needed |
+| --- | --- | --- | --- | --- |
+| `image-size` | GHSA-w3rx-r6r6-pgpr, GHSA-5p2g-fcmc-qvqq (2 × high) | `metro`, build time | `tooling/image-size-compat` → `image-size@2` | Fix is a new major; Metro 0.84 pins `^1.0.2`, and 2 dropped file-path input |
+| `@grpc/grpc-js` | GHSA-m9gg-hp2v-232j (high), GHSA-f596-whhp-79r4 (low) | RNFB → Firebase JS SDK → Firestore | `^1.14.7` | Fix is 1.13.6; Firestore pins `~1.9.0` |
+| `glob` | GHSA-3g3m-2fjr-6pw4 (moderate) | `babel-plugin-module-resolver`, Jest 29, `test-exclude` | `tooling/glob-compat` → `glob@14` | Fix is 14.0.2; consumers pin `^7` / `^9`, and 14 changed its CommonJS shape |
+| `minimatch` | GHSA-g3hv-75wg-m249 (moderate) | ESLint, `@eslint/*`, `eslint-plugin-react`, `typescript-estree`, `glob`, `test-exclude` | `tooling/minimatch-callable` → `minimatch@11` | Fix is 11.0.1; consumers pin `^3` / `^8` / `^10`, and 11 changed its CommonJS shape |
 
-- **Taken: the mitigation below**, which keeps Metro on the version it
-  declares.
-- **Available: an `overrides` pin to `image-size@2.0.4`.** Tested on
-  2026-10-19 against the exact call Metro makes (CommonJS default export,
-  `Buffer` in, `{width, height}` out): it works, and 2.x still exposes
-  `disableTypes()`. It would clear both advisories, at the cost of running
-  Metro outside its declared dependency range. Worth taking if this
-  exception keeps being renewed.
+`@grpc/grpc-js` is a plain version pin. It never loads in a React Native
+app at all (RNFB uses the native Firebase SDKs on iOS and Android;
+Firestore is not installed; and Firestore's RN build has no reference to
+grpc-js), so the pin is purely to clear the advisory and carries no runtime
+risk.
 
-It cannot be swapped for a *different* package. It is required from exactly one
-module in the whole tree — `metro/src/Assets.js` — as a synchronous
-CommonJS default export taking a `Buffer` and returning `{width, height}`.
-Nothing matches that shape: `image-dimensions` is ESM-only (Metro's
-`require()` would throw), `probe-image-size` is async/stream-oriented, and
-`buffer-image-size` is an unmaintained fork of the same code. Aliasing the
-name via `overrides` to any of them breaks asset sizing, and a silently
-wrong size ships images at the wrong dimensions — a worse production
-outcome than a build-time hang.
+The other three needed more than a pin, because their patched majors
+changed what `require()` returns or accepts:
 
-**It is mitigated instead, in `metro.config.js`.** Metro passes a Buffer,
-so `image-size` selects a parser from magic bytes and ignores the
-extension — a hostile ICNS payload named `logo.png` reaches the ICNS
-parser and hangs the bundler (verified: it loops indefinitely). But Metro
-only requests dimensions for types on its own allowlist (png, jpg, jpeg,
-bmp, gif, webp, psd, svg, tiff, ktx), and none of the three vulnerable
-formats are on it. `metro.config.js` therefore calls `disableTypes()` on
-Metro's own `image-size` instance at startup, which costs nothing and
-makes the same payload fail instantly with "disabled file type" while
-legitimate images resolve normally.
+- `image-size@2`'s `imageSize()` accepts only a `Uint8Array`; file-path
+  input moved to the async `imageSizeFromFile()`. Metro's `getAssetData()`
+  (`metro/src/Assets.js`) passes a **string path** for every image asset
+  outside a `.zip/`, so a bare pin fails on the first PNG Metro meets
+  (`@react-navigation/elements`' header icons) with 'The "list" argument
+  must be an instance of ... ArrayBufferView'. An earlier review of this
+  pin only checked the `Buffer` call in `getAssetSize()` and missed this.
+  The facade restores image-size@1's string form exactly (open, stat, read
+  at most the first 512 KiB, parse) and passes `Uint8Array` input through.
+  With the parsers patched, the `disableTypes()` mitigation that used to
+  live in `metro.config.js` is gone.
+- `minimatch@11`'s CommonJS entry is a namespace object
+  (`{ minimatch, Minimatch, filter, ... }`); `minimatch@3` exported the
+  matcher function itself. `eslint-plugin-react` (five rules, including
+  `react/no-unstable-nested-components`, which the RN ESLint config
+  enables) and `test-exclude@6` still call `minimatch(path, pattern)`
+  directly, so a bare override makes `npm run lint` throw
+  "minimatch is not a function" on any component defined inside a prop.
+- `glob@14`'s CommonJS entry is an `__esModule` namespace with **no**
+  `default`; `glob@7`/`@9` exported a callable. `babel-plugin-module-resolver`,
+  `jest-runtime`, `jest-config` and `@jest/reporters` are compiled to
+  `_interopRequireDefault(require('glob')).default.sync(...)`, so a bare
+  override makes every Babel transform throw.
 
-`npm audit` still reports both advisories, because it matches installed
-versions and cannot see reachability. The vulnerable code is present but no
-longer reachable through Metro. Drop the mitigation once Metro depends on a
-patched `image-size`, or no longer depends on it at all.
+Those three overrides therefore point at local facades under `tooling/`,
+each a few lines that adapt the patched package back to the call form its
+consumers were written against. The real packages are installed under the
+root aliases `image-size-upstream` (`npm:image-size@^2`), `glob-upstream`
+(`npm:glob@^14`) and `minimatch-upstream` (`npm:minimatch@^11`), because
+npm applies overrides by package name and a dependency on the real name
+from inside a facade would resolve to the facade again. Each facade's
+header comment records the advisory, the consumers it exists for, and when
+to delete it.
 
-**`@grpc/grpc-js`** (GHSA-m9gg-hp2v-232j, GHSA-f596-whhp-79r4) — a
-certificate-authorisation flaw and a server-side error-message leak.
-`@react-native-firebase/app` depends on the Firebase JS SDK as its fallback
-for non-native platforms (web, macOS), and that SDK's Firestore pins
-grpc-js `~1.9.0`, below the 1.13.6 fix. It cannot run here:
+**Removing an override.** Each one is scaffolding around an upstream range,
+and should go when the range catches up:
 
-- On iOS and Android, RNFB uses the native Firebase SDKs.
-- This app installs only `app` and `crashlytics`, and nothing loads
-  Firestore.
-- Firestore's React Native build (`dist/index.rn.js`) has no reference to
-  grpc-js at all. grpc-js serves only Firestore's Node.js build, and it
-  needs Node's `http2` module, which doesn't exist in a React Native app.
+- `image-size`: when React Native moves to a Metro that depends on
+  `image-size@^2` or not at all (Metro 0.87.1 already dropped it).
+- `@grpc/grpc-js`: when `@firebase/firestore` moves off `~1.9.0`.
+- `glob` / `minimatch`: when `babel-plugin-module-resolver`, the Jest 29
+  packages and the ESLint packages above declare `glob@^14` and
+  `minimatch@^11` themselves, or when RN's Jest preset moves to Jest 30.
 
-Forcing 1.13.6 through `overrides` would buy nothing at runtime and put
-Firestore outside its declared range.
+Delete the facade directory, the `*-upstream` alias and the override
+together, then run a bundle (`npx react-native bundle ...`) as well as the
+usual gates: the facades' consumers are build tooling, and only a bundle
+exercises the Metro one.
 
-**`braces`** (GHSA-vfj7-8cjw-p6xm) and **`sprintf-js`**
-(GHSA-hp3w-g68c-fv3c) — denial of service on hostile input, with every
-published version affected, so there is nothing to upgrade to. Both are
-build and test tooling only. `braces` expands the glob patterns in Metro's
-and Jest's own configuration. `sprintf-js` sits under Jest's code-coverage
-config loader, which this project doesn't enable. Neither ever sees input
-from outside the repository.
+Check with `npm ls glob minimatch image-size @grpc/grpc-js` after any
+dependency bump: every row should still resolve to the forced version, and
+`npm ls` as a whole should report nothing `invalid`.
+
+### The remaining exception
+
+**`deepmerge`** (GHSA-gcqx-w48m-w2h4, low) — prototype poisoning in
+`mergeObject()`. The advisory covers `>=4.2.0 <=4.3.1` and lists **no
+patched version**; 4.3.1 is the latest release, so there is nothing to
+override to, and npm's only suggested fix is a downgrade of
+`@react-native-community/cli` to 11.4.1 (ruled out below). It is reached
+via `@react-native-community/cli` (and its `cli-config`, `cli-doctor`) and
+via `jest` → `jest-config`, and in both it only merges this project's own
+CLI and Jest configuration objects on a developer machine or CI runner. No
+user-, network- or device-supplied object ever reaches it, so there is no
+attacker to supply a `__proto__` key. Vendoring a hardened copy was
+considered and declined: maintaining a forked library is a worse trade than
+one low-severity, unreachable, time-boxed exception. Re-review when the
+allowlist entry expires or when deepmerge publishes a fix, whichever is
+first.
 
 ### The audit gate
 
@@ -382,7 +396,7 @@ Because `npm audit` exits non-zero while any advisory is open, it is useless
 as a CI gate on a project carrying one it cannot fix. `npm run audit:ci`
 (`scripts/audit-gate.mjs`, no dependencies) replaces it: it collapses the
 report to distinct upstream advisories — npm lists one entry per affected
-package, which is why two `image-size` flaws show up as 8 — and checks each
+package, which is why one `deepmerge` flaw shows up as 9 — and checks each
 against `audit-allowlist.json`.
 
 It fails on:
@@ -433,18 +447,18 @@ three `@react-native-community/cli*` packages are pinned to `^20.2.0` here
 and the tree now resolves 5.10.1. React Native 0.86.2 does not itself pin
 the CLI, so this is safe to set independently.
 
-### Remaining deprecation warnings
+### Deprecation warnings
 
-`npm install` prints two: `glob@7` and its `inflight` dependency. Both come
-from Jest 29 (`jest-config`, `jest-runtime`, `@jest/reporters`,
-`test-exclude`). RN 0.86's `@react-native/jest-preset` is built against the
-Jest 29 line, so these clear when React Native moves to Jest 30. They are
-deprecation notices, not advisories.
+`npm install` used to print two, for `glob@7` and its `inflight`
+dependency, both pulled in by Jest 29. The `glob` override above routes
+every `glob` in the tree to `glob@14`, so `glob@7` and `inflight` are no
+longer installed and the warnings are gone.
 
 ### `overrides`
 
-`package.json` pins `eslint-plugin-ft-flow` to `^3.0.11`. The version
-bundled with `@react-native/eslint-config@0.86.2` (2.0.3) calls
+Besides the four audit-driven pins described above, `package.json` pins
+`eslint-plugin-ft-flow` to `^3.0.11`. The version bundled with
+`@react-native/eslint-config@0.86.2` (2.0.3) calls
 `context.getAllComments()`, removed in ESLint 9, which crashes the linter.
 3.0.11 declares `eslint ^8.56.0 || ^9.0.0`. Remove this override if the RN
 config ever bundles an ESLint 9-compatible ft-flow itself.
