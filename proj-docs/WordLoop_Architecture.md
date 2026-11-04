@@ -231,7 +231,10 @@ player's best chain length **at the moment the game ends**, not when it started.
 doesn't change the formula, only the comparison. A game can now be paused for days while
 another game sets a new best (D-13, D-14). Comparing against the best from when the game
 started would then announce "new best" and pay the +5 for a chain shorter than the
-player's real best.
+player's real best. *Implemented by WL-411 (2026-11-03)* as a refresh of the game's
+baseline each time a saved game comes back into play. Because only one game can be in
+play at a time, nothing else can move the best while it is played, so this gives the same
+answer as reading it at the end (see Data Model §4.1).
 
 **Status:** First-pass draft, approved for prototyping. Subject to tuning per PRD section 16.
 

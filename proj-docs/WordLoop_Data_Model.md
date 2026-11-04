@@ -249,6 +249,14 @@ Notes:
   above was about reading *mid-round*; a single read at the end is safe, because only one
   game is ever being played. WL-411 decides whether this field is refreshed at the end or
   retired.
+  **Decided by WL-411 (2026-11-03): kept, and refreshed whenever a saved game comes back
+  into play** (`withCurrentBest`, `features/game/savedGames.ts`). That is equivalent to
+  reading the best at the end: only one game can be in play at a time (D-13), so while a
+  game is played nothing else can move the player's best. The baseline can only go stale
+  while the game is out of play, and the refresh on resume covers exactly that. Keeping
+  the field also keeps the game machine pure: `endRound` needs no access to the profile.
+  The field's meaning is now "the player's best as of when this game last came into
+  play".
 
 - `phase` is the `TurnPhase` union also declared in `types/game.ts`; it's UI/interaction
   state that has no reason to exist in a server-persisted `GameSession`, only in the

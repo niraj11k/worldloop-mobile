@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "session": {
+    "sessionId": "local-1761900000000",
+    "difficulty": "easy",
+    "currentWord": "tiger",
+    "requiredLetter": "r",
+    "status": "active",
+    "phase": "computer_thinking",
+    "chain": [
+      {
+        "moveId": "local-1761900000000-0",
+        "turnNumber": 1,
+        "actor": "computer",
+        "submittedWord": "apple",
+        "normalizedWord": "apple",
+        "isValid": true,
+        "invalidReason": null,
+        "hintUsed": false,
+        "hintLevel": null,
+        "scoreAwarded": 0
+      },
+      {
+        "moveId": "local-1761900000000-1",
+        "turnNumber": 2,
+        "actor": "player",
+        "submittedWord": "eagle",
+        "normalizedWord": "eagle",
+        "isValid": true,
+        "invalidReason": null,
+        "hintUsed": false,
+        "hintLevel": null,
+        "scoreAwarded": 12
+      },
+      {
+        "moveId": "local-1761900000000-2",
+        "turnNumber": 3,
+        "actor": "computer",
+        "submittedWord": "elephant",
+        "normalizedWord": "elephant",
+        "isValid": true,
+        "invalidReason": null,
+        "hintUsed": false,
+        "hintLevel": null,
+        "scoreAwarded": 0
+      },
+      {
+        "moveId": "local-1761900000000-3",
+        "turnNumber": 4,
+        "actor": "player",
+        "submittedWord": "tiger",
+        "normalizedWord": "tiger",
+        "isValid": true,
+        "invalidReason": null,
+        "hintUsed": false,
+        "hintLevel": null,
+        "scoreAwarded": 14
+      }
+    ],
+    "score": 26,
+    "hintsUsed": 1,
+    "isOfflineSession": true,
+    "previousBestChainLength": 4
+  }
+}

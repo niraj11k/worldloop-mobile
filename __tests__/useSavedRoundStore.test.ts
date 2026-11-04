@@ -12,6 +12,8 @@ import {
 import { storage, STORAGE_KEYS } from '@services/storage/storage';
 import type { GameSessionState } from '@app-types/game';
 import type { ValidationResult } from '@features/game/ruleEngine';
+import savedGameV1 from './fixtures/savedGames/v1.json';
+import savedGameV2 from './fixtures/savedGames/v2.json';
 
 const valid = (word: string): ValidationResult => ({
   isValid: true,
@@ -39,7 +41,15 @@ const roundInPlay = (): GameSessionState => ({
  * The app being killed: the store is a module-level singleton, so clearing it
  * without touching storage is exactly what a force-quit leaves behind.
  */
-const killApp = () => useSavedRoundStore.setState({ saved: null, paused: null, status: 'idle' });
+const killApp = () =>
+  useSavedRoundStore.setState({
+    saved: null,
+    savedAt: null,
+    paused: null,
+    pausedAt: null,
+    lostSaves: [],
+    status: 'idle',
+  });
 
 describe('useSavedRoundStore', () => {
   beforeEach(async () => {
@@ -290,5 +300,77 @@ describe('useSavedRoundStore — paused games (D-13)', () => {
 
     expect(store().saved).toBeNull();
     expect(store().paused?.sessionId).toBe('easy-1');
+  });
+});
+
+/** D-14 / WL-411: last-played times, and saves an update couldn't carry over. */
+describe('useSavedRoundStore — keeping a game across days (D-14)', () => {
+  const store = () => useSavedRoundStore.getState();
+  const game = (sessionId: string, difficulty: 'easy' | 'medium' | 'hard'): GameSessionState => ({
+    ...playerPlays(createSession({ sessionId, difficulty, startingWord: 'apple' }), 'eagle'),
+    phase: 'input_empty',
+  });
+
+  beforeEach(async () => {
+    killApp();
+    await storage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
+    await storage.removeItem(STORAGE_KEYS.PAUSED_SESSION);
+  });
+
+  it('records when the open game and the paused game were last played, across a restart', async () => {
+    await store().pause(game('easy-1', 'easy'));
+    const pausedAt = store().pausedAt;
+    await store().save(game('hard-1', 'hard'));
+    const savedAt = store().savedAt;
+    expect(pausedAt).not.toBeNull();
+    expect(savedAt).not.toBeNull();
+
+    killApp();
+    await store().load();
+
+    expect(store().pausedAt).toBe(pausedAt);
+    expect(store().savedAt).toBe(savedAt);
+  });
+
+  it('a v1 save from before WL-411 restores with an unknown last-played time', async () => {
+    await storage.setItem(STORAGE_KEYS.PAUSED_SESSION, JSON.stringify(savedGameV1));
+
+    await store().load();
+
+    expect(store().paused?.sessionId).toBe('local-1761900000000');
+    expect(store().pausedAt).toBeNull();
+    expect(store().lostSaves).toEqual([]);
+  });
+
+  it('reports a save lost in an update once, then never again', async () => {
+    const stored = JSON.parse(JSON.stringify(savedGameV2));
+    stored.schemaVersion = 99; // a format this build has never heard of
+    await storage.setItem(STORAGE_KEYS.PAUSED_SESSION, JSON.stringify(stored));
+
+    await store().load();
+    expect(store().lostSaves).toEqual(['medium']);
+    expect(store().paused).toBeNull();
+    // Cleared from storage, so the notice can't come back on the next launch.
+    await expect(storage.getItem(STORAGE_KEYS.PAUSED_SESSION)).resolves.toBeNull();
+
+    store().dismissLostSaves();
+    expect(store().lostSaves).toEqual([]);
+
+    killApp();
+    await store().load();
+    expect(store().lostSaves).toEqual([]);
+  });
+
+  it('does not report junk as a lost game', async () => {
+    await storage.setItem(STORAGE_KEYS.CURRENT_SESSION, '{ not json');
+    await store().load();
+    expect(store().lostSaves).toEqual([]);
+  });
+
+  it('resuming carries the game over as played now', async () => {
+    await store().pause(game('easy-1', 'easy'));
+    await store().resumePaused();
+    expect(store().savedAt).not.toBeNull();
+    expect(store().pausedAt).toBeNull();
   });
 });

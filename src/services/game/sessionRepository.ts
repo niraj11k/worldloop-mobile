@@ -13,7 +13,11 @@
  */
 import { storage, STORAGE_KEYS } from '@services/storage/storage';
 import { reportError } from '@services/crashReporting/crashReporting';
-import { parseSavedSession, serializeSession } from '@features/game/sessionPersistence';
+import {
+  readSavedSession,
+  serializeSession,
+  type SaveReadResult,
+} from '@features/game/sessionPersistence';
 import type { GameSessionState } from '@app-types/game';
 
 export type SaveSlot = 'current' | 'paused';
@@ -24,31 +28,30 @@ const SLOT_KEYS: Record<SaveSlot, string> = {
 };
 
 /**
- * The game in a slot, or `null` if there is nothing worth restoring — an
- * empty slot, one this build can't read, or one that didn't survive
- * validation.
+ * What a slot holds — see `SaveReadResult`: a game to restore (converted from
+ * an older format if need be), nothing, or a game lost in an update.
  *
- * A read failure resolves to `null` rather than throwing: the worst case is
- * the player starts a new game, and that must not be dressed up as a launch
- * crash. It is still reported, because a save slot that never reads back
- * looks exactly like a feature nobody uses.
+ * A storage failure resolves to `discarded` rather than throwing: the worst
+ * case is the player starts a new game, and that must not be dressed up as a
+ * launch crash. It is still reported, because a save slot that never reads
+ * back looks exactly like a feature nobody uses.
  */
-export async function loadSavedRound(
-  slot: SaveSlot = 'current',
-): Promise<GameSessionState | null> {
+export async function loadSavedRound(slot: SaveSlot = 'current'): Promise<SaveReadResult> {
   try {
-    return parseSavedSession(await storage.getItem(SLOT_KEYS[slot]));
+    return readSavedSession(await storage.getItem(SLOT_KEYS[slot]));
   } catch (error) {
     reportError(error, { scope: `sessionRepository.load.${slot}` });
-    return null;
+    return { kind: 'discarded' };
   }
 }
 
+/** `savedAt` is the game's last-played time, shown on Home (D-14). */
 export async function saveRound(
   session: GameSessionState,
   slot: SaveSlot = 'current',
+  savedAt: Date = new Date(),
 ): Promise<void> {
-  await storage.setItem(SLOT_KEYS[slot], serializeSession(session));
+  await storage.setItem(SLOT_KEYS[slot], serializeSession(session, savedAt));
 }
 
 /** Empties a slot — the game finished, moved to the other slot, or was let go. */

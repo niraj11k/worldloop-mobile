@@ -111,12 +111,35 @@ export const DIFFICULTY_LABELS: Record<DifficultyLevel, string> = {
 const wordCount = (words: number) => `${words} ${words === 1 ? 'word' : 'words'}`;
 
 /**
- * The label for a saved game on Home and the Difficulty screen (Wireframe §5,
- * D-13): "Resume Easy game · 12 words". The difficulty names *which* game,
- * since there can be two.
+ * How long ago a game was last played (Wireframe §5, D-14): "today",
+ * "yesterday", "3 days ago". Takes whole calendar days (`daysSincePlayed`).
  */
-export const resumeGameLabel = (difficulty: DifficultyLevel, words: number): string =>
-  `Resume ${DIFFICULTY_LABELS[difficulty]} game · ${wordCount(words)}`;
+export const lastPlayedPhrase = (days: number): string =>
+  days <= 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`;
+
+/**
+ * The label for a saved game on Home and the Difficulty screen (Wireframe §5,
+ * D-13, D-14): "Resume Easy game · 12 words · 3 days ago". The difficulty
+ * names *which* game, since there can be two. The age is left off when it is
+ * unknown (a save from before WL-411) rather than guessed.
+ */
+export const resumeGameLabel = (
+  difficulty: DifficultyLevel,
+  words: number,
+  daysAgo: number | null = null,
+): string =>
+  `Resume ${DIFFICULTY_LABELS[difficulty]} game · ${wordCount(words)}` +
+  (daysAgo === null ? '' : ` · ${lastPlayedPhrase(daysAgo)}`);
+
+/**
+ * Home's one-time notice for a game an app update couldn't carry over
+ * (Wireframe §5, D-14). Reassurance, not an error: the player did nothing
+ * wrong. Names the game when its difficulty could still be read.
+ */
+export const lostSaveNotice = (difficulty: DifficultyLevel | null): string =>
+  difficulty === null
+    ? "Your saved game couldn't be restored after the update."
+    : `Your saved ${DIFFICULTY_LABELS[difficulty]} game couldn't be restored after the update.`;
 
 /**
  * Leaving a game in progress, by any route — the Back control, Android's back

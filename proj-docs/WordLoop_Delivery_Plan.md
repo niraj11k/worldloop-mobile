@@ -2815,7 +2815,7 @@ Statistics does not. Unit tests cover each rule in the storage store, not only i
 > source-tagging gap WL-103 records for `robert`/`nike`/`pepsi`, and worth a review given
 > what the words are.
 
-**WL-411 · Keep a game across days** — M · 1–1.5d · D-14, WL-410
+**WL-411 · Keep a game across days** — M · 1–1.5d · D-14, WL-410 — **DONE 2026-11-03**
 Implements D-14. **Sequenced before WL-601**, for the same reason as WL-410. Four parts:
 
 - **Saves survive app updates.** Replace "discard on version mismatch" in
@@ -2833,6 +2833,73 @@ Implements D-14. **Sequenced before WL-601**, for the same reason as WL-410. Fou
 the sample-save test fails if conversion breaks; a game resumed after another game set a
 new best doesn't claim "new best"; and the Home label reads correctly for today,
 yesterday and several days ago, on both platforms.
+
+> **DONE 2026-11-03.**
+>
+> **Save format v2.** `SESSION_SCHEMA_VERSION` 1 → 2 adds `savedAt`, the game's last-played
+> time, to the save envelope. It is not part of `GameSessionState`, so the Data Model entity
+> is unchanged. `sessionPersistence.ts` now converts old saves one version at a time
+> (`CONVERSIONS`, v1 → v2 sets `savedAt: null`). It then validates the game exactly as
+> strictly as before. Conversion only reshapes the envelope, so strictness and conversion
+> don't conflict.
+>
+> **Reads now report what a slot held** (`readSavedSession`):
+>
+> - `restored`.
+> - `empty`.
+> - `discarded`: junk, corrupt, or already finished, dropped silently as before.
+> - `lost_in_update`: a real, still-active game from another version that couldn't be
+>   converted, including one from a *newer* build after a downgrade.
+>
+> Only `lost_in_update` raises Home's one-time notice, and the slot is cleared as it is
+> reported, so the notice cannot come back.
+>
+> **The fixtures are real, and guarded.** `__tests__/fixtures/savedGames/v1.json` was
+> written by the v1 code *before* the format changed (a game killed mid-computer-turn,
+> with a hint used); `v2.json` by the v2 code. A test requires one fixture per version up
+> to the current one, and every fixture must restore. Checked by breaking it on purpose:
+>
+> - Deleting the v1 → v2 conversion fails 2 tests.
+> - Bumping to v3 without a conversion and fixture fails 5.
+>
+> The rule for the next bump is written on `SESSION_SCHEMA_VERSION` itself.
+>
+> **Personal best: kept the field and refreshed it, rather than reading the profile at the
+> end** (Data Model §4.1 and Architecture §7 record this). `withCurrentBest` sets the
+> baseline from the live profile each time a saved game comes back into play. This is
+> equivalent to reading the best at the end, because only one game can be in play at a
+> time (D-13), so nothing else can move the best while it is played. It also keeps
+> `endRound` pure, with no profile access. A unit test plays the done-when's case through
+> `summarizeRound`: the stale baseline would claim a best and pay +5; the refreshed one
+> doesn't.
+>
+> **Home.** Each Resume entry shows its age on a **second line**. The one-line form
+> "Resume Easy game · 4 words · 3 days ago" wrapped mid-phrase on the iPhone SE ("· 3 /
+> DAYS AGO"), so the visible label breaks before the age. The accessibility label keeps
+> the one-line sentence from Wireframe §5. Ages are whole calendar days in local time, so
+> 11pm-then-8am reads "yesterday". The time is read on every render, so Home doesn't keep
+> saying "today" into tomorrow. A save with no recorded time, such as a converted v1 save,
+> shows no age rather than a guessed one. The notice is a quiet caption with a dismiss
+> control, in the register of WL-506's notices.
+>
+> *Verified on the iPhone SE (3rd gen) simulator and the `Medium_Phone_API_36.1`
+> emulator.* Saves were seeded straight into storage by a temporary dev-only hook, removed
+> afterwards (`grep` confirms nothing remains), because neither an old-format save nor a
+> three-day-old one can be produced by playing.
+>
+> - **The real v1 fixture** restored as "Resume Easy game · 4 words", with no age. Opened,
+>   it showed the exact chain and score (26), and the computer finished the turn the save
+>   was killed in.
+> - **A paused game in an unknown format** showed "Your saved Medium game couldn't be
+>   restored after the update." Dismissing it removed it, and it did not return on
+>   relaunch.
+> - **Ages read "yesterday" and "3 days ago"** for seeded saves, and **"today"** for a game
+>   after it was played. On Android that was confirmed after the hook was removed, so on
+>   real stored data across a force-stop.
+>
+> The personal-best case is covered by tests, not by device play. Reaching it on a device
+> needs a profile best above a resumable chain, which is a seeding exercise that would
+> test the seed more than the code.
 
 **WL-412 · End Game result and Home stat** — M · 1–1.5d · D-15, WL-410
 Implements D-15. **Sequenced before WL-601**, so analytics events record the new ending.
