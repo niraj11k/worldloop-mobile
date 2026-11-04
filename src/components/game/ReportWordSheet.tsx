@@ -1,11 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { BottomSheet } from '@components/common/BottomSheet';
 import { Button } from '@components/common/Button';
 import { Input } from '@components/common/Input';
 import { MAX_COMMENT_LENGTH, WORD_REPORT_TYPES } from '@features/report/wordReports';
-import { palette, spacing, typeScale, displayTextProps } from '@theme/theme';
+import {
+  palette,
+  spacing,
+  typeScale,
+  displayTextProps,
+  MAX_SQUEEZED_SHEET_FONT_SCALE,
+} from '@theme/theme';
 import type { WordReportType } from '@app-types/report';
 
 interface ReportWordSheetProps {
@@ -58,11 +64,23 @@ export function ReportWordSheet({
     }
   }, [visible]);
 
+  /**
+   * At large text the sheet scrolls as a whole and the options list keeps its
+   * height; below it, WL-312's squeeze applies. See
+   * `MAX_SQUEEZED_SHEET_FONT_SCALE` for why both are needed.
+   */
+  const { fontScale } = useWindowDimensions();
+  const largeText = fontScale > MAX_SQUEEZED_SHEET_FONT_SCALE;
+
   const subject = askForWord ? typedWord.trim() : word;
   const canSubmit = selected !== null && subject.length > 0;
 
   return (
-    <BottomSheet visible={visible} onRequestClose={onCancel} title="Report a word">
+    <BottomSheet
+      visible={visible}
+      onRequestClose={onCancel}
+      title="Report a word"
+      scrollable={largeText}>
       {askForWord ? (
         <Input
           accessibilityLabel="Word to report"
@@ -70,6 +88,12 @@ export function ReportWordSheet({
           onChangeText={setTypedWord}
           placeholder="Which word?"
           autoCapitalize="none"
+          // The report must name the word the player typed. Found on the
+          // simulator: iOS offered to turn "zyxt" into "Zyrtec" here — the
+          // same failure WL-505 fixed for the in-game entry, where autocorrect
+          // rewrote a rejected word before it was reported (see also D-11).
+          autoCorrect={false}
+          spellCheck={false}
         />
       ) : (
         <Text {...displayTextProps} style={styles.word}>
@@ -77,7 +101,12 @@ export function ReportWordSheet({
         </Text>
       )}
 
-      <ScrollView style={styles.optionsScroll} contentContainerStyle={styles.options}>
+      <ScrollView
+        style={largeText ? styles.optionsUncapped : styles.optionsScroll}
+        contentContainerStyle={styles.options}
+        // Inside the sheet's own scroll at large text: the list is then laid
+        // out at full height and never scrolls separately.
+        scrollEnabled={!largeText}>
         {WORD_REPORT_TYPES.map(option => {
           const isSelected = option.type === selected;
           return (
@@ -134,6 +163,7 @@ const styles = StyleSheet.create({
   // list is the right part to give up that space, because it is already
   // scrollable and the comment field the player is typing into is not.
   optionsScroll: { maxHeight: 220, flexGrow: 0, flexShrink: 1 },
+  optionsUncapped: { flexGrow: 0, flexShrink: 0 },
   options: { gap: spacing.sm },
   option: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   optionDot: { ...typeScale.body, color: palette.ink },

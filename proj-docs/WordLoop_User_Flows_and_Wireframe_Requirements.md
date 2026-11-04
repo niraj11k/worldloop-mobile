@@ -606,6 +606,16 @@ Rules:
   game as failure.
 - **Restart Game** ends the game the same way but goes straight to a new game, with no
   result screen.
+- **Where the result appears** (WL-412, 2026-11-04). End Game from the Pause screen (after
+  its confirmation) or from the Back control's "Leave this game?" dialog ends the game *on
+  the game screen* and shows this result there. In the Back route the dialog itself is
+  the confirmation, so there is no second one, and the navigation the dialog held is
+  dropped: the player leaves from the result. A game ended without being on screen —
+  Home's **End It** for an open game, the Difficulty screen's **End and Start New** — is
+  recorded the same way, but shows no result, since the player is on the way to another
+  game, as with Restart.
+- **"New personal best!"** is also hidden when the message is **New Best Chain!**, by the
+  same rule as "New words discovered": the screen shouldn't repeat itself (WL-412).
 - **Not affected:** a genuine computer win (the computer left the player with no words)
   keeps its existing copy, which is true in that case and false after End Game. The
   computer-timeout's End Round is still recorded as **player exits** (`abandoned`),

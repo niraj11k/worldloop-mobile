@@ -2667,6 +2667,34 @@ game screen stays usable at the largest system text size.
 > recorded in the Store Submission Checklist as its own row rather than folded into the
 > engineering rows it would otherwise hide behind.
 
+> **Follow-up 2026-11-04: Settings rows and button labels at the largest text sizes.**
+> Both were found while checking the bottom sheets for WL-412.
+>
+> - **Button labels broke mid-word** at iOS AX3: "RESET STATISTI / CS", "ATTRIBUT / IONS".
+>   Each label now scales with the OS setting only until its longest word would no longer
+>   fit on one line of the narrowest button, and never below 1x (`labelScaleCap` in
+>   `Button.tsx`, recorded as a Design System §4 rule).
+>   - The cap is computed per label from the word length and screen width. Labels are
+>     uppercase monospace, so word width is arithmetic (`MONO_ADVANCE_EM`, now shared
+>     with the stat-card test).
+>   - Short labels are unaffected: "On" and "Play Again" still scale past AX3. The cap
+>     only applies where a word would break.
+>   - This is the first scaling cap on UI text outside the display face and the letter
+>     keyboard. It stops at the largest whole word, the size that keeps the text intact,
+>     which is what WCAG 1.4.4 asks for. 8 unit tests pin it against the iPhone SE.
+> - **Settings rows overflowed** (the Haptics toggle ran off the right edge at AX3; "Follows
+>   your device" was clipped at Android 2.0x). Rows now wrap, so a control drops beneath
+>   its label when they no longer fit side by side, and the value wraps within its line.
+>
+> *Verified on the iPhone SE (3rd gen) simulator at AX3 and the `Medium_Phone_API_36.1`
+> emulator at 2.0x:*
+>
+> - "RESET / STATISTICS" and "ATTRIBUTIONS" are whole.
+> - Haptics' toggle and "Follows your device" sit on their own lines.
+> - Home's short labels are unchanged.
+>
+> Default size on iOS was re-checked and looks identical.
+
 **WL-409 · Responsive and orientation pass** — M · 1.5d · WL-301 — **DONE 2026-08-30**
 Wireframe §19: small phones, large phones, tablets, landscape.
 *Done when:* the game screen is usable at every size in the WL-005 matrix in portrait, and
@@ -2901,7 +2929,7 @@ yesterday and several days ago, on both platforms.
 > needs a profile best above a resumable chain, which is a seeding exercise that would
 > test the seed more than the code.
 
-**WL-412 · End Game result and Home stat** — M · 1–1.5d · D-15, WL-410
+**WL-412 · End Game result and Home stat** — M · 1–1.5d · D-15, WL-410 — **DONE 2026-11-04**
 Implements D-15. **Sequenced before WL-601**, so analytics events record the new ending.
 Four parts:
 
@@ -2920,6 +2948,115 @@ including the one-word and plural cases. A genuine computer win still shows its 
 copy. A player-ended game counts toward games played and bests. Every message fits
 without clipping on the iPhone SE (3rd gen) at default and largest text sizes, on both
 platforms.
+
+> **DONE 2026-11-04.**
+>
+> - **`endByPlayer`** (`gameSession.ts`) records `computer_win` plus `endedByPlayer: true`.
+>   It counts as a game played and towards the bests, and pays the personal-best +5 but
+>   no win bonus.
+> - The field is on `GameSessionState` and `RoundSummary`. Saves and stored rounds that
+>   lack it read `false`, with no format bump, as Data Model §4.1 and §6 planned.
+> - **All four player endings use it:** End Game, Restart, Home's End It, and End and
+>   Start New. Only the computer-timeout's End Round still records `abandoned`.
+> - **Copy is data** (`END_GAME_CONTENT`, verbatim from §14). The tier choice is pure
+>   (`endGameMessage`), and so is the panel's whole copy decision (`gameOverCopy`), which
+>   is what lets "a genuine computer win keeps its copy" be unit-tested here.
+>   `GameOverPanel` only lays it out.
+> - **Tests:**
+>   - Each tier is reached from real session data: a game played through the session
+>     machine, ended, and folded into a real profile. This includes the one-word and
+>     plural cases and the 9/10-word boundary.
+>   - Making the panel ignore `endedByPlayer` fails the computer-win test.
+>
+> **Where the result appears, and why the screen changed shape.** End Game now ends the
+> game *on* the game screen, so the result can be shown. WL-410's version recorded the
+> game and navigated away. In the Back route the leave dialog is the confirmation, and its
+> held navigation is dropped. Wireframe §14 records this, plus the off-screen endings that
+> show no result.
+>
+> Staying on screen opened a race WL-410 never had: a computer turn finishing *after* End
+> Game would bring the ended game back. Every state computed before an `await` is now
+> applied only if the game is still in play (`applyIfInPlay`, a functional update checked
+> against current state). `handleSubmit` also stops after validation if the game ended,
+> and the timeout notice can't render over a result.
+>
+> **Smaller calls, each recorded:**
+>
+> - **"New personal best!"** is hidden alongside "New words discovered" when the message
+>   already says it. §14 states the rule for words only, and its reason covers both.
+> - **The Restart confirmation copy** said "Your chain and score for this round will be
+>   lost". That is false once Restart records the game, so it now reads "Your N-word chain
+>   is saved to your history, and a new word is dealt."
+> - **No italic sign-off.** Only JetBrains Mono Regular and Bold are bundled, so
+>   `fontStyle: 'italic'` would have been a synthesized slant, which the Design System
+>   rules out.
+> - **Home's Words Discovered** card stacks full-width above `MAX_SIDE_BY_SIDE_STATS_FONT_SCALE`
+>   (1.5). At Android's 2.0x, "Discovered" broke mid-word in a half-width card. The
+>   arithmetic is pinned in `typography.test.ts` against the iPhone SE.
+>
+> **Found and fixed, on the End Game path:** `BottomSheet` never scrolled, so at the
+> largest OS text size a sheet's lower controls were unreachable. At iOS's AX3,
+> "Leave this game?" showed only Keep Playing, so End Game couldn't be reached at all.
+> `BottomSheet` gained an opt-in `scrollable`, now used by `ConfirmSheet` and `PauseSheet`.
+> It is opt-in rather than the default because `ReportWordSheet` scrolls its own list and
+> has WL-312's keyboard behaviour built around that.
+>
+> **Remaining sheets checked the same day, at iOS AX3 and Android 2.0x:**
+>
+> - **Hint — failed, fixed.** At AX3, the count, example, clue, Use Hint and Cancel were
+>   all off-screen. It now passes `scrollable`. Its letter also lacked `displayTextProps`,
+>   so it rendered at about 3x (200pt) instead of the 1.5x cap WL-408 applies to the
+>   display face everywhere else; fixed. At Android 2.0x it fits without scrolling.
+> - **Definition — passed unchanged.** Its body scroll (capped at 240) keeps Close visible
+>   on both platforms.
+> - **Report — failed, fixed.** WL-312's squeeze shrank the options list to a sliver at
+>   AX3, so no report type could be chosen, and Send Report needs one. Above
+>   `MAX_SQUEEZED_SHEET_FONT_SCALE` (1.3) the whole sheet now scrolls and the list keeps
+>   its height. At or below it, WL-312's behaviour is untouched, and default size was
+>   checked to look identical.
+>   - *Not exercised:* large text **with a full docked keyboard**. The emulator's Gboard
+>     ran in its floating toolbar mode, and the simulator used the hardware keyboard.
+>     The whole sheet scrolls in that mode, so nothing can become unreachable, but the
+>     combination itself is unseen.
+> - **Report's Settings entry now has autocorrect off** on its word field. iOS offered to
+>   turn "zyxt" into "Zyrtec", which is the WL-505 failure (a report naming a word the
+>   player never typed) at the entry point WL-505 didn't cover.
+>
+> **Seen in passing, not fixed here:** at the largest sizes Settings' rows overflow (the
+> Haptics toggle runs off the right edge; "Follows your device" is clipped). Several
+> button labels also break mid-word ("RESET STATISTI / CS", "ATTRIBUT / IONS") on iOS AX3.
+> These are screen layout work for WL-408's outstanding pass, not sheet issues.
+>
+> *Verified on the iPhone SE (3rd gen) simulator and the `Medium_Phone_API_36.1` emulator:*
+>
+> - **New Best Chain!** from the Pause route: score +5, sign-off shown, "New personal
+>   best!" hidden.
+> - **Nice Find!** naming TIGER (iOS) and GIRAFFE (Android), with the stat line hidden.
+> - **The Back/hardware-back route** stayed on screen and showed the result.
+> - **Home's Words Discovered card** replaced Best Streak, and Best Score appeared once a
+>   player-ended game counted as played.
+> - **Largest sizes:** iOS AX3 (after the sheet fix) and Android 2.0x, with messages
+>   wrapping and the screen scrolling to its buttons, nothing clipped.
+>
+> React Native doesn't re-measure text after a *live* text-size change, so each size was
+> checked after a relaunch.
+
+> **WL-411 follow-up, found while verifying WL-412 (2026-11-04):** two real bugs in WL-411,
+> both fixed here.
+>
+> - **A game resumed mid-computer-turn kept its stale personal-best baseline.** The
+>   mount effect finished the turn from the raw saved game (`resumed`) rather than the
+>   refreshed one (`session`), and its result replaced the refresh. A 5-word chain then
+>   claimed "New Best Chain!" and +5 against a best of 5. The unit tests couldn't see it
+>   because it lives in the screen. After the fix, the same reseeded save scored no +5 and
+>   made no claim.
+> - **Home's "N days ago" went stale when the app stayed open across a day.** It was
+>   computed per render, but Home stays mounted, so an app left on Home overnight showed
+>   the previous day's ages; a fresh launch was correct. `useNowOnReturn` now refreshes
+>   the time when the app returns to the foreground or Home regains focus. The day
+>   arithmetic itself was verified against the stored timestamps. The refresh trigger
+>   could not be exercised end to end, because the simulator clock follows the host and
+>   can't be advanced.
 
 ---
 

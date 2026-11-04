@@ -179,6 +179,25 @@ Every interactive and card-like component follows the same construction:
 >
 > WCAG 1.4.3 *exempts* inactive controls from contrast minimums, so this was legal as written. It is still worth fixing, because the exemption assumes disabled controls are peripheral and here that assumption is wrong: Wireframe section 8 disables Submit whenever the input is empty, which is the state **every single turn opens in**. The disabled Submit button is one of the most-viewed elements in the entire product. Shipping it at 1.86:1 to stay inside a technicality would be the wrong call.
 
+**Text scaling (2026-11-04).** A button label grows with the OS text setting **until its
+longest word would no longer fit on one line of the narrowest button**, and stops there. It
+never goes below its normal size. Every other kind of text keeps scaling freely; this is
+the only cap besides the display face (section 2) and the letter keyboard's keys (above).
+
+The reason is arithmetic, not taste. Labels are uppercase in the monospace face, so every
+letter is equally wide, about 0.62em with the +0.02em tracking. At iOS's largest
+accessibility size a 15px label reaches roughly 47px, which makes "STATISTICS" or
+"ATTRIBUTIONS" wider than any button on a 375pt phone. The platform then breaks the word
+mid-way ("RESET STATISTI / CS"), which is harder to read than a slightly smaller whole
+word. Short labels are unaffected: a five-letter word fits up to the largest sizes, so the
+cap only applies where it prevents a break. Labels still wrap between words as before
+(WL-408).
+
+The cap is computed per label from its longest word and the screen width, not fixed in
+advance (`Button.tsx`, `labelScaleCap`). The narrowest line a label can sit on is taken as
+a button inside a card on a screen, the deepest nesting any button has today; a button
+inside a bottom sheet is shallower.
+
 ### Cards
 - `paper` or any section 1 palette fill, `ink` border, 6-8px offset shadow, 20px radius.
 - Slight rotation permitted (see section 3) for informational cards (word review entries, stat cards). Never rotate cards containing the input field or primary game controls.

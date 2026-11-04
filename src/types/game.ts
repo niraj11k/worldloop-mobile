@@ -81,4 +81,12 @@ export interface GameSessionState {
    * unknown.
    */
   previousBestChainLength: number | null;
+  /**
+   * The player chose to end this game — End Game, or Restart (D-15, Data Model
+   * §4.1). It is still *recorded* as `computer_win`, so this is what tells it
+   * apart from the computer genuinely leaving the player with no words: the
+   * game-over screen needs it to pick the right message, and WL-605 must not
+   * read giving up as being beaten. `false` for every game still in play.
+   */
+  endedByPlayer: boolean;
 }

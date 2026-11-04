@@ -21,6 +21,7 @@ import {
   applyComputerMove,
   applyComputerCannotMove,
   abandonSession,
+  endByPlayer,
   chargeHint,
   isRoundInProgress,
   isRoundOver,
@@ -189,7 +190,6 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
    */
   const dictionaryAvailable = isDictionaryAvailable();
   const saveRound = useSavedRoundStore(state => state.save);
-  const clearSavedRound = useSavedRoundStore(state => state.clear);
   const pauseGame = useSavedRoundStore(state => state.pause);
   /** D-13: the one paused game, which decides whether this one can be paused. */
   const pausedGame = useSavedRoundStore(state => state.paused);
@@ -330,6 +330,15 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
 
   const lastMove = session.chain[session.chain.length - 1];
   const roundOver = isRoundOver(session);
+  /**
+   * Whether the game was still in play at the last commit, for async work that
+   * must stop once it ends (see `applyIfInPlay`). A ref, read after `await`s,
+   * where `roundOver` would be the stale value the closure captured.
+   */
+  const inPlayRef = useRef(!roundOver);
+  useEffect(() => {
+    inPlayRef.current = !roundOver;
+  }, [roundOver]);
   /** Is there anything here the player would mind losing? (WL-401) */
   const roundInProgress = isRoundInProgress(session);
   /**
@@ -437,10 +446,17 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
    * the round would restore with the thinking indicator up and nothing ever
    * arriving. Mount-only: any later `computer_thinking` is driven by
    * `handleSubmit`, which runs the turn itself.
+   *
+   * Runs from `session` — the game as it came into play — and **not** from
+   * `resumed`, the raw saved copy. They differ: `withCurrentBest` has already
+   * refreshed the personal-best baseline (D-14). Finishing the turn from
+   * `resumed` replaced the refreshed game with one carrying the stale
+   * baseline, so a game resumed mid-turn claimed "New Best Chain!" for a chain
+   * that only equalled the player's best. Found on the simulator at WL-412.
    */
   useEffect(() => {
-    if (resumed?.phase === 'computer_thinking') {
-      attemptComputerTurn(resumed);
+    if (resumed !== null && session.phase === 'computer_thinking') {
+      attemptComputerTurn(session);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -524,6 +540,19 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   };
 
   /**
+   * D-15: a game can now end while a turn is still resolving — End Game from
+   * the Back control's dialog during the computer's think, say — and the
+   * player stays on this screen to read the result. Every state computed
+   * before an `await` is therefore applied only if the game is still in play
+   * when it lands; otherwise a late computer reply would bring an ended game
+   * back. The functional update checks the real current state, not the one
+   * this closure captured.
+   */
+  const applyIfInPlay = (next: GameSessionState) => {
+    setSession(current => (isRoundOver(current) ? current : next));
+  };
+
+  /**
    * Races the computer's turn against Wireframe section 17's timeout. If the
    * timeout wins, `runComputerTurn`'s promise is simply never read again —
    * harmless, since nothing else awaits it — and the screen offers Try Again
@@ -543,7 +572,7 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
       setComputerTimedOut(true);
       return;
     }
-    setSession(result);
+    applyIfInPlay(result);
   };
 
   /**
@@ -616,6 +645,9 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
       requiredLetter: validating.requiredLetter,
       usedWords: usedWords(validating),
     });
+    // The game was ended while the word was being checked (D-15): nothing
+    // from this submission belongs on the result screen.
+    if (!inPlayRef.current) return;
 
     const afterPlayer = applyValidation(validating, {
       submittedWord: submitted,
@@ -650,7 +682,7 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
       // rejected, and one that is in the word list. The report has to describe
       // the judgement it is disputing.
       setRejectedWord(submitted);
-      setSession(afterPlayer);
+      applyIfInPlay(afterPlayer);
       return;
     }
 
@@ -659,13 +691,14 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
     latestInputRef.current = '';
     // Paint `valid_move` (Wireframe section 9) before moving on — see
     // `VALID_MOVE_DISPLAY_MS`'s docblock for why this can't be skipped.
-    setSession(afterPlayer);
+    applyIfInPlay(afterPlayer);
     await new Promise<void>(resolve => {
       setTimeout(resolve, VALID_MOVE_DISPLAY_MS);
     });
 
+    if (!inPlayRef.current) return;
     const thinking = beginComputerTurn(afterPlayer);
-    setSession(thinking);
+    applyIfInPlay(thinking);
     await attemptComputerTurn(thinking);
   };
 
@@ -679,15 +712,15 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
    * reset here, including the two refs, so the new round is indistinguishable
    * from one started from the Difficulty screen.
    *
-   * The round being replaced is recorded as `abandoned` first, the same way
-   * leaving records it (WL-402) — a round given up is a round given up,
-   * whichever control did it. `previousBestChainLength` is re-read for the
-   * new round, since a best set since this screen mounted should count
-   * against the round starting now.
+   * The game being replaced is recorded as ended by the player first — the
+   * same recording as End Game (D-15), with no result screen, since the player
+   * asked for a new game rather than to stop (Wireframe §14).
+   * `previousBestChainLength` is re-read for the new round, since a best set
+   * since this screen mounted should count against the round starting now.
    */
   const handleRestart = () => {
     if (!roundRecordedRef.current) {
-      recordRound(abandonSession(session));
+      recordRound(endByPlayer(session));
     }
     roundRecordedRef.current = false;
 
@@ -721,36 +754,29 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
   };
 
   /**
-   * End Game, by any route (D-13): the Back control's leave choice, or the
-   * pause sheet after its confirmation.
+   * End Game, by any route (D-13, D-15): the Back control's leave choice, or
+   * the pause sheet after its confirmation.
    *
-   * Recorded as `abandoned` — WL-410's interim recording until WL-412 builds
-   * D-15's End Game result. The screen is about to unmount, so this
-   * deliberately does not `setSession`: the state is written to the profile,
-   * not to a component that is going away. `recordRound` is not awaited for
-   * the same reason, and does not need to be — the write underneath is
-   * synchronous MMKV.
-   *
-   * An abandoned game still lands in the history and still keeps any words
-   * the player found; it just doesn't count as a game played, doesn't touch
-   * a best, and doesn't break the streak (see `recordRoundCompleted`).
-   *
-   * The current save slot is cleared too: the slot exists for exits the
-   * player did not choose (WL-403), so an ended game must not be offered
-   * back on Home afterwards.
+   * The game ends *on this screen* and the End Game result replaces the board
+   * (Wireframe §13: End Game "shows the End Game result"); the player leaves
+   * from there. Everything else follows from the session changing: the
+   * recording effect files it as a player-ended `computer_win` (a game played,
+   * bests counted), and the save effect clears the slot, since a finished game
+   * is never saved.
    */
   const endGame = () => {
-    if (!roundRecordedRef.current) {
-      roundRecordedRef.current = true;
-      recordRound(abandonSession(session));
-    }
-    clearSavedRound();
+    setSession(current => endByPlayer(current));
   };
 
-  /** The leave choice's End Game: end it, then replay the held navigation. */
+  /**
+   * The leave choice's End Game. The held navigation is dropped rather than
+   * replayed: the player chose to end the game, and the result belongs to
+   * that choice whichever control raised the dialog. The leave dialog is the
+   * confirmation here, so there is no second one.
+   */
   const handleLeaveAndEnd = () => {
+    cancelLeave();
     endGame();
-    confirmLeave();
   };
 
   /**
@@ -777,15 +803,16 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
 
   /**
    * Pause sheet's End Game, after its confirmation (Wireframe §13: confirm
-   * before ending). A game with nothing in it yet skips the confirmation, the
-   * same rule Restart follows: there is nothing to end.
+   * before ending). A game with nothing in it yet has nothing to end or to
+   * show a result for, so it simply leaves — the same rule Restart follows.
    */
   const handleConfirmEndGame = () => {
     setConfirmEndGame(false);
     if (roundInProgress) {
       endGame();
+    } else {
+      setLeavingDeliberately(true);
     }
-    setLeavingDeliberately(true);
   };
 
   /**
@@ -810,19 +837,24 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
         );
 
   /**
-   * WL-503: how many of this round's words the player had never played before.
+   * WL-503: this round's words the player had never played before, in the
+   * order found — the End Game message names one (D-15), the stat line counts
+   * them.
    *
-   * Subscribed to the store rather than computed here, and read *after* the
-   * recording effect above has folded the round in — which is why it is a
-   * count off `discoveredWords` and not off `session.chain`. The profile is
-   * the only thing that knows what the player has played before; the chain
-   * only knows this round. Before the round is recorded this is 0, which is
-   * also what the panel would want to show for a round that found nothing.
+   * Read off the profile rather than the chain, and after the recording effect
+   * above has folded the round in: the profile is the only thing that knows
+   * what the player has played before; the chain only knows this round. Before
+   * the round is recorded this is empty, which is also right for a round that
+   * found nothing. Derived with `useMemo` from the profile, not selected as a
+   * fresh array, which would re-render on every store read.
    */
-  const newWordsDiscovered = useProfileStore(state =>
-    state.profile === null
-      ? 0
-      : discoveredWordsForSession(state.profile, session.sessionId).length,
+  const profile = useProfileStore(state => state.profile);
+  const newWords = useMemo(
+    () =>
+      profile === null
+        ? []
+        : discoveredWordsForSession(profile, session.sessionId).map(entry => entry.word),
+    [profile, session.sessionId],
   );
 
   const submitDisabled = busy || normalizeWord(input).length === 0;
@@ -934,7 +966,7 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
           <View
             style={styles.currentWordRow}
             accessibilityLiveRegion="polite">
-            {computerTimedOut ? (
+            {computerTimedOut && !roundOver ? (
               // Wireframe section 17: "computer response timeout."
               <>
                 <Text style={styles.turnLabel}>{COMPUTER_TIMEOUT_MESSAGE}</Text>
@@ -999,7 +1031,7 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
           {roundOver ? (
             <GameOverPanel
               session={session}
-              newWordsDiscovered={newWordsDiscovered}
+              newWords={newWords}
               /*
                 `popTo`, not `navigate` (WL-401). In React Navigation 7 a
                 `navigate` to a route that is not the current one *pushes*
@@ -1328,7 +1360,7 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
       <ConfirmSheet
         visible={confirmRestart}
         title={RESTART_ROUND_CONFIRM.title}
-        message={RESTART_ROUND_CONFIRM.message}
+        message={RESTART_ROUND_CONFIRM.message(session.chain.length)}
         confirmLabel={RESTART_ROUND_CONFIRM.confirmLabel}
         cancelLabel={RESTART_ROUND_CONFIRM.cancelLabel}
         onConfirm={handleRestart}

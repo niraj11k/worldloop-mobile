@@ -64,7 +64,8 @@ export function PauseSheet({
     // Android back and a scrim tap both resume: the sheet is a pause, and the
     // least destructive reading of "get me out of this" is to carry on
     // playing. Nothing here is lost by dismissing it.
-    <BottomSheet visible={visible} onRequestClose={onResume} title="Paused">
+    // Five actions outgrow a small phone at the largest OS text size (WL-412).
+    <BottomSheet visible={visible} onRequestClose={onResume} title="Paused" scrollable>
       <View style={styles.actions}>
         <Button label="Resume Game" tone="grape" onPress={onResume} />
         <Button label="How to Play" variant="secondary" onPress={onHowToPlay} />

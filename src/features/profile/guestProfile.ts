@@ -138,6 +138,7 @@ export function summarizeRound(session: GameSessionState, now: Date): RoundSumma
     longestChain: session.chain.length,
     hintsUsed: session.hintsUsed,
     result: session.status,
+    endedByPlayer: session.endedByPlayer === true,
     isPersonalBest:
       isSettledResult(session.status) &&
       session.previousBestChainLength !== null &&
@@ -398,7 +399,11 @@ export function parseProfile(raw: string | null): GuestProfile | null {
     lastSeenAt: isoOr(stored.lastSeenAt, fallbackTimestamp),
     gamesPlayed: countOr(stored.gamesPlayed),
     localScores: Array.isArray(stored.localScores)
-      ? stored.localScores.slice(0, MAX_RETAINED_ROUNDS)
+      ? stored.localScores
+          .slice(0, MAX_RETAINED_ROUNDS)
+          // D-15: rounds recorded before WL-412 have no `endedByPlayer`; every
+          // one of them really was not ended by the player (Data Model §6).
+          .map((round: RoundSummary) => ({ ...round, endedByPlayer: round.endedByPlayer === true }))
       : [],
     bests: {
       score: countOr(stored.bests?.score),

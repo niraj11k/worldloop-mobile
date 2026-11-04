@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { BottomSheet } from '@components/common/BottomSheet';
 import { Button } from '@components/common/Button';
-import { palette, spacing, typeScale } from '@theme/theme';
+import { palette, spacing, typeScale, displayTextProps } from '@theme/theme';
 
 interface HintSheetProps {
   visible: boolean;
@@ -45,6 +45,14 @@ interface HintSheetProps {
  * Rebuilt on `BottomSheet` and `Button` under WL-204, so the sheet's border,
  * shadow, and scrim come from the shared component rather than being restated
  * here.
+ *
+ * ## At the largest text sizes
+ *
+ * The sheet scrolls, under a fixed title. At iOS's AX3 it was taller than the
+ * screen, and the count, example, clue, Use Hint and Cancel were all off the
+ * bottom edge with no way to reach them. The letter takes `displayTextProps`
+ * like every other use of the display face (WL-408): without it, it rendered
+ * at about 3x — 200pt — on its own.
  */
 export function HintSheet({
   visible,
@@ -56,9 +64,11 @@ export function HintSheet({
   onCancel,
 }: HintSheetProps): React.JSX.Element {
   return (
-    <BottomSheet visible={visible} onRequestClose={onCancel} title="Hint">
+    <BottomSheet visible={visible} onRequestClose={onCancel} title="Hint" scrollable>
       <Text style={styles.body}>Your word must begin with:</Text>
-      <Text style={styles.letter}>{requiredLetter.toUpperCase()}</Text>
+      <Text {...displayTextProps} style={styles.letter}>
+        {requiredLetter.toUpperCase()}
+      </Text>
       <Text style={styles.body}>Words available: {wordCount}</Text>
       {exampleWord !== null && (
         <Text style={styles.body}>Example: {exampleWord.toUpperCase()}</Text>

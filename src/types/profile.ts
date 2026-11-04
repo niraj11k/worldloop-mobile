@@ -24,6 +24,13 @@ export interface RoundSummary {
   longestChain: number;
   hintsUsed: number;
   result: RoundResult;
+  /**
+   * `ended_by_player` (Data Model §6, D-15): a `computer_win` the player chose,
+   * by End Game or Restart. Rounds recorded before WL-412 read `false`, which
+   * is accurate — End Game didn't exist, so every earlier `computer_win` was
+   * the computer leaving the player with no words.
+   */
+  endedByPlayer: boolean;
   isPersonalBest: boolean;
   createdAt: string;
 }

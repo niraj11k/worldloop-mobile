@@ -74,6 +74,8 @@ export function ConfirmSheet({
       onRequestClose={onCancel}
       title={title}
       dismissOnScrimPress={false}
+      // At the largest OS text size the buttons outgrow the screen (WL-412).
+      scrollable
       testID={testID}>
       <Text style={styles.message}>{message}</Text>
 
