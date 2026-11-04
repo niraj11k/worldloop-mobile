@@ -8,67 +8,13 @@
   ],
   "advisories": [
     {
-      "url": "https://github.com/advisories/GHSA-w3rx-r6r6-pgpr",
-      "package": "image-size",
-      "severity": "high",
-      "title": "image-size: ICNS parser allows denial of service through an infinite loop",
-      "reason": "Re-reviewed 2026-10-19. Reached only via metro (the bundler) at build time; not present in the shipped app binary. A patched image-size now exists (2.0.3+, the advisory covers <=2.0.2), but it is a major version: metro 0.84.x, which react-native 0.86.2 pins at ^0.84.3, depends on image-size ^1.0.2, and the 1.x line (1.2.1, the 'legacy' tag) has no fix. Metro 0.87.1 drops image-size entirely, so an RN upgrade onto it removes this advisory. An overrides pin to 2.0.4 was tested against Metro's call shape (CommonJS default export, Buffer in, {width, height} out) and works, but it forces Metro outside its declared range, so it is recorded as an option rather than taken.",
-      "mitigation": "metro.config.js calls image-size's disableTypes() on Metro's own instance to switch off the icns parser. Metro never requests dimensions for ICNS assets, so this costs nothing and the payload is rejected instantly instead of looping. The app also currently bundles no image assets outside the native projects, so Metro never calls image-size at all today.",
-      "reviewBy": "2027-01-18"
-    },
-    {
-      "url": "https://github.com/advisories/GHSA-5p2g-fcmc-qvqq",
-      "package": "image-size",
-      "severity": "high",
-      "title": "image-size: JXL and HEIF parsers allow denial of service through infinite loops",
-      "reason": "Re-reviewed 2026-10-19. Same root cause, package, reachability and fix situation as GHSA-w3rx-r6r6-pgpr.",
-      "mitigation": "metro.config.js disables the jxl, jxl-stream and heif parsers alongside icns.",
-      "reviewBy": "2027-01-18"
-    },
-    {
-      "url": "https://github.com/advisories/GHSA-m9gg-hp2v-232j",
-      "package": "@grpc/grpc-js",
-      "severity": "high",
-      "title": "@grpc/grpc-js: In certain configurations, getAuthContext can return unauthorized certificates as though they were authorized",
-      "reason": "Transitive via @react-native-firebase/app -> firebase (the Firebase JS SDK) -> @firebase/firestore -> @grpc/grpc-js@1.9.16. The fix is 1.13.6, but @firebase/firestore pins ~1.9.0, so no in-range upgrade exists; npm's fixAvailable is a major downgrade of @react-native-firebase to 20.1.0. Forcing 1.13.6 through overrides would put a library outside its declared range for no runtime benefit (see the mitigation).",
-      "mitigation": "Unreachable in the shipped app, three times over. (1) On iOS and Android, RNFB uses the native Firebase SDKs; the JS SDK is only its fallback for other platforms (web, macOS). (2) The app installs only @react-native-firebase/app and /crashlytics; nothing in src/ or in RNFB imports Firestore (only RNFB's own web shim references it, and only the uninstalled @react-native-firebase/firestore package would load that). (3) Even if Firestore were bundled, Metro resolves its 'react-native' entry (dist/index.rn.js), which has no reference to grpc-js; grpc-js is used only by Firestore's Node.js build, and it needs Node's http2 module, which does not exist in a React Native app.",
-      "reviewBy": "2027-01-18"
-    },
-    {
-      "url": "https://github.com/advisories/GHSA-f596-whhp-79r4",
-      "package": "@grpc/grpc-js",
-      "severity": "low",
-      "title": "@grpc/grpc-js: The server transmits some error messages thrown by method handlers to the client in status messages",
-      "reason": "Same dependency path and fix situation as GHSA-m9gg-hp2v-232j. This one concerns grpc-js acting as a server, which the app never does.",
-      "mitigation": "Same as GHSA-m9gg-hp2v-232j: grpc-js is never loaded on iOS or Android.",
-      "reviewBy": "2027-01-18"
-    },
-    {
       "url": "https://github.com/advisories/GHSA-gcqx-w48m-w2h4",
       "package": "deepmerge",
       "severity": "low",
       "title": "deepmerge mergeObject() allows prototype poisoning of returned objects",
-      "reason": "Reviewed 2026-11-04. Build and test tooling only: @react-native-community/cli (and its cli-config, cli-doctor) -> deepmerge@4.3.1, and jest -> @jest/core -> jest-config -> deepmerge. The advisory covers >=4.2.0 <=4.3.1, and 4.3.1 is the latest published version, so there is no version to upgrade to. npm's fixAvailable is a downgrade of @react-native-community/cli to 11.4.1, which the README's 'Do not run npm audit fix --force' section rules out.",
+      "reason": "Re-reviewed 2026-11-05; now the only exception, after image-size, @grpc/grpc-js, glob and minimatch were fixed through `overrides`. Build and test tooling only: @react-native-community/cli (and its cli-config, cli-doctor) -> deepmerge@4.3.1, and jest -> @jest/core -> jest-config -> deepmerge. The advisory covers >=4.2.0 <=4.3.1 with no patched version (GitHub lists first_patched_version as null) and 4.3.1 is the latest published release, so there is nothing to override to. npm's fixAvailable is a downgrade of @react-native-community/cli to 11.4.1, which the README's 'Do not run npm audit fix --force' section rules out. Vendoring a hardened copy was considered and declined as not worth maintaining for a low-severity, unreachable flaw.",
       "mitigation": "Never in the shipped app. deepmerge only merges this project's own CLI and Jest configuration objects on a developer machine or CI runner; no user-, network- or device-supplied object ever reaches it, so there is no attacker to supply a __proto__ key.",
-      "reviewBy": "2027-02-04"
-    },
-    {
-      "url": "https://github.com/advisories/GHSA-3g3m-2fjr-6pw4",
-      "package": "glob",
-      "severity": "moderate",
-      "title": "Glob: AbortSignal cancellation bypass allows post-timeout filesystem traversal",
-      "reason": "Reviewed 2026-11-04. Build tooling only: babel-plugin-module-resolver@5.0.3 -> glob@9.3.5, the only installed copy in the advisory's >=9.0.0 <=14.0.1 range (the glob@7.2.3 copies under jest are outside it; npm lists them only through their minimatch dependency). The fix is glob 14.0.2+, five majors ahead of the ^9.3.3 the plugin declares. npm's fixAvailable is a downgrade of jest to 25.1.0, which the README's 'Do not run npm audit fix --force' section rules out.",
-      "mitigation": "Never in the shipped app. glob runs at Babel build time over the alias roots in this project's own babel.config.js, and babel-plugin-module-resolver never passes an AbortSignal, so the cancellation path the advisory concerns is never exercised.",
-      "reviewBy": "2027-02-04"
-    },
-    {
-      "url": "https://github.com/advisories/GHSA-g3hv-75wg-m249",
-      "package": "minimatch",
-      "severity": "moderate",
-      "title": "minimatch has potential denial of service via globparts amplification",
-      "reason": "Reviewed 2026-11-04. Build, lint and test tooling only: minimatch@3.1.5 via eslint, @eslint/config-array, @eslint/eslintrc, eslint-plugin-react, jest (via glob@7) and test-exclude; minimatch@8.0.7 via glob@9 (babel-plugin-module-resolver); minimatch@10.2.6 via @typescript-eslint/typescript-estree. The advisory covers <11.0.1 and every consumer pins an older major (3.x also has a different export shape from 10+), so an overrides pin would push eslint, jest and babel tooling outside their declared ranges. npm's fixAvailable is a downgrade of jest to 25.1.0.",
-      "mitigation": "Never in the shipped app. minimatch only matches glob patterns written by this project (ESLint config and ignores, Jest's testMatch and coverage excludes, Babel alias roots) on a developer machine or CI runner; no user-, network- or device-supplied pattern ever reaches it.",
-      "reviewBy": "2027-02-04"
+      "reviewBy": "2027-02-05"
     }
   ]
 }

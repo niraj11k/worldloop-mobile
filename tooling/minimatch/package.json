@@ -1,0 +1,8 @@
+{
+  "name": "minimatch",
+  "version": "11.0.4",
+  "private": true,
+  "description": "Local facade: callable CommonJS entry over minimatch@11 for consumers written against the minimatch@3 default-export API. Wired in via package.json devDependencies + overrides. See README.md 'Dependency audit state'.",
+  "license": "MIT",
+  "main": "index.js"
+}
