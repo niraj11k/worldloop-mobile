@@ -1,37 +1,37 @@
 PODS:
   - FBLazyVector (0.86.2)
-  - Firebase/CoreOnly (12.18.0):
-    - FirebaseCore (~> 12.18.0)
-  - Firebase/Crashlytics (12.18.0):
+  - Firebase/CoreOnly (12.19.3):
+    - FirebaseCore (~> 12.19.3)
+  - Firebase/Crashlytics (12.19.3):
     - Firebase/CoreOnly
-    - FirebaseCrashlytics (~> 12.18.0)
-  - FirebaseCore (12.18.0):
-    - FirebaseCoreInternal (~> 12.18.0)
+    - FirebaseCrashlytics (~> 12.19.0)
+  - FirebaseCore (12.19.3):
+    - FirebaseCoreInternal (~> 12.19.0)
     - GoogleUtilities/Environment (~> 8.1)
     - GoogleUtilities/Logger (~> 8.1)
-  - FirebaseCoreExtension (12.18.0):
-    - FirebaseCore (~> 12.18.0)
-  - FirebaseCoreInternal (12.18.0):
+  - FirebaseCoreExtension (12.19.0):
+    - FirebaseCore (~> 12.19.0)
+  - FirebaseCoreInternal (12.19.0):
     - "GoogleUtilities/NSData+zlib (~> 8.1)"
-  - FirebaseCrashlytics (12.18.0):
-    - FirebaseCore (~> 12.18.0)
-    - FirebaseInstallations (~> 12.18.0)
-    - FirebaseRemoteConfigInterop (~> 12.18.0)
-    - FirebaseSessions (~> 12.18.0)
+  - FirebaseCrashlytics (12.19.0):
+    - FirebaseCore (~> 12.19.0)
+    - FirebaseInstallations (~> 12.19.0)
+    - FirebaseRemoteConfigInterop (~> 12.19.0)
+    - FirebaseSessions (~> 12.19.0)
     - GoogleDataTransport (~> 10.1)
     - GoogleUtilities/Environment (~> 8.1)
     - nanopb (~> 3.30910.0)
     - PromisesObjC (~> 2.4)
-  - FirebaseInstallations (12.18.0):
-    - FirebaseCore (~> 12.18.0)
+  - FirebaseInstallations (12.19.0):
+    - FirebaseCore (~> 12.19.0)
     - GoogleUtilities/Environment (~> 8.1)
     - GoogleUtilities/UserDefaults (~> 8.1)
     - PromisesObjC (~> 2.4)
-  - FirebaseRemoteConfigInterop (12.18.0)
-  - FirebaseSessions (12.18.0):
-    - FirebaseCore (~> 12.18.0)
-    - FirebaseCoreExtension (~> 12.18.0)
-    - FirebaseInstallations (~> 12.18.0)
+  - FirebaseRemoteConfigInterop (12.19.0)
+  - FirebaseSessions (12.19.0):
+    - FirebaseCore (~> 12.19.0)
+    - FirebaseCoreExtension (~> 12.19.0)
+    - FirebaseInstallations (~> 12.19.0)
     - GoogleDataTransport (~> 10.1)
     - GoogleUtilities/Environment (~> 8.1)
     - GoogleUtilities/UserDefaults (~> 8.1)
@@ -40,15 +40,15 @@ PODS:
   - GoogleDataTransport (10.1.1):
     - nanopb (~> 3.30910.0)
     - PromisesObjC (~> 2.4)
-  - GoogleUtilities/Environment (8.1.2):
+  - GoogleUtilities/Environment (8.1.5):
     - GoogleUtilities/Privacy
-  - GoogleUtilities/Logger (8.1.2):
+  - GoogleUtilities/Logger (8.1.5):
     - GoogleUtilities/Environment
     - GoogleUtilities/Privacy
-  - "GoogleUtilities/NSData+zlib (8.1.2)":
+  - "GoogleUtilities/NSData+zlib (8.1.5)":
     - GoogleUtilities/Privacy
-  - GoogleUtilities/Privacy (8.1.2)
-  - GoogleUtilities/UserDefaults (8.1.2):
+  - GoogleUtilities/Privacy (8.1.5)
+  - GoogleUtilities/UserDefaults (8.1.5):
     - GoogleUtilities/Logger
     - GoogleUtilities/Privacy
   - hermes-engine (250829098.0.16):
@@ -2022,8 +2022,8 @@ PODS:
     - React-utils (= 0.86.2)
     - ReactNativeDependencies
   - ReactNativeDependencies (0.86.2)
-  - RNFBApp (26.4.0):
-    - Firebase/CoreOnly (= 12.18.0)
+  - RNFBApp (26.4.1):
+    - Firebase/CoreOnly (~> 12.19.0)
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2045,9 +2045,9 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - RNFBCrashlytics (26.4.0):
-    - Firebase/Crashlytics (= 12.18.0)
-    - FirebaseCoreExtension (= 12.18.0)
+  - RNFBCrashlytics (26.4.1):
+    - Firebase/Crashlytics (~> 12.19.0)
+    - FirebaseCoreExtension (~> 12.19.0)
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2390,16 +2390,16 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   FBLazyVector: 3c3be9a019176b5699455f7f66c5444b78a411c6
-  Firebase: 5523dd53ebe603451b4e1befcd99fa20a5c015cd
-  FirebaseCore: 96787d19ee32dc2242cc487b301bc616afeb398b
-  FirebaseCoreExtension: a86bab02524ca2bff95dddab7a3fcad505c2ddeb
-  FirebaseCoreInternal: 93b2d5f9e184c6818a04433891c358b0720a6a38
-  FirebaseCrashlytics: bd160cfa074ad21ed708a466e15d1928ded1642a
-  FirebaseInstallations: 933b2747e8594084c9117b65e8358fce29d7ced7
-  FirebaseRemoteConfigInterop: 3cbd659033c3129ea81a756a52e4bf1cfc20c3a7
-  FirebaseSessions: 3eaac5fd8077513b95f9723efd940438e3e35fb2
+  Firebase: e3c5ab38229ae085490d02398d97b9f5374bbe6e
+  FirebaseCore: ab948de5d99e69aeed3cd6f5ace263ce795b2559
+  FirebaseCoreExtension: 201c78d7491a273d61d8afbf491214276a951e6d
+  FirebaseCoreInternal: 656b1c2fd5a1c5976183dc54b73deda78fb26ee3
+  FirebaseCrashlytics: 5c8e09beebcd41913b35250cd0e533b58e4961a0
+  FirebaseInstallations: f70a49eed611f5602f373e40974b3b01556ac217
+  FirebaseRemoteConfigInterop: 90659b3cac8f6de884f2d930fbdbeb711533e142
+  FirebaseSessions: 39bcaa7c16b5d8b91d58f495f29ce2988d2f915c
   GoogleDataTransport: a24e58982ab3ba2f64d79613e027fe7f57e88539
-  GoogleUtilities: 766ace00c6b10d8148408f329d10c4f051931850
+  GoogleUtilities: 7dc09b3fa9ecb5c2298b952313d14628b61b9da3
   hermes-engine: c299903c885d1177ec423169f9b50e40529f195e
   MMKVCore: 3d16ce9f7d411e135020915fde98a056859a1efa
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
@@ -2481,8 +2481,8 @@ SPEC CHECKSUMS:
   ReactCodegen: 3bbb7de19774794a7428ef623a7b777106cf3737
   ReactCommon: 9002f006f571256348994183f7d4387aa7cf84e8
   ReactNativeDependencies: 2bd6854ade79bf1b60586d1ab7813a389df1b6bf
-  RNFBApp: e767823f39a9b587d3c4867bbe064bd78f4d814b
-  RNFBCrashlytics: c57b2db38d8f3c234b4db87f466b4122b30d3a27
+  RNFBApp: 4ac7429bc4336380cc0ec364426912b538569ba1
+  RNFBCrashlytics: 0cbf10ede095da856a57186784d143af53445ef0
   RNScreens: de068bbd7d91b820fedac25c597d4b14830de74b
   Yoga: 9891cfb1c680f64de9c41b09e7453dea33454d2b
 
