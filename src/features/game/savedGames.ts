@@ -84,3 +84,47 @@ export function difficultyStartFor(
   if (paused === null) return 'new';
   return paused.difficulty === difficulty ? 'resume_or_restart' : 'new_unpausable';
 }
+
+/**
+ * Whole calendar days between a game's last-played time and `now`, in the
+ * device's local time, for Home's "today" / "yesterday" / "3 days ago" (D-14).
+ *
+ * Calendar days rather than 24-hour periods: a game played at 11pm and
+ * resumed at 8am is "yesterday", which is what a person would call it. `null`
+ * when the time is unknown (a save from before WL-411) — the label is then
+ * left off rather than guessed. A time in the future (the device clock moved
+ * back) reads as today; the clock only ever affects this label, never a rule.
+ */
+export function daysSincePlayed(savedAt: string | null, now: Date): number | null {
+  if (savedAt === null) return null;
+  const played = new Date(savedAt);
+  if (Number.isNaN(played.getTime())) return null;
+
+  const startOfDay = (date: Date) =>
+    new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  // Rounded rather than floored: a daylight-saving change makes one calendar
+  // day 23 or 25 hours long.
+  const days = Math.round((startOfDay(now) - startOfDay(played)) / 86_400_000);
+  return Math.max(0, days);
+}
+
+/**
+ * A saved game coming back into play, compared against the player's best
+ * *now* rather than the best when it started (D-14, Architecture §7).
+ *
+ * The baseline can only go stale while a game is out of play: while one game
+ * is being played no other game can set a best (D-13 allows only one game in
+ * play), so refreshing it as the game comes back is the same as reading it
+ * when the game ends. Without this, a game paused while another set a new
+ * best would announce "new best" and pay the +5 for a chain shorter than the
+ * player's real best.
+ *
+ * `currentBest` is `null` while the profile hasn't loaded; the game then keeps
+ * the baseline it has rather than losing it.
+ */
+export function withCurrentBest(
+  session: GameSessionState,
+  currentBest: number | null,
+): GameSessionState {
+  return currentBest === null ? session : { ...session, previousBestChainLength: currentBest };
+}

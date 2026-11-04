@@ -118,11 +118,11 @@ export function updateSettings(
  * section 6).
  *
  * `isPersonalBest` is decided against `previousBestChainLength` — the
- * baseline copied into the session when it was created (WL-111) — and not
- * against the live profile, so this agrees exactly with the bonus the round
- * already paid out and with what `GameOverPanel` already told the player.
- * Reading the live profile here could disagree with both if another round had
- * been recorded in between.
+ * baseline copied into the session when it came into play (WL-111, refreshed
+ * on resume by D-14) — and not against the live profile, so this agrees
+ * exactly with the bonus the round already paid out and with what
+ * `GameOverPanel` already told the player. Reading the live profile here would
+ * see this round's own best already recorded, and could disagree with both.
  *
  * "Words played" and "longest chain" are both the chain length, as the
  * Wireframe section 14 mockup itself shows them (18/18) — a chain only grows

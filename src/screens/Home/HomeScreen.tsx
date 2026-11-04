@@ -7,11 +7,18 @@ import { Card } from '@components/common/Card';
 import { ConfirmSheet } from '@components/common/ConfirmSheet';
 import { IconButton } from '@components/common/IconButton';
 import { HomeBackdrop } from '@components/home/HomeBackdrop';
-import { HOME_EMPTY_STATE, OPEN_GAME_CHOICE, resumeGameLabel } from '@constants/gameConstants';
+import {
+  HOME_EMPTY_STATE,
+  OPEN_GAME_CHOICE,
+  lastPlayedPhrase,
+  lostSaveNotice,
+  resumeGameLabel,
+} from '@constants/gameConstants';
 import { abandonSession } from '@features/game/gameSession';
-import { canPause } from '@features/game/savedGames';
+import { canPause, daysSincePlayed } from '@features/game/savedGames';
 import { useProfileStore } from '@store/useProfileStore';
 import { useSavedRoundStore } from '@store/useSavedRoundStore';
+import type { GameSessionState } from '@app-types/game';
 import { palette, spacing, typeScale, displayTextProps, CONTENT_MAX_WIDTH } from '@theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
@@ -59,6 +66,15 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
   const clearOpenGame = useSavedRoundStore(state => state.clear);
   const pauseGame = useSavedRoundStore(state => state.pause);
   const resumePaused = useSavedRoundStore(state => state.resumePaused);
+  /** When each saved game was last played, for "· 3 days ago" (D-14). */
+  const openGameAt = useSavedRoundStore(state => state.savedAt);
+  const pausedGameAt = useSavedRoundStore(state => state.pausedAt);
+  /** Games an app update couldn't carry over, reported once (D-14). */
+  const lostSaves = useSavedRoundStore(state => state.lostSaves);
+  const dismissLostSaves = useSavedRoundStore(state => state.dismissLostSaves);
+  // Read per render rather than once: Home stays mounted under the game, and a
+  // label computed when the app opened would still say "today" tomorrow.
+  const now = new Date();
   /**
    * Where the player was heading when an open game got in the way: D-13 rule
    * 3 means it has to be paused or ended first. `null` while no choice is
@@ -185,6 +201,27 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
 
         <Text style={styles.tagline}>Ready for a chain?</Text>
 
+        {/*
+          D-14 / Wireframe §5: a game an app update couldn't carry over is
+          reported once, here, rather than vanishing. A quiet caption, not an
+          alert — the same register as WL-506's notices — because the player
+          did nothing wrong and can do nothing about it. The save is already
+          cleared from storage, so dismissing it (or relaunching) is the end
+          of it.
+        */}
+        {lostSaves.length > 0 && (
+          <View style={styles.noticeRow}>
+            <View style={styles.noticeText}>
+              {lostSaves.map((difficulty, index) => (
+                <Text key={index} style={styles.notice} accessibilityLiveRegion="polite">
+                  {lostSaveNotice(difficulty)}
+                </Text>
+              ))}
+            </View>
+            <IconButton name="close" accessibilityLabel="Dismiss" onPress={dismissLostSaves} />
+          </View>
+        )}
+
         <View style={styles.primaryActions}>
           <Button
             label="Start Game"
@@ -202,7 +239,11 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
         */}
           {openGame !== null && (
             <Button
-              label={resumeGameLabel(openGame.difficulty, openGame.chain.length)}
+              {...resumeEntryLabels(
+                openGame.difficulty,
+                openGame.chain.length,
+                daysSincePlayed(openGameAt, now),
+              )}
               variant="secondary"
               onPress={() =>
                 navigation.navigate('Game', {
@@ -215,7 +256,11 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
           )}
           {pausedGame !== null && (
             <Button
-              label={resumeGameLabel(pausedGame.difficulty, pausedGame.chain.length)}
+              {...resumeEntryLabels(
+                pausedGame.difficulty,
+                pausedGame.chain.length,
+                daysSincePlayed(pausedGameAt, now),
+              )}
               variant="secondary"
               onPress={handleResumePaused}
               style={styles.fullWidthButton}
@@ -338,6 +383,25 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
   );
 }
 
+/**
+ * A Resume entry's visible label and its spoken one (D-14). The age goes on a
+ * line of its own: on a small phone the one-line form wraps mid-phrase
+ * ("· 3 / DAYS AGO"). A screen reader gets the one-line sentence.
+ */
+function resumeEntryLabels(
+  difficulty: GameSessionState['difficulty'],
+  words: number,
+  daysAgo: number | null,
+): { label: string; accessibilityLabel: string } {
+  return {
+    label:
+      daysAgo === null
+        ? resumeGameLabel(difficulty, words)
+        : `${resumeGameLabel(difficulty, words)}\n${lastPlayedPhrase(daysAgo)}`,
+    accessibilityLabel: resumeGameLabel(difficulty, words, daysAgo),
+  };
+}
+
 const styles = StyleSheet.create({
   // `overflow: hidden` is what keeps the backdrop's oversized letters inside
   // the screen instead of drawing past its edges on iOS, where views do not
@@ -361,6 +425,9 @@ const styles = StyleSheet.create({
   wordmark: { ...typeScale.wordmark, color: palette.ink },
   tagline: { ...typeScale.body, color: palette.ink },
   primaryActions: { gap: spacing.md },
+  noticeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  noticeText: { flex: 1, gap: spacing.xs },
+  notice: { ...typeScale.caption, color: palette.ink },
   // Buttons are `alignSelf: 'flex-start'` by default; the primary action gets
   // the full width because it is the one thing this screen exists for.
   fullWidthButton: { alignSelf: 'stretch' },

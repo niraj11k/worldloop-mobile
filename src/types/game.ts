@@ -75,6 +75,10 @@ export interface GameSessionState {
   score: number;
   hintsUsed: number;
   isOfflineSession: boolean;
-  /** Longest chain the player has recorded before this round; null if unknown. */
+  /**
+   * The player's longest chain as of when this game came into play — refreshed
+   * when a saved game is resumed (D-14) — for the personal-best bonus; null if
+   * unknown.
+   */
   previousBestChainLength: number | null;
 }

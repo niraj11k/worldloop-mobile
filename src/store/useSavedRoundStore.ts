@@ -1,12 +1,13 @@
 import { create } from 'zustand';
 
-import { restoreSession } from '@features/game/sessionPersistence';
+import { restoreSession, type SaveReadResult } from '@features/game/sessionPersistence';
 import { isRoundInProgress } from '@features/game/gameSession';
 import { canPause, reconcileSavedGames } from '@features/game/savedGames';
 import {
   clearSavedRound,
   loadSavedRound,
   saveRound,
+  type SaveSlot,
 } from '@services/game/sessionRepository';
 import { reportError } from '@services/crashReporting/crashReporting';
 import type { GameSessionState } from '@app-types/game';
@@ -17,11 +18,20 @@ interface SavedRoundState {
    * phase-normalized by `restoreSession` — or `null` when there is none.
    */
   saved: GameSessionState | null;
+  /** When `saved` was last played (ISO), or `null` if unknown (D-14). */
+  savedAt: string | null;
   /**
    * The one game the player chose to keep for later (D-13), or `null`.
    * Phase-normalized the same way.
    */
   paused: GameSessionState | null;
+  /** When `paused` was last played (ISO), or `null` if unknown (D-14). */
+  pausedAt: string | null;
+  /**
+   * Games an app update couldn't carry over (D-14), named by difficulty where
+   * it could still be read. Home says so once; `dismissLostSaves` clears it.
+   */
+  lostSaves: (GameSessionState['difficulty'] | null)[];
   /** `idle` until `load` runs at launch; `ready` after. */
   status: 'idle' | 'loading' | 'ready';
   load: () => Promise<void>;
@@ -48,11 +58,13 @@ interface SavedRoundState {
   clearPaused: () => Promise<void>;
   /** Empty both slots — Delete My Data. */
   clearAll: () => Promise<void>;
+  /** The player has seen the lost-in-update notice. */
+  dismissLostSaves: () => void;
 }
 
 /**
  * Saved games: the game in progress (WL-403) and the one paused game (D-13,
- * WL-410).
+ * WL-410), each with its last-played time (D-14, WL-411).
  *
  * Wireframe section 13 asks that a temporary exit not cost the player their
  * chain. Backgrounding alone never did — the process is still alive — so what
@@ -64,33 +76,60 @@ interface SavedRoundState {
  * The `paused` slot is the other kind of exit: one the player chose. The
  * rules for what the two slots may hold are in `features/game/savedGames`.
  *
+ * "Last played" is simply when the game was last written, which is after
+ * every change while it is played, and when it is paused or resumed.
+ *
  * Loaded once at launch, so the screens can ask synchronously whether there
  * is a game to resume.
  */
 export const useSavedRoundStore = create<SavedRoundState>((set, get) => ({
   saved: null,
+  savedAt: null,
   paused: null,
+  pausedAt: null,
+  lostSaves: [],
   status: 'idle',
 
   load: async () => {
     if (get().status === 'loading') return;
     set({ status: 'loading' });
 
-    const [current, paused] = await Promise.all([
+    const [currentRead, pausedRead] = await Promise.all([
       loadSavedRound('current'),
       loadSavedRound('paused'),
     ]);
+    const current = restoredFrom(currentRead);
+    const paused = restoredFrom(pausedRead);
     const settled = reconcileSavedGames({
-      current: current === null ? null : restoreSession(current),
-      paused: paused === null ? null : restoreSession(paused),
+      current: current === null ? null : restoreSession(current.session),
+      paused: paused === null ? null : restoreSession(paused.session),
     });
-    set({ saved: settled.current, paused: settled.paused, status: 'ready' });
+    const lost: [SaveSlot, SaveReadResult][] = (
+      [
+        ['current', currentRead],
+        ['paused', pausedRead],
+      ] as [SaveSlot, SaveReadResult][]
+    ).filter(([, read]) => read.kind === 'lost_in_update');
+
+    set({
+      saved: settled.current,
+      savedAt: settled.current === null ? null : (current?.savedAt ?? null),
+      paused: settled.paused,
+      pausedAt: settled.paused === null ? null : (paused?.savedAt ?? null),
+      lostSaves: lost.map(([, read]) => (read.kind === 'lost_in_update' ? read.difficulty : null)),
+      status: 'ready',
+    });
 
     // A game that reconciliation found in both slots is the one in play; drop
     // the stale pause-slot copy from storage too, so the next launch doesn't
     // have to settle it again.
     if (paused !== null && settled.paused === null) {
       await writeSafely(() => clearSavedRound('paused'), 'useSavedRoundStore.load');
+    }
+    // A save lost in an update is cleared, so the notice about it is shown on
+    // this launch only, not on every launch after.
+    for (const [slot] of lost) {
+      await writeSafely(() => clearSavedRound(slot), 'useSavedRoundStore.load');
     }
   },
 
@@ -107,15 +146,16 @@ export const useSavedRoundStore = create<SavedRoundState>((set, get) => ({
       return;
     }
 
-    set({ saved: session });
+    const now = new Date();
+    set({ saved: session, savedAt: now.toISOString() });
     // Same reasoning as the profile store: this is called from a turn
     // resolving, which can do nothing useful with a rejection, and an
     // unhandled one there would be a crash mid-game.
-    await writeSafely(() => saveRound(session, 'current'), 'useSavedRoundStore.save');
+    await writeSafely(() => saveRound(session, 'current', now), 'useSavedRoundStore.save');
   },
 
   clear: async () => {
-    set({ saved: null });
+    set({ saved: null, savedAt: null });
     await writeSafely(() => clearSavedRound('current'), 'useSavedRoundStore.clear');
   },
 
@@ -127,11 +167,17 @@ export const useSavedRoundStore = create<SavedRoundState>((set, get) => ({
     // Normalized like a restored game, because that is what a paused game is
     // when the player comes back to it: a word in flight is retyped, and a
     // computer reply that was owed is finished on resume.
-    set({ paused: restoreSession(session), saved: null });
+    const now = new Date();
+    set({
+      paused: restoreSession(session),
+      pausedAt: now.toISOString(),
+      saved: null,
+      savedAt: null,
+    });
     // Pause slot first, then the current slot. An app killed between the two
     // leaves the game in both slots, which `load` settles as still in play —
     // never in neither.
-    await writeSafely(() => saveRound(session, 'paused'), 'useSavedRoundStore.pause');
+    await writeSafely(() => saveRound(session, 'paused', now), 'useSavedRoundStore.pause');
     await writeSafely(() => clearSavedRound('current'), 'useSavedRoundStore.pause');
     return true;
   },
@@ -140,25 +186,39 @@ export const useSavedRoundStore = create<SavedRoundState>((set, get) => ({
     const { paused, saved } = get();
     if (paused === null || saved !== null) return null;
 
-    set({ saved: paused, paused: null });
+    const now = new Date();
+    set({ saved: paused, savedAt: now.toISOString(), paused: null, pausedAt: null });
     // Same order as `pause`, mirrored: the game is in the current slot before
     // it leaves the pause slot.
-    await writeSafely(() => saveRound(paused, 'current'), 'useSavedRoundStore.resumePaused');
+    await writeSafely(
+      () => saveRound(paused, 'current', now),
+      'useSavedRoundStore.resumePaused',
+    );
     await writeSafely(() => clearSavedRound('paused'), 'useSavedRoundStore.resumePaused');
     return paused;
   },
 
   clearPaused: async () => {
-    set({ paused: null });
+    set({ paused: null, pausedAt: null });
     await writeSafely(() => clearSavedRound('paused'), 'useSavedRoundStore.clearPaused');
   },
 
   clearAll: async () => {
-    set({ saved: null, paused: null });
+    set({ saved: null, savedAt: null, paused: null, pausedAt: null, lostSaves: [] });
     await writeSafely(() => clearSavedRound('current'), 'useSavedRoundStore.clearAll');
     await writeSafely(() => clearSavedRound('paused'), 'useSavedRoundStore.clearAll');
   },
+
+  dismissLostSaves: () => {
+    set({ lostSaves: [] });
+  },
 }));
+
+function restoredFrom(
+  read: SaveReadResult,
+): { session: GameSessionState; savedAt: string | null } | null {
+  return read.kind === 'restored' ? { session: read.session, savedAt: read.savedAt } : null;
+}
 
 async function writeSafely(write: () => Promise<void>, scope: string): Promise<void> {
   try {

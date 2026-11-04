@@ -50,7 +50,7 @@ import {
   leaveGamePauseFullMessage,
   pauseSlotFullNote,
 } from '@constants/gameConstants';
-import { canPause } from '@features/game/savedGames';
+import { canPause, withCurrentBest } from '@features/game/savedGames';
 import { Badge } from '@components/common/Badge';
 import { Button } from '@components/common/Button';
 import { Card } from '@components/common/Card';
@@ -215,33 +215,36 @@ export function GameScreen({ route, navigation }: Props): React.JSX.Element {
     new round rather than failing — the player asked to play.
   */
   const resumed = route.params.resume === true ? useSavedRoundStore.getState().saved : null;
+  /*
+    WL-402's baseline for the game-end personal-best bonus, read once, here,
+    rather than subscribed to: only this game can set a best while it is in
+    play (D-13), so reading it as the game comes into play is the same as
+    reading it when the game ends (D-14, Architecture §7). `getState()` rather
+    than the hook keeps it a snapshot.
 
-  const [session, setSession] = useState(
-    () =>
-      resumed ??
-      createSession({
-        sessionId: `local-${Date.now()}`,
-        difficulty,
-        /*
-          WL-402's baseline for the round-end personal-best bonus, read once,
-          here, rather than subscribed to: `previousBestChainLength` is
-          defined as the value *at session creation* (WL-111), so a best
-          recorded while this round is in play must not move the bar
-          mid-round. `getState()` rather than the hook keeps it a snapshot.
+    `null` while the profile is still loading, which is the documented "no
+    baseline known" case and awards no milestone — distinct from a real best
+    of 0, which a first game beats.
+  */
+  const currentBest = useProfileStore.getState().profile?.bests.chainLength ?? null;
 
-          `null` while the profile is still loading, which is the documented
-          "no baseline known" case and awards no milestone — distinct from a
-          real best of 0, which a first round beats.
-        */
-        previousBestChainLength: useProfileStore.getState().profile?.bests.chainLength ?? null,
-        // `null` means no letter in the dictionary could offer a usable
-        // opening word, which with the bundled asset means the asset itself
-        // is missing or corrupt. Falling back keeps the round playable rather
-        // than dead; surfacing it as the Wireframe section 17 "dictionary
-        // unavailable" state is WL-506's, and the game-over treatment
-        // WL-308's. `apple` is Wireframe section 7's own teaching word.
-        startingWord: nextStartingWord() ?? FALLBACK_STARTING_WORD,
-      }),
+  const [session, setSession] = useState(() =>
+    resumed !== null
+      ? // D-14: a saved game may have sat while another game set a new best,
+        // so it is compared against the best now, not the one it started with.
+        withCurrentBest(resumed, currentBest)
+      : createSession({
+          sessionId: `local-${Date.now()}`,
+          difficulty,
+          previousBestChainLength: currentBest,
+          // `null` means no letter in the dictionary could offer a usable
+          // opening word, which with the bundled asset means the asset itself
+          // is missing or corrupt. Falling back keeps the round playable rather
+          // than dead; surfacing it as the Wireframe section 17 "dictionary
+          // unavailable" state is WL-506's, and the game-over treatment
+          // WL-308's. `apple` is Wireframe section 7's own teaching word.
+          startingWord: nextStartingWord() ?? FALLBACK_STARTING_WORD,
+        }),
   );
   const [input, setInput] = useState('');
   const [errorReason, setErrorReason] = useState<InvalidReason | null>(null);
