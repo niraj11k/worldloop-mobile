@@ -296,17 +296,20 @@ dictionary itself — see the Delivery Plan, Phase 1.
 
 ## Dependency audit state
 
-Last reviewed **2026-10-19**. `npm audit` reports 60 entries, which collapse
-to **6 distinct advisories in 4 packages**. All 6 are accepted, time-boxed
-exceptions in `audit-allowlist.json`, and none of the 4 packages runs in the
-shipped app.
+Last reviewed **2026-11-04**. `npm audit`'s entries collapse to **9 distinct
+advisories in 5 packages**. All 7 are accepted, time-boxed exceptions in
+`audit-allowlist.json`, and none of the 5 packages runs in the shipped app.
+The earlier `braces` (GHSA-vfj7-8cjw-p6xm) and `sprintf-js`
+(GHSA-hp3w-g68c-fv3c) exceptions were deleted after GitHub withdrew both
+advisories in October 2026.
 
 | Package | Advisories | Reached via | Why it can't be upgraded away |
 | --- | --- | --- | --- |
 | `image-size@1.2.1` | 2 × high | `metro` (bundler), build time | Fix is 2.x; Metro 0.84 pins `^1.0.2` |
 | `@grpc/grpc-js@1.9.16` | 1 × high, 1 × low | RNFB → Firebase JS SDK → Firestore | Fix is 1.13.6; Firestore pins `~1.9.0` |
-| `braces@3.0.3` | 1 × high | Metro's file watcher, Jest | Every published version is affected |
-| `sprintf-js@1.0.3` | 1 × moderate | Jest code-coverage tooling | Every published version is affected |
+| `deepmerge@4.3.1` | 1 × low | RN CLI, Jest config loading | Every published 4.2+ version is affected; 4.3.1 is the latest |
+| `glob@9.3.5` | 1 × moderate | `babel-plugin-module-resolver`, build time | Fix is 14.0.2; the plugin pins `^9.3.3` |
+| `minimatch@3.1.5`, `8.0.7`, `10.2.6` | 1 × moderate | ESLint, Jest, glob, typescript-estree | Fix is 11.x; every consumer pins an older major |
 
 **`image-size`** (GHSA-w3rx-r6r6-pgpr, GHSA-5p2g-fcmc-qvqq) — DoS via
 infinite loops on malformed ICNS/JXL/HEIF files. The advisory covers
@@ -368,13 +371,18 @@ grpc-js `~1.9.0`, below the 1.13.6 fix. It cannot run here:
 Forcing 1.13.6 through `overrides` would buy nothing at runtime and put
 Firestore outside its declared range.
 
-**`braces`** (GHSA-vfj7-8cjw-p6xm) and **`sprintf-js`**
-(GHSA-hp3w-g68c-fv3c) — denial of service on hostile input, with every
-published version affected, so there is nothing to upgrade to. Both are
-build and test tooling only. `braces` expands the glob patterns in Metro's
-and Jest's own configuration. `sprintf-js` sits under Jest's code-coverage
-config loader, which this project doesn't enable. Neither ever sees input
-from outside the repository.
+**`deepmerge`** (GHSA-gcqx-w48m-w2h4), **`glob`** (GHSA-3g3m-2fjr-6pw4) and
+**`minimatch`** (GHSA-g3hv-75wg-m249) — prototype poisoning, a post-timeout
+traversal after AbortSignal cancellation, and DoS through pattern
+amplification. All three are build, lint and test tooling only. `deepmerge`
+has no fixed release (4.3.1 is the latest and is affected). The `glob` and
+`minimatch` fixes are new majors (14.0.2 and 11.x) that none of their
+consumers accept, and npm's only suggested fix is a downgrade to Jest 25 or
+RN CLI 11, ruled out below. `deepmerge` only merges the project's own CLI
+and Jest config; `minimatch` only matches patterns from the project's own
+ESLint, Jest and Babel config; and `babel-plugin-module-resolver` never
+passes `glob` an AbortSignal. None of them sees input from outside the
+repository.
 
 ### The audit gate
 
