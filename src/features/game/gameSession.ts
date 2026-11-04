@@ -156,6 +156,7 @@ export function createSession(params: {
     hintsUsed: 0,
     isOfflineSession: params.isOfflineSession ?? true,
     previousBestChainLength: params.previousBestChainLength ?? null,
+    endedByPlayer: false,
   };
 }
 
@@ -327,9 +328,30 @@ export const applyPlayerCannotMove = ignoreIfOver((state: GameSessionState): Gam
   endRound(state, 'computer_win'),
 );
 
-/** Player left the round deliberately (Wireframe section 13, "Exit to Home"). */
+/**
+ * The round stopped without anyone choosing to end it — today only the
+ * computer-timeout's End Round (Wireframe §17), where the app stalled rather
+ * than the player deciding to stop. The player choosing to end a game is
+ * `endByPlayer`, not this (D-15).
+ */
 export const abandonSession = ignoreIfOver((state: GameSessionState): GameSessionState =>
   endRound(state, 'abandoned'),
+);
+
+/**
+ * The player ended the game themselves — End Game, or Restart (Delivery Plan
+ * D-15, PRD §7 rule 6).
+ *
+ * Recorded as `computer_win`, so it counts as a game played and its score and
+ * chain count towards the player's bests, the same as any settled result — a
+ * long game earns credit rather than being thrown away. `endedByPlayer` marks
+ * it so it is never shown, or tuned against, as the computer having won.
+ */
+export const endByPlayer = ignoreIfOver(
+  (state: GameSessionState): GameSessionState => ({
+    ...endRound(state, 'computer_win'),
+    endedByPlayer: true,
+  }),
 );
 
 /**

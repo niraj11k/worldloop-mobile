@@ -187,6 +187,10 @@ function validateSession(value: unknown): GameSessionState | null {
     previousBestChainLength: isCount(restored.previousBestChainLength)
       ? restored.previousBestChainLength
       : null,
+    // D-15. Missing from every save written before WL-412, and a saved game
+    // is always one still in play, so `false` is the true value, not a guess —
+    // no format version bump is needed (Data Model §4.1).
+    endedByPlayer: restored.endedByPlayer === true,
   };
 }
 

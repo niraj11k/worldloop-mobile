@@ -99,6 +99,45 @@ export const GAME_OVER_CONTENT: Record<
   },
 };
 
+/**
+ * The End Game result (Wireframe §14, Delivery Plan D-15), shown instead of
+ * `GAME_OVER_CONTENT.computer_win` when the player ended the game themselves.
+ * Recorded as a computer win; never shown as one. Copy verbatim from §14.
+ *
+ * Five tiers, chosen by `endGameMessage` from the game's real numbers — the
+ * first that matches wins, in this order. Avoids "Don't give up", "Better luck
+ * next time" and "You lost" (§14): each frames ending a game as failure.
+ */
+export const END_GAME_CONTENT = {
+  newBest: {
+    headline: 'New Best Chain!',
+    line: (chainLength: number) => `${chainLength} words in a row — your longest yet.`,
+  },
+  oneNewWord: {
+    headline: 'Nice Find!',
+    // Shown in capitals, as words are elsewhere in the app.
+    line: (word: string) =>
+      `You discovered a new word: ${word.toUpperCase()}. It's waiting in Review Words.`,
+  },
+  newWords: {
+    headline: 'Words Collected!',
+    line: (count: number) => `You discovered ${count} new words this game. See them in Review Words.`,
+  },
+  longGame: {
+    headline: 'Well Played!',
+    line: (chainLength: number) =>
+      `${chainLength} words strong. Your next chain starts whenever you're ready.`,
+  },
+  shortGame: {
+    headline: 'Good Game!',
+    line: () => 'Every chain starts with one word. Ready for a fresh letter?',
+  },
+  /** Closes every End Game result. */
+  signOff: 'Sorry to see you go. Hope to see you in the next game!',
+  /** §14's "10+ words": the chain length that counts as a long game. */
+  longGameMinWords: 10,
+} as const;
+
 type DifficultyLevel = GameSessionState['difficulty'];
 
 /** How a difficulty is named in copy ("your Easy game"). */
@@ -224,7 +263,10 @@ export const END_AND_START_NEW_CONFIRM = {
  */
 export const RESTART_ROUND_CONFIRM = {
   title: 'Restart this round?',
-  message: 'Your chain and score for this round will be lost, and a new word dealt.',
+  // D-15: Restart records the game like End Game, so "will be lost" — the
+  // original WL-404 wording — stopped being true. Phrased like END_GAME_CONFIRM.
+  message: (words: number) =>
+    `Your ${words}-word chain is saved to your history, and a new word is dealt.`,
   confirmLabel: 'Restart',
   cancelLabel: 'Keep Playing',
 } as const;

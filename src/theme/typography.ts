@@ -82,6 +82,14 @@ export const typeScale = {
   caption: { fontFamily: fontFamily.monoRegular, fontSize: 12 },
 } as const;
 
+/**
+ * JetBrains Mono's advance width: every glyph is 600 units on a 1000-unit em.
+ * Monospace makes text width pure arithmetic — characters × this × font size —
+ * which is what lets layout decisions about the largest text sizes be checked
+ * in a test rather than eyeballed (Home's stat cards, button labels).
+ */
+export const MONO_ADVANCE_EM = 0.6;
+
 export type TypeRole = keyof typeof typeScale;
 
 /** The display faces, for the "never below 20px" rule. */

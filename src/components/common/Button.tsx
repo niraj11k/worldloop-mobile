@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 
 import {
@@ -13,6 +13,7 @@ import {
   disabledFill,
   pressTranslate,
   MIN_TAP_TARGET,
+  MONO_ADVANCE_EM,
 } from '@theme/theme';
 import type { FillToken } from '@theme/theme';
 
@@ -84,6 +85,35 @@ export interface ButtonProps {
  * secondary, the dropped shadow *is* the whole signal, and it is carried to
  * assistive tech by `accessibilityState` regardless.
  */
+/**
+ * Horizontal space around the narrowest line a label can sit on: a button
+ * inside a card on a screen, the deepest nesting any button has. Screen
+ * padding (16 × 2), card padding (16 × 2) and border (3 × 2), then the
+ * button's own padding (24 × 2) and border (3 × 2). A button in a bottom sheet
+ * (padding 16 × 2, border 4 × 2) has more room, so this is the safe side.
+ */
+const NARROWEST_LABEL_INSET = 16 * 2 + 16 * 2 + 3 * 2 + 24 * 2 + 3 * 2;
+
+/**
+ * How far the OS text setting may scale this label (Design System §4, "Text
+ * scaling"): until its longest word would no longer fit on one line, and never
+ * below 1x. For a short label the cap is above any real OS text scale, so it
+ * never bites; it only takes effect where a word would otherwise break.
+ *
+ * Labels are uppercase in the monospace face, so a word's width is just its
+ * length × the advance width (plus the +0.02em tracking) × the font size.
+ * Past this scale the platform breaks the word mid-way ("RESET STATISTI /
+ * CS"), which reads worse than a slightly smaller whole word.
+ */
+export function labelScaleCap(label: string, screenWidth: number): number | undefined {
+  const longestWord = Math.max(...label.split(/\s+/).map(word => word.length));
+  const { fontSize, letterSpacing } = typeScale.buttonLabel;
+  const wordWidthAtOneX = longestWord * (fontSize * MONO_ADVANCE_EM + letterSpacing);
+  const available = screenWidth - NARROWEST_LABEL_INSET;
+  if (wordWidthAtOneX <= 0 || available <= 0) return undefined;
+  return Math.max(1, available / wordWidthAtOneX);
+}
+
 function fillFor(variant: ButtonVariant, tone: ButtonTone, disabled: boolean): FillToken {
   if (variant === 'secondary') return 'paper';
   if (!disabled) return tone;
@@ -104,6 +134,7 @@ export function Button({
   testID,
 }: ButtonProps): React.JSX.Element {
   const fill = fillFor(variant, tone, disabled);
+  const { width } = useWindowDimensions();
 
   const backgroundColor =
     fill === 'disabledGrape'
@@ -161,8 +192,13 @@ export function Button({
           has to reach 200% without loss of content. The button grows
           vertically instead; every screen lays these out in a column or a
           wrapping row, so nothing else breaks when it does.
+
+          It wraps between words only: the scale is capped where the longest
+          word would stop fitting a line (`labelScaleCap`, Design System §4).
         */}
-        <Text style={[styles.label, { color: textOn(fill) }]}>
+        <Text
+          style={[styles.label, { color: textOn(fill) }]}
+          maxFontSizeMultiplier={labelScaleCap(label, width)}>
           {label}
         </Text>
       </View>

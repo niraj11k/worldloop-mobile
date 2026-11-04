@@ -3,6 +3,7 @@ import {
   KeyboardAvoidingView,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -58,6 +59,16 @@ export interface BottomSheetProps {
   title?: string;
   /** Defaults to true. Set false where a deliberate choice is required. */
   dismissOnScrimPress?: boolean;
+  /**
+   * Let the content scroll under a fixed title when the sheet is taller than
+   * the screen. Without it, a sheet at the largest OS text size loses its
+   * lower controls off the bottom edge with no way to reach them — found at
+   * WL-412, where it made End Game unreachable. Opt-in rather than the
+   * default: `ReportWordSheet` already scrolls its own options list and has
+   * WL-312's keyboard behaviour tuned around that, which an outer scroll
+   * would change.
+   */
+  scrollable?: boolean;
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }
@@ -68,6 +79,7 @@ export function BottomSheet({
   children,
   title,
   dismissOnScrimPress = true,
+  scrollable = false,
   style,
   testID,
 }: BottomSheetProps): React.JSX.Element {
@@ -130,7 +142,17 @@ export function BottomSheet({
             accessibilityViewIsModal
             accessibilityLabel={title}>
             {title ? <Text {...displayTextProps} style={styles.title}>{title}</Text> : null}
-            {children}
+            {scrollable ? (
+              <ScrollView
+                style={styles.scroll}
+                contentContainerStyle={styles.scrollContent}
+                // Only when it has to: a sheet that fits should not rubber-band.
+                alwaysBounceVertical={false}>
+                {children}
+              </ScrollView>
+            ) : (
+              children
+            )}
           </View>
         </SpringIn>
       </KeyboardAvoidingView>
@@ -156,4 +178,7 @@ const styles = StyleSheet.create({
     boxShadow: shadow.modal,
   },
   title: { ...typeScale.screenTitle, color: palette.ink },
+  scroll: { flexShrink: 1 },
+  // The sheet's own gap, kept for content that now sits inside the scroll.
+  scrollContent: { gap: spacing.md },
 });

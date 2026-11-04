@@ -324,9 +324,16 @@ const styles = StyleSheet.create({
   section: { gap: spacing.md },
   sectionTitle: { ...typeScale.caption, color: palette.ink },
   body: { ...typeScale.body, color: palette.ink },
-  settingValue: { ...typeScale.caption, color: palette.ink },
+  // `flexShrink` lets the value wrap within its line rather than run past the
+  // card edge once it has a line to itself.
+  settingValue: { ...typeScale.caption, color: palette.ink, flexShrink: 1 },
+  // Wraps rather than overflowing: at the largest text sizes a label and its
+  // control no longer fit side by side, and the control drops beneath the
+  // label instead of running off the screen (the Haptics toggle did, at iOS
+  // AX3; "Follows your device" was clipped on Android at 2.0x).
   settingRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.md,

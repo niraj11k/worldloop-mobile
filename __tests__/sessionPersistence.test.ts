@@ -212,6 +212,15 @@ describe('saves from every shipped format keep restoring', () => {
     expect(result.savedAt).toBeNull();
   });
 
+  it('reads every save from before WL-412 as a game not ended by the player', () => {
+    // D-15 added `endedByPlayer` without a format bump: a saved game is always
+    // one still in play, so `false` is the true value (Data Model §4.1).
+    Object.values(FIXTURES).forEach(raw => {
+      const result = readSavedSession(raw);
+      expect(result.kind === 'restored' && result.session.endedByPlayer).toBe(false);
+    });
+  });
+
   it('reads the last-played time from a v2 save', () => {
     const result = readSavedSession(FIXTURES[2]!);
     expect(result.kind === 'restored' && result.savedAt).toBe('2026-10-30T19:45:00.000Z');

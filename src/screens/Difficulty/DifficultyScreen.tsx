@@ -11,7 +11,7 @@ import {
   resumeGameLabel,
   unpausableGameNote,
 } from '@constants/gameConstants';
-import { abandonSession } from '@features/game/gameSession';
+import { endByPlayer } from '@features/game/gameSession';
 import { difficultyStartFor } from '@features/game/savedGames';
 import { useProfileStore } from '@store/useProfileStore';
 import { useSavedRoundStore } from '@store/useSavedRoundStore';
@@ -69,14 +69,15 @@ export function DifficultyScreen({ navigation }: Props): React.JSX.Element {
   };
 
   /**
-   * End and Start New: the paused game is recorded as `abandoned`, the same
-   * as End Game anywhere else (WL-410's interim recording until WL-412), and a
-   * new game of the same difficulty starts.
+   * End and Start New: the paused game is recorded as ended by the player, the
+   * same as End Game anywhere else (D-15), and a new game of the same
+   * difficulty starts. No result screen: the player isn't looking at the game
+   * being ended, and asked to start another, as with Restart (Wireframe §14).
    */
   const handleEndPausedAndStart = async () => {
     setConfirmEndPaused(false);
     if (pausedGame !== null) {
-      recordRound(abandonSession(pausedGame));
+      recordRound(endByPlayer(pausedGame));
     }
     await clearPaused();
     navigation.navigate('Game', { difficulty: selected });

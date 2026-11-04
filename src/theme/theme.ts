@@ -34,6 +34,7 @@ import {
   ornamentScale,
   displayTextProps,
   MAX_DISPLAY_FONT_SCALE,
+  MONO_ADVANCE_EM,
 } from './typography';
 import type { FillToken } from './palette';
 
@@ -45,6 +46,7 @@ export {
   ornamentScale,
   displayTextProps,
   MAX_DISPLAY_FONT_SCALE,
+  MONO_ADVANCE_EM,
   disabledFill,
   inkMuted,
   scrim,
@@ -236,6 +238,35 @@ export const MAX_KEY_FONT_SCALE = 1.3;
  * the OS keyboard can honour and this one cannot.
  */
 export const MAX_SYSTEM_KEYBOARD_FONT_SCALE = 1.6;
+
+/**
+ * The OS text scale past which Home's two stat cards stack instead of sitting
+ * side by side (WL-412).
+ *
+ * A card's longest single word has to fit a half-width card, or the line
+ * breaks mid-word ("Words Dis / covered" — found at Android's 2.0x).
+ * "Discovered" is 10 characters of the 12px caption face at 0.6em advance:
+ * 72px at 1x. On the narrowest screen in the WL-005 matrix (iPhone SE,
+ * 375pt) a half-width card leaves about 125px for text, so it fits up to
+ * ~1.7x; 1.5 leaves margin for the card's border and rounding.
+ * `__tests__/typography.test.ts` pins this arithmetic.
+ */
+export const MAX_SIDE_BY_SIDE_STATS_FONT_SCALE = 1.5;
+
+/**
+ * The OS text scale past which `ReportWordSheet` scrolls as a whole instead
+ * of squeezing its options list.
+ *
+ * WL-312 has the list give up space when the keyboard takes it, which keeps
+ * the comment field and Send Report in view. At large text the fields and
+ * buttons alone fill a small phone, so the same squeeze shrinks the list to a
+ * sliver: no report type can be read or chosen, and Send Report needs one.
+ * Found at iOS's AX3. Up to this scale the WL-312 behaviour is kept exactly;
+ * past it the whole sheet scrolls and the list keeps its height. 1.3 covers
+ * every standard (non-accessibility) iOS size up to XXL and Android's larger
+ * presets.
+ */
+export const MAX_SQUEEZED_SHEET_FONT_SCALE = 1.3;
 
 /**
  * The widest a column of content is allowed to get (WL-409).

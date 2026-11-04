@@ -21,6 +21,7 @@ import {
   MAX_DISPLAY_FONT_SCALE,
   displayTextProps,
 } from '@theme/typography';
+import { MAX_SIDE_BY_SIDE_STATS_FONT_SCALE, MONO_ADVANCE_EM } from '@theme/theme';
 
 describe('Design System §2 rules', () => {
   it('never uses the display face below 20px', () => {
@@ -104,5 +105,25 @@ describe('display text scaling (WL-408)', () => {
     );
 
     expect(mono.map(([role]) => role).sort()).toEqual(['body', 'buttonLabel', 'caption']);
+  });
+});
+
+describe('Home stat cards (WL-412)', () => {
+  /**
+   * Below `MAX_SIDE_BY_SIDE_STATS_FONT_SCALE` the two cards sit side by side,
+   * so "Discovered" — the longest single word on either — has to fit a
+   * half-width card on the narrowest screen without breaking mid-word.
+   * iPhone SE 375pt, minus Home's padding (16 × 2), the gap between the cards
+   * (16), and each card's own padding (16 × 2) and border (3 × 2).
+   */
+  const HALF_CARD_TEXT_WIDTH = (375 - 16 * 2 - 16) / 2 - 16 * 2 - 3 * 2;
+
+  it('keeps "Discovered" whole at every scale the cards sit side by side', () => {
+    const width =
+      'Discovered'.length *
+      MONO_ADVANCE_EM *
+      typeScale.caption.fontSize *
+      MAX_SIDE_BY_SIDE_STATS_FONT_SCALE;
+    expect(width).toBeLessThanOrEqual(HALF_CARD_TEXT_WIDTH);
   });
 });

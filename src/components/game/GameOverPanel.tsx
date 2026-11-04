@@ -3,19 +3,20 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@components/common/Button';
 import { Card } from '@components/common/Card';
-import { GAME_OVER_CONTENT } from '@constants/gameConstants';
+import { gameOverCopy } from '@features/game/endGameMessage';
 import { isSettledResult } from '@features/scoring/scoringEngine';
 import { palette, spacing, typeScale, displayTextProps } from '@theme/theme';
-import type { GameSessionState, GameStatus } from '@app-types/game';
+import type { GameSessionState } from '@app-types/game';
 
 interface GameOverPanelProps {
   session: GameSessionState;
   /**
-   * How many words in this round the player had never played before (WL-503).
-   * The line is omitted at 0 — "New words discovered: 0" is a scoreboard for
-   * something the player did not fail at.
+   * The words in this round the player had never played before (WL-503), in
+   * the order found. The stat line is omitted when there are none — "New words
+   * discovered: 0" is a scoreboard for something the player did not fail at —
+   * and the End Game message names them when there are (D-15).
    */
-  newWordsDiscovered: number;
+  newWords: string[];
   onReviewWords: () => void;
   onPlayAgain: () => void;
   onHome: () => void;
@@ -39,15 +40,22 @@ interface GameOverPanelProps {
  * not a duplicate to collapse: a round's chain only ever grows until the
  * round ends, so both labels describe `session.chain.length` — matching the
  * Wireframe mockup's own example, which shows them equal (18/18).
+ *
+ * ## When the player ended the game (D-15)
+ *
+ * End Game is recorded as `computer_win`, but the panel never says so: it
+ * shows one of §14's five encouraging messages, chosen from this game's real
+ * numbers, then the sign-off. A genuine computer win keeps
+ * `GAME_OVER_CONTENT`'s copy. All of that is decided in `gameOverCopy`, which
+ * is pure and unit-tested; this component only lays it out.
  */
 export function GameOverPanel({
   session,
-  newWordsDiscovered,
+  newWords,
   onReviewWords,
   onPlayAgain,
   onHome,
 }: GameOverPanelProps): React.JSX.Element {
-  const content = GAME_OVER_CONTENT[session.status as Exclude<GameStatus, 'active'>];
   const wordsPlayed = session.chain.length;
 
   // The same settled-status gate `roundEndBonus` and the profile's own
@@ -58,11 +66,14 @@ export function GameOverPanel({
     session.previousBestChainLength !== null &&
     session.chain.length > session.previousBestChainLength;
 
+  const copy = gameOverCopy({ session, isPersonalBest, newWords });
+
   return (
     <Card style={styles.card}>
       <Text style={styles.label}>Round Complete</Text>
-      <Text {...displayTextProps} style={styles.headline}>{content.headline}</Text>
-      <Text style={styles.description}>{content.description}</Text>
+      <Text {...displayTextProps} style={styles.headline}>{copy.headline}</Text>
+      <Text style={styles.description}>{copy.description}</Text>
+      {copy.signOff !== null && <Text style={styles.signOff}>{copy.signOff}</Text>}
 
       <View style={styles.stats}>
         <Text style={styles.statLine}>Score: {session.score}</Text>
@@ -75,12 +86,12 @@ export function GameOverPanel({
           off the profile rather than the chain — the profile is what knows
           whether the player had ever played the word before.
         */}
-        {newWordsDiscovered > 0 && (
+        {copy.showNewWordsStat && (
           <Text style={styles.statLine}>
-            New words discovered: {newWordsDiscovered}
+            New words discovered: {newWords.length}
           </Text>
         )}
-        {isPersonalBest && (
+        {copy.showPersonalBestStat && (
           <Text style={styles.statLine}>New personal best!</Text>
         )}
       </View>
@@ -99,6 +110,7 @@ const styles = StyleSheet.create({
   label: { ...typeScale.body, color: palette.ink },
   headline: { ...typeScale.wordmark, color: palette.ink, textAlign: 'center' },
   description: { ...typeScale.body, color: palette.ink, textAlign: 'center' },
+  signOff: { ...typeScale.body, color: palette.ink, textAlign: 'center' },
   stats: { alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },
   statLine: { ...typeScale.body, color: palette.ink },
   actions: {

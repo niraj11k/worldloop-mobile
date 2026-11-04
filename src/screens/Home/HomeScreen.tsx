@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@navigation/types';
 import { Button } from '@components/common/Button';
@@ -14,12 +14,20 @@ import {
   lostSaveNotice,
   resumeGameLabel,
 } from '@constants/gameConstants';
-import { abandonSession } from '@features/game/gameSession';
+import { endByPlayer } from '@features/game/gameSession';
 import { canPause, daysSincePlayed } from '@features/game/savedGames';
 import { useProfileStore } from '@store/useProfileStore';
 import { useSavedRoundStore } from '@store/useSavedRoundStore';
+import { useNowOnReturn } from '@hooks/useNowOnReturn';
 import type { GameSessionState } from '@app-types/game';
-import { palette, spacing, typeScale, displayTextProps, CONTENT_MAX_WIDTH } from '@theme/theme';
+import {
+  palette,
+  spacing,
+  typeScale,
+  displayTextProps,
+  CONTENT_MAX_WIDTH,
+  MAX_SIDE_BY_SIDE_STATS_FONT_SCALE,
+} from '@theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -29,7 +37,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
  * WL-204 component set (WL-405).
  *
  * Required elements, all present: Start Game, the Resume entries for saved
- * games (D-13), Best Score, Best Streak, Word Review, How to Play, Settings.
+ * games (D-13), Best Score, Words Discovered (D-15), Word Review, How to Play,
+ * Settings.
  * Explicitly *not* here, per section 5's own
  * "important decision": no shop, social feed, leaderboard, or school
  * dashboard — "they would compete with the main action."
@@ -72,9 +81,15 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
   /** Games an app update couldn't carry over, reported once (D-14). */
   const lostSaves = useSavedRoundStore(state => state.lostSaves);
   const dismissLostSaves = useSavedRoundStore(state => state.dismissLostSaves);
-  // Read per render rather than once: Home stays mounted under the game, and a
-  // label computed when the app opened would still say "today" tomorrow.
-  const now = new Date();
+  // Refreshed when the player comes back to the app or to Home, not merely per
+  // render: Home stays mounted, so a render-time clock went stale overnight.
+  const now = useNowOnReturn();
+  /**
+   * WL-412: past this text size "Words Discovered" can't fit a half-width
+   * card without breaking mid-word, so the cards stack full-width.
+   */
+  const { fontScale } = useWindowDimensions();
+  const stackStats = fontScale > MAX_SIDE_BY_SIDE_STATS_FONT_SCALE;
   /**
    * Where the player was heading when an open game got in the way: D-13 rule
    * 3 means it has to be paused or ended first. `null` while no choice is
@@ -148,15 +163,15 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
     });
 
   /**
-   * End the open game, then carry on. It is ended here rather than when the
-   * next game is dealt, so it is recorded as `abandoned` against the profile
-   * the same way End Game on the game screen records it — one rule, both
-   * paths.
+   * End the open game, then carry on. It is recorded as ended by the player,
+   * the same way End Game on the game screen records it (D-15) — one rule,
+   * every path. No result screen: the player isn't looking at this game and is
+   * on the way to another, as with Restart (Wireframe §14).
    */
   const handleEndOpenGame = () =>
     settleOpenGame(async () => {
       if (openGame !== null) {
-        recordRound(abandonSession(openGame));
+        recordRound(endByPlayer(openGame));
       }
       await clearOpenGame();
     });
@@ -274,16 +289,18 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
         for assistive tech so each card reads as one phrase ("Best score: 120")
         rather than a label and a number that arrive separately.
 
-        "Best streak" is the consecutive-*wins* streak — see `GuestStreak` for
-        why that reading of an under-specified field, and the WL-402 note in
-        the Delivery Plan for the decision this task did not overrule.
+        The second card is "Words discovered" (D-15, Wireframe §5), not the
+        win streak it replaced: End Game is recorded as a computer win, which
+        resets the streak, so it would read 0 for nearly every player. Words
+        discovered only grows, and measures what the game is for. The streak
+        is still kept in the profile, unused, rather than deleted.
       */}
         {profile === null ? null : hasPlayed ? (
-          <View style={styles.stats}>
+          <View style={[styles.stats, stackStats && styles.statsStacked]}>
             <Card
               fill="tangerine"
               rotation={-2}
-              style={styles.statCard}
+              style={[styles.statCard, stackStats && styles.statCardStacked]}
               accessibilityLabel={`Best score: ${profile.bests.score}`}>
               <Text style={styles.statLabel}>Best Score</Text>
               <Text {...displayTextProps} style={styles.statValue}>
@@ -293,11 +310,11 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
             <Card
               fill="sunbeam"
               rotation={3}
-              style={styles.statCard}
-              accessibilityLabel={`Best streak: ${profile.localStreak.best}`}>
-              <Text style={styles.statLabel}>Best Streak</Text>
+              style={[styles.statCard, stackStats && styles.statCardStacked]}
+              accessibilityLabel={`Words discovered: ${profile.discoveredWords.length}`}>
+              <Text style={styles.statLabel}>Words Discovered</Text>
               <Text {...displayTextProps} style={styles.statValue}>
-                {profile.localStreak.best}
+                {profile.discoveredWords.length}
               </Text>
             </Card>
           </View>
@@ -432,6 +449,10 @@ const styles = StyleSheet.create({
   // the full width because it is the one thing this screen exists for.
   fullWidthButton: { alignSelf: 'stretch' },
   stats: { flexDirection: 'row', gap: spacing.lg },
+  statsStacked: { flexDirection: 'column' },
+  // `flex: 1` shares a row's width; in a column it would share a height the
+  // stack doesn't have, so stacked cards size to their content instead.
+  statCardStacked: { flex: 0 },
   // Equal halves, so neither stat reads as the more important of the two.
   statCard: { flex: 1, alignItems: 'center', gap: spacing.xs },
   statLabel: { ...typeScale.caption, color: palette.ink },
