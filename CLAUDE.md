@@ -27,6 +27,8 @@ All in `proj-docs/`, all prefixed `WordLoop_`. Cite them by section number in co
 | `WordLoop_Word_List_Licence_Review.md` | D-01/D-02 decision record: word-list source (ESDB), licence terms, required attribution text, size-tier cutoffs |
 | `WordLoop_Store_Submission_Checklist.md` | Everything to verify or complete before submitting to the App Store / Google Play, cross-referenced to its source doc |
 | `WordLoop_Delivery_Plan.md` | Phases, task breakdown, open decisions (D-01..D-10), milestones |
+| `WordLoop_Beta_Release_Readiness_Report.md` | Beta (= M2 playtest build) readiness as of 2026-11-11: state snapshot, pending engineering, blocked items, suggested sequence. A point-in-time analysis; the Delivery Plan wins on any disagreement |
+| `WordLoop_Beta_Blocker_Register.md` | Numbered register (BR-01..BR-31) of beta-blocking, follow-through, post-beta and doc-debt items, with state, estimate, source and unblock action. Tick items off here as they close |
 
 ## Status
 Planning is complete; this is now an active build. The reference docs above are the source of truth — treat contradictions between code and docs as bugs to flag, not silently resolve. Several docs carry unresolved decisions; check the Delivery Plan's decision log (section 3) before building against anything marked open or `[Inference]`.

@@ -7,6 +7,7 @@ import {
   replyCountForLetter,
   maxReplyCount,
   computerPlayableEntriesStartingWith,
+  allowedEntriesStartingWith,
   exampleWordForHint,
   setRuntimeExclusions,
   getRuntimeExclusions,
@@ -173,6 +174,28 @@ describe('reply-count index (WL-106)', () => {
   it('returns 0 for a non-letter', () => {
     expect(replyCountForLetter('1', new Set())).toBe(0);
     expect(replyCountForLetter('', new Set())).toBe(0);
+  });
+
+  // BR-09: the totals used to include 2-letter entries the rule engine rejects
+  // as too short, so a letter could report replies when none were playable.
+  it('counts only words the rule engine would accept, for every letter', () => {
+    for (let code = 97; code <= 122; code += 1) {
+      const letter = String.fromCharCode(code);
+      const playable = allowedEntriesStartingWith(letter).filter(
+        entry => entry.normalizedWord.length >= MIN_WORD_LENGTH,
+      ).length;
+      expect(replyCountForLetter(letter, new Set())).toBe(playable);
+    }
+  });
+
+  it('reaches exactly 0 once every playable word for a letter is used', () => {
+    const used = new Set(
+      allowedEntriesStartingWith('x')
+        .map(entry => entry.normalizedWord)
+        .filter(word => word.length >= MIN_WORD_LENGTH),
+    );
+    expect(used.size).toBeGreaterThan(0);
+    expect(replyCountForLetter('x', used)).toBe(0);
   });
 
   it('exposes the maximum per-letter count for normalization', () => {

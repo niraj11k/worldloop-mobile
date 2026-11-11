@@ -94,7 +94,7 @@ function printReport(report: SimulationReport): void {
   console.log(`  Mean score              ${report.meanScore.toFixed(1)}`);
   console.log(
     `  Length-gap endings      ${report.phantomDeadEndCount}/${report.rounds}  ` +
-      '(see "Finding 2" in roundSimulator.ts — expected to be common at Medium/Hard, not a bug)',
+      '(see "Finding 2" in roundSimulator.ts — should be 0; non-zero means reply counts drifted)',
   );
 }
 

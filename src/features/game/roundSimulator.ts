@@ -72,34 +72,26 @@
  *    question for WL-605, not this task — but the simulator did its job:
  *    this is now visible before a player ever saw it.
  *
- * ## Finding 2: `replyCountForLetter` undercounts what it excludes, and this
- * is not rare
+ * ## Finding 2 (FIXED, BR-09): `replyCountForLetter` counted words the rule
+ * engine rejects
  *
- * WL-108 found and fixed a gap where the computer's own move generation
- * didn't respect `MIN_WORD_LENGTH`. The *reply-count* precomputation
- * (WL-106, `scripts/generate-dictionary.py`'s `reply_counts_by_letter`) has
- * the same gap and was never patched to match, because doing so means
- * re-deriving the bundled asset. The first version of this module checked
- * only the round-*start* case (empty chain) and found the gap could never
- * fire — the thinnest letter still had 115 replies. That check was
- * incomplete: it is a **round-start** claim, not a general one. Once a round
- * runs long enough (see Finding 1 — routinely, not rarely) for a letter's
- * longer words to be genuinely exhausted, what's left can be entirely
- * sub-3-letter entries that `replyCountForLetter` still counts as available
- * replies. Measured: this fired on **29 of 30 Medium rounds and all 30 Hard
- * rounds** in the same run above.
+ * WL-108 fixed `MIN_WORD_LENGTH` for the computer's own move generation, but
+ * the *reply-count* precomputation (WL-106,
+ * `scripts/generate-dictionary.py`'s `reply_counts_by_letter`) still counted
+ * 2-letter entries the player can never submit. Once a letter's longer words
+ * were exhausted (routine, per Finding 1) the count stayed above zero with
+ * nothing playable behind it. Measured before the fix: 29 of 30 Medium rounds
+ * and all 30 Hard rounds. The shipped `GameScreen`/`gameSession` would have
+ * read that phantom count as "the player can still move" and waited forever.
  *
- * This module treats it as `phantomDeadEnd` and falls back to ending the
- * round (`computer_win` — no real submission could satisfy the length rule
- * either) rather than crashing or looping, which is the objectively correct
- * classification. **The shipped `GameScreen`/`gameSession` have no
- * equivalent fallback.** They would read `replyCountForLetter`'s phantom
- * nonzero count as "the player can still move" and simply wait — a real
- * player facing this would be legitimately, correctly stuck with no word
- * the rule engine would ever accept, and the app would not recognize the
- * round as over. That is a genuine correctness gap in shipped code,
- * surfaced by building this tool, not fixed by it — flagged in the Delivery
- * Plan under WL-106 rather than silently patched here.
+ * The generator now applies `MIN_WORD_LENGTH`, so the count is exact and the
+ * session's existing zero-reply handling (`applyComputerMove` ->
+ * `computer_win`, `applyComputerCannotMove` -> `draw`) covers the case with no
+ * `gameSession` change. After the fix the same run reports 0/30 at both
+ * difficulties. `phantomDeadEnd` stays as a tripwire: a non-zero count means
+ * the bundled reply counts have drifted from the rule engine again.
+ * `__tests__/dictionaryService.test.ts` pins the counts to a recount of the
+ * asset; `__tests__/stuckPlayer.test.ts` covers the end-to-end round endings.
  *
  * ## "Dead-letter frequency"
  *
@@ -158,7 +150,7 @@ export interface RoundOutcome {
   chainLength: number;
   /** The player's score (`gameSession.score` never counts the computer's moves). */
   score: number;
-  /** See Finding 2 in the module docblock. Not rare — track it, don't assume it. */
+  /** See Finding 2 in the module docblock. Should always be false since BR-09; true means the reply counts drifted. */
   phantomDeadEnd: boolean;
 }
 
@@ -216,7 +208,8 @@ export async function simulateRound(params: {
     const playerWord = pickPlayerWord(session.requiredLetter, usedBeforePlayer, random);
     if (playerWord === null) {
       // replyCountForLetter said there was a reply; there wasn't one this
-      // module's own filtering could find. See Finding 2 — routine, not a bug.
+      // module's own filtering could find. Since BR-09 this should never fire;
+      // if it does, the bundled reply counts have drifted (see Finding 2).
       phantomDeadEnd = true;
       session = applyPlayerCannotMove(session);
       break;
@@ -304,7 +297,7 @@ export interface SimulationReport {
   drawRate: number;
   meanChainLength: number;
   meanScore: number;
-  /** See Finding 2. Expect this close to `rounds` at Medium/Hard, not close to 0. */
+  /** See Finding 2. Expect 0 since BR-09; anything else means the reply counts drifted. */
   phantomDeadEndCount: number;
 }
 
