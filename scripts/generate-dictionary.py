@@ -67,6 +67,11 @@ ESDB_TAG = "rel-2026.02.25"
 SOURCE_NAME = "English Speller Database (ESDB), formerly SCOWL"
 
 SIZE_CAP = 70
+# Shortest word the rule engine accepts (src/constants/gameConstants.ts
+# MIN_WORD_LENGTH; PRD section 8). Duplicated because this script cannot
+# import TypeScript. __tests__/dictionaryService.test.ts recounts the shipped
+# asset against the TS constant, so drift in either direction fails CI (BR-09).
+MIN_WORD_LENGTH = 3
 ALLOWED_SPELLINGS = ("_", "A", "B", "Z")
 EXCLUDED_REGIONS = ("AU",)
 EXCLUDED_CATEGORIES = ("hacker", "roman-numerals")
@@ -271,7 +276,7 @@ def pack_entries(entries: list[dict]) -> str:
 
 
 def reply_counts_by_letter(entries: list[dict]) -> list[int]:
-    """Counts allowed words per first letter, a-z (WL-106).
+    """Counts player-submittable words per first letter, a-z (WL-106, BR-09).
 
     This is the difficulty engine's `option_reduction_score` input: PRD
     section 10 defines it for both Medium and Hard as "the number of valid
@@ -279,14 +284,22 @@ def reply_counts_by_letter(entries: list[dict]) -> list[int]:
     set (`isAllowed`) rather than the narrower computer-playable tier the
     computer draws its own move from (PRD section 8.7).
 
+    "Submittable" has to include the length rule. The rule engine rejects
+    anything under MIN_WORD_LENGTH before it looks at the dictionary, so a
+    2-letter entry that is `isAllowed` can never actually be played. Counting
+    it made `replyCountForLetter` report a phantom reply once a letter's
+    real words ran out, and the app waited on a player who had none (BR-09,
+    found by WL-113).
+
     Precomputed here because doing it per turn is O(candidates x dictionary)
     and would stall the computer's turn; at runtime the only work left is
     subtracting the handful of words already used this round.
     """
     counts = [0] * 26
     for entry in entries:
-        if entry["isAllowed"]:
-            counts[ord(entry["normalizedWord"][0]) - ord("a")] += 1
+        word = entry["normalizedWord"]
+        if entry["isAllowed"] and len(word) >= MIN_WORD_LENGTH:
+            counts[ord(word[0]) - ord("a")] += 1
     return counts
 
 

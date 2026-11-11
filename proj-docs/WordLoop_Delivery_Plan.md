@@ -924,6 +924,7 @@ filtering and the rule engine fails loudly rather than silently miscounting.
    leaving a genuinely, correctly stuck player in a round the app never recognizes as over.
    Flagged for a fix against `scripts/generate-dictionary.py`'s `reply_counts_by_letter`
    (WL-106), not addressed here.
+   **Fixed under WL-114 (2026-11-11).**
 
 > **Phase 1 gate:** the simulator reports a plausible win-rate spread across the three
 > difficulties (Easy clearly player-favoured, Hard 20–40% per section 2). If Hard sits at
@@ -933,6 +934,35 @@ filtering and the rule engine fails loudly rather than silently miscounting.
 > WL-605 (gated on this task) is where it gets acted on, informed by whichever of "Hard is
 > over-tuned" or "the simulated player needs to be less weak" (or both) further
 > investigation points to.
+
+**WL-114 · Reply counts must respect the minimum word length** — S · 0.5–1d · WL-106, WL-113 — **DONE 2026-11-11**
+Closes WL-113 finding 3 (register item BR-09). `reply_counts_by_letter` counted every
+`isAllowed` word, including the 410 under `MIN_WORD_LENGTH` that the rule engine rejects before
+it ever reads the dictionary. Once a letter's playable words ran out, `replyCountForLetter`
+still reported replies, so `applyComputerMove` never ended the round and a player with no legal
+word was left waiting.
+*Done when:* the reply counts exclude sub-length words, the pack is regenerated, the fixture
+verifier and the simulator are re-run, and the stuck-player ending is covered by a test. ✅
+
+**Fix.** `scripts/generate-dictionary.py` now carries `MIN_WORD_LENGTH = 3` (mirrors
+`src/constants/gameConstants.ts`) and `reply_counts_by_letter` skips shorter words. Only
+`replyCounts` changed in `dictionary.pack.json`: `records`, `wordCount` and `sizeTiers` are
+byte-identical, so `definitions.pack.json` stays aligned. 215 phantom replies removed across the
+26 letters (per-letter reductions 1–17; A lost the most, Z lost 1).
+
+**No `gameSession`/`GameScreen` change was needed.** The session already ends the round on a
+zero count (`applyComputerMove` → `computer_win`, `applyComputerCannotMove` → `draw`). The count
+was wrong, not the handling. Fixing the source also fixes the hint sheet's "N possible words"
+and the option-reduction score, which read the same count.
+
+**Verified.** `npm run dictionary:verify` passes (709 cases). `npm run simulate -- --rounds 30
+--seed 1`: "length-gap endings" (phantom dead ends) went from **29/30 Medium and 30/30 Hard to
+0/30 at both**. Win rates are unchanged within sampling noise (Medium 3.3%, Hard 0.0% at 30
+rounds), so WL-605's tuning baseline is not disturbed. Full suite 482 passing. Two tests pin it:
+`dictionaryService.test.ts` recounts every letter from the asset against `MIN_WORD_LENGTH`
+(fails if the Python and TS constants drift), and `stuckPlayer.test.ts` runs both round endings
+through the real dictionary. All four new tests fail against the old pack. The simulator's
+`phantomDeadEnd` fallback stays as a tripwire and its wording now says "should be 0".
 
 ---
 
@@ -3573,7 +3603,7 @@ The section 2 metrics, plus invalid-reason distribution and win rate by difficul
 > own. Most of it is standard Firebase reporting (D-12), so this is mainly configuration.
 > Gates 1–2 come from moderator notes, not the dashboard.
 
-**WL-605 · Difficulty and scoring tuning pass** — M · 2d · WL-113, WL-604
+**WL-605 · Difficulty and scoring tuning pass** — M · 2d · WL-113, WL-114, WL-604
 Use the simulator plus internal play to bring Hard into the 20–40% band and sanity-check
 score magnitudes. Architecture §6 and §7 both label their formulas first-pass drafts
 explicitly awaiting this.
